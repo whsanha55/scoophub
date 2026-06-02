@@ -1,0 +1,15 @@
+services:
+  app:
+    build: .
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      DB_HOST: postgres
+    ports:
+      - "127.0.0.1:8000:8000"
+    networks:
+      - infra
+
+networks:
+  infra:
+    external: true
