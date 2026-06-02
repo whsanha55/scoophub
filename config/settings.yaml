@@ -1,0 +1,17 @@
+crawlers:
+  news:
+    schedule_minutes: 15
+    cutoff_minutes: 30
+    source_timeout_seconds: 10
+    retry_count: 3
+    retry_delay_seconds: 10
+  weather:
+    schedule_minutes: 30
+    source_timeout_seconds: 15
+
+api:
+  default_minutes: 30
+  max_limit: 100
+
+retention:
+  days: 30
