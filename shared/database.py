@@ -1,0 +1,122 @@
+# shared/database.py
+from __future__ import annotations
+
+import logging
+from typing import Any
+
+import asyncpg
+
+logger = logging.getLogger(__name__)
+
+SCHEMA_SQL = """
+-- News Context
+CREATE TABLE IF NOT EXISTS news_articles (
+    id SERIAL PRIMARY KEY,
+    source TEXT NOT NULL,
+    title TEXT NOT NULL,
+    description TEXT,
+    url TEXT UNIQUE NOT NULL,
+    published_at TIMESTAMPTZ,
+    fetched_at TIMESTAMPTZ NOT NULL,
+    category TEXT,
+    importance TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_news_published ON news_articles(published_at DESC);
+CREATE INDEX IF NOT EXISTS idx_news_category ON news_articles(category);
+CREATE INDEX IF NOT EXISTS idx_news_fetched ON news_articles(fetched_at DESC);
+
+-- Weather Context
+CREATE TABLE IF NOT EXISTS weather_snapshots (
+    id SERIAL PRIMARY KEY,
+    location TEXT NOT NULL DEFAULT 'seoul',
+    fetched_at TIMESTAMPTZ NOT NULL,
+    temperature REAL,
+    feels_like REAL,
+    humidity INTEGER,
+    wind_speed REAL,
+    wind_direction TEXT,
+    condition TEXT,
+    precip_mm REAL,
+    rain_chance INTEGER,
+    pm10 REAL,
+    pm10_grade TEXT,
+    pm25 REAL,
+    pm25_grade TEXT,
+    ozone REAL,
+    uv_index REAL,
+    uv_grade TEXT,
+    weekly_forecast JSONB,
+    raw_json JSONB
+);
+
+CREATE INDEX IF NOT EXISTS idx_weather_location_time ON weather_snapshots(location, fetched_at DESC);
+
+-- Shared Kernel (EAV metadata)
+CREATE TABLE IF NOT EXISTS crawler_metadata (
+    id SERIAL PRIMARY KEY,
+    crawler TEXT NOT NULL,
+    meta_key TEXT NOT NULL,
+    meta_value TEXT NOT NULL,
+    deleted BOOLEAN DEFAULT FALSE NOT NULL,
+    deleted_at TIMESTAMPTZ,
+    created_at TIMESTAMPTZ DEFAULT NOW() NOT NULL,
+    updated_at TIMESTAMPTZ DEFAULT NOW() NOT NULL
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_crawler_meta_active
+    ON crawler_metadata(crawler, meta_key) WHERE deleted = FALSE;
+
+-- Crawl Logs
+CREATE TABLE IF NOT EXISTS crawl_logs (
+    id SERIAL PRIMARY KEY,
+    crawler TEXT NOT NULL,
+    status TEXT NOT NULL,
+    items_fetched INTEGER DEFAULT 0,
+    items_new INTEGER DEFAULT 0,
+    error_message TEXT,
+    started_at TIMESTAMPTZ NOT NULL,
+    finished_at TIMESTAMPTZ
+);
+
+CREATE INDEX IF NOT EXISTS idx_crawl_logs_crawler ON crawl_logs(crawler, started_at DESC);
+"""
+
+
+class Database:
+    def __init__(self, database_url: str):
+        self._database_url = database_url
+        self._pool: asyncpg.Pool | None = None
+
+    @property
+    async def pool(self) -> asyncpg.Pool:
+        if self._pool is None:
+            self._pool = await asyncpg.create_pool(self._database_url, min_size=2, max_size=10)
+        return self._pool
+
+    async def initialize(self) -> None:
+        pool = await self.pool
+        async with pool.acquire() as conn:
+            await conn.execute(SCHEMA_SQL)
+        logger.info("Database schema initialized")
+
+    async def close(self) -> None:
+        if self._pool:
+            await self._pool.close()
+            self._pool = None
+
+    async def execute(self, query: str, *args: Any) -> str:
+        pool = await self.pool
+        return await pool.execute(query, *args)
+
+    async def fetch(self, query: str, *args: Any) -> list[asyncpg.Record]:
+        pool = await self.pool
+        return await pool.fetch(query, *args)
+
+    async def fetchrow(self, query: str, *args: Any) -> asyncpg.Record | None:
+        pool = await self.pool
+        return await pool.fetchrow(query, *args)
+
+    async def fetchval(self, query: str, *args: Any) -> Any:
+        pool = await self.pool
+        return await pool.fetchval(query, *args)
