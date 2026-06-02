@@ -59,6 +59,13 @@ def create_app(db: Database | None = None) -> FastAPI:
     from app.news.scheduler import register_jobs as news_register_jobs
 
     app.dependency_overrides[news_get_db] = lambda: _db
+
+    # Sources router MUST be registered BEFORE news routes
+    # to prevent /api/news/{article_id} from matching "sources"
+    from app.news.sources_router import router as news_sources_router, _get_db as ns_get_db
+    app.dependency_overrides[ns_get_db] = lambda: _db
+    app.include_router(news_sources_router)
+
     app.include_router(news_router)
 
     with open("config/settings.yaml") as f:

@@ -11,7 +11,7 @@ import httpx
 
 from app.news.classifier import NewsClassifier
 from app.news.filter_rules import is_within_cutoff
-from app.news.sources import RssSource, get_active_sources
+from app.news.sources import RssSource
 from app.core.base_crawler import BaseCrawler, CrawlResult
 
 logger = logging.getLogger(__name__)
@@ -49,8 +49,16 @@ class NewsCrawler(BaseCrawler):
         self.cutoff_minutes = cutoff_minutes
         self.classifier = NewsClassifier()
 
+    async def _get_sources(self) -> list[RssSource]:
+        """Load active sources from DB."""
+        rows = await self.db.fetch(
+            "SELECT name, url, active FROM crawl_sources "
+            "WHERE crawler='news' AND active=TRUE ORDER BY id"
+        )
+        return [RssSource(name=r["name"], url=r["url"], active=r["active"]) for r in rows]
+
     async def fetch(self) -> CrawlResult:
-        sources = get_active_sources()
+        sources = await self._get_sources()
         total_fetched = 0
         total_new = 0
         errors: list[str] = []

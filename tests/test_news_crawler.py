@@ -6,6 +6,11 @@ from app.news.crawler import NewsCrawler
 
 @pytest.mark.asyncio
 async def test_crawler_stores_articles(db):
+    # Insert a source for the crawler to find
+    await db.execute(
+        "INSERT INTO crawl_sources (crawler, name, url, active) VALUES ('news', 'Test', 'https://test.com/rss', TRUE)"
+    )
+
     mock_entries = [
         MagicMock(
             title="대통령 국회 연설",
