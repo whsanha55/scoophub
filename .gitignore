@@ -1,0 +1,29 @@
+# Environment
+.env.local
+.env
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+.venv/
+venv/
+
+# Data & Logs
+data/
+logs/
+*.db
+*.db-wal
+*.db-shm
+
+# Planning documents (never committed)
+docs/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
