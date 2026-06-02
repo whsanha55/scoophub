@@ -8,7 +8,7 @@ from datetime import datetime, timezone
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from shared.database import Database
+    from app.core.database import Database
 
 logger = logging.getLogger(__name__)
 

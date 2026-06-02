@@ -1,6 +1,6 @@
 # tests/test_classifier.py
 import pytest
-from news.classifier import NewsClassifier
+from app.news.classifier import NewsClassifier
 
 
 @pytest.fixture

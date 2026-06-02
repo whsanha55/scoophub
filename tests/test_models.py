@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 
-from shared.models import ApiResponse, ErrorDetail, ErrorBody
+from app.core.models import ApiResponse, ErrorDetail, ErrorBody
 
 
 def test_success_response():

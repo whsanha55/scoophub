@@ -9,10 +9,10 @@ from email.utils import parsedate_to_datetime
 import feedparser
 import httpx
 
-from news.classifier import NewsClassifier
-from news.filter_rules import is_within_cutoff
-from news.sources import RssSource, get_active_sources
-from shared.base_crawler import BaseCrawler, CrawlResult
+from app.news.classifier import NewsClassifier
+from app.news.filter_rules import is_within_cutoff
+from app.news.sources import RssSource, get_active_sources
+from app.core.base_crawler import BaseCrawler, CrawlResult
 
 logger = logging.getLogger(__name__)
 

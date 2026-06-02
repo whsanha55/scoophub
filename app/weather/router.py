@@ -6,8 +6,8 @@ from datetime import datetime
 
 from fastapi import APIRouter, Depends, Query
 
-from shared.database import Database
-from shared.models import ApiResponse
+from app.core.database import Database
+from app.core.models import ApiResponse
 
 router = APIRouter(prefix="/api")
 

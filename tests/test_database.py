@@ -1,6 +1,6 @@
 # tests/test_database.py
 import pytest
-from shared.database import Database
+from app.core.database import Database
 
 
 @pytest.mark.asyncio

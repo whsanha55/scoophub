@@ -3,8 +3,8 @@ import pytest
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
 
-from config import settings
-from shared.database import Database
+from app.config import settings
+from app.core.database import Database
 
 
 @pytest_asyncio.fixture
@@ -24,7 +24,7 @@ async def db():
 @pytest_asyncio.fixture
 async def client(db):
     """FastAPI test client — imported here to avoid circular imports."""
-    from main import create_app
+    from app.main import create_app
 
     app = create_app(db=db)
     transport = ASGITransport(app=app)

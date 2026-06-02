@@ -2,7 +2,7 @@
 import json
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
-from weather.crawler import WeatherCrawler
+from app.weather.crawler import WeatherCrawler
 
 
 WTTR_RESPONSE = {
@@ -37,7 +37,7 @@ OPENMETEO_RESPONSE = {
 
 @pytest.mark.asyncio
 async def test_weather_crawler_stores_snapshot(db):
-    with patch("weather.crawler.httpx.AsyncClient") as mock_client_cls:
+    with patch("app.weather.crawler.httpx.AsyncClient") as mock_client_cls:
         mock_client = AsyncMock()
         # wttr.in response
         wttr_resp = MagicMock()

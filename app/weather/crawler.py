@@ -7,7 +7,7 @@ from datetime import datetime, timezone
 
 import httpx
 
-from shared.base_crawler import BaseCrawler, CrawlResult
+from app.core.base_crawler import BaseCrawler, CrawlResult
 
 logger = logging.getLogger(__name__)
 

@@ -1,6 +1,6 @@
 # tests/test_base_crawler.py
 import pytest
-from shared.base_crawler import BaseCrawler, CrawlResult
+from app.core.base_crawler import BaseCrawler, CrawlResult
 
 
 class FailingCrawler(BaseCrawler):

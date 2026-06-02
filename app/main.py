@@ -9,17 +9,24 @@ import yaml
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from config import settings
-from shared.database import Database
-from shared.scheduler import create_scheduler, add_job
-from system.router import router as system_router
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
+
+from app.config import settings
+from app.core.database import Database
+from app.system.router import router as system_router
 
 logger = logging.getLogger(__name__)
 
 
 def create_app(db: Database | None = None) -> FastAPI:
     _db = db or Database(settings.database_url)
-    scheduler = create_scheduler()
+    scheduler = AsyncIOScheduler(
+        job_defaults={
+            "max_instances": 1,
+            "misfire_grace_time": 60,
+            "coalesce": True,
+        }
+    )
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
@@ -35,7 +42,7 @@ def create_app(db: Database | None = None) -> FastAPI:
     app = FastAPI(title="ScoopHub", lifespan=lifespan)
 
     # Dependency override for DB
-    from system.router import get_db
+    from app.system.router import get_db
     app.dependency_overrides[get_db] = lambda: _db
 
     app.add_middleware(
@@ -48,8 +55,8 @@ def create_app(db: Database | None = None) -> FastAPI:
     app.include_router(system_router)
 
     # News Context
-    from news.router import router as news_router, _get_db as news_get_db
-    from news.crawler import NewsCrawler
+    from app.news.router import router as news_router, _get_db as news_get_db
+    from app.news.scheduler import register_jobs as news_register_jobs
 
     app.dependency_overrides[news_get_db] = lambda: _db
     app.include_router(news_router)
@@ -57,26 +64,25 @@ def create_app(db: Database | None = None) -> FastAPI:
     with open("config/settings.yaml") as f:
         cfg = yaml.safe_load(f)
     news_cfg = cfg["crawlers"]["news"]
-    add_job(
+    news_register_jobs(
         scheduler,
-        lambda: NewsCrawler(_db, cutoff_minutes=news_cfg["cutoff_minutes"]).run(),
-        job_id="news_crawler",
-        minutes=news_cfg["schedule_minutes"],
+        _db,
+        schedule_minutes=news_cfg["schedule_minutes"],
+        cutoff_minutes=news_cfg["cutoff_minutes"],
     )
 
     # Weather Context
-    from weather.router import router as weather_router, _get_db as weather_get_db
-    from weather.crawler import WeatherCrawler
+    from app.weather.router import router as weather_router, _get_db as weather_get_db
+    from app.weather.scheduler import register_jobs as weather_register_jobs
 
     app.dependency_overrides[weather_get_db] = lambda: _db
     app.include_router(weather_router)
 
     weather_cfg = cfg["crawlers"]["weather"]
-    add_job(
+    weather_register_jobs(
         scheduler,
-        lambda: WeatherCrawler(_db).run(),
-        job_id="weather_crawler",
-        minutes=weather_cfg["schedule_minutes"],
+        _db,
+        schedule_minutes=weather_cfg["schedule_minutes"],
     )
 
     # Phase 2/3 routers will be added here
