@@ -47,6 +47,23 @@ def create_app(db: Database | None = None) -> FastAPI:
 
     app.include_router(system_router)
 
+    # News Context
+    from news.router import router as news_router, _get_db as news_get_db
+    from news.crawler import NewsCrawler
+
+    app.dependency_overrides[news_get_db] = lambda: _db
+    app.include_router(news_router)
+
+    with open("config/settings.yaml") as f:
+        cfg = yaml.safe_load(f)
+    news_cfg = cfg["crawlers"]["news"]
+    add_job(
+        scheduler,
+        lambda: NewsCrawler(_db, cutoff_minutes=news_cfg["cutoff_minutes"]).run(),
+        job_id="news_crawler",
+        minutes=news_cfg["schedule_minutes"],
+    )
+
     # Phase 2/3 routers will be added here
     return app
 
