@@ -11,6 +11,12 @@ from shared.database import Database
 async def db():
     database = Database(settings.database_url)
     await database.initialize()
+    # Clean tables before each test for isolation
+    pool = await database.pool
+    async with pool.acquire() as conn:
+        await conn.execute(
+            "TRUNCATE news_articles, weather_snapshots, crawl_logs, crawler_metadata RESTART IDENTITY CASCADE"
+        )
     yield database
     await database.close()
 
