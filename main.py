@@ -64,6 +64,21 @@ def create_app(db: Database | None = None) -> FastAPI:
         minutes=news_cfg["schedule_minutes"],
     )
 
+    # Weather Context
+    from weather.router import router as weather_router, _get_db as weather_get_db
+    from weather.crawler import WeatherCrawler
+
+    app.dependency_overrides[weather_get_db] = lambda: _db
+    app.include_router(weather_router)
+
+    weather_cfg = cfg["crawlers"]["weather"]
+    add_job(
+        scheduler,
+        lambda: WeatherCrawler(_db).run(),
+        job_id="weather_crawler",
+        minutes=weather_cfg["schedule_minutes"],
+    )
+
     # Phase 2/3 routers will be added here
     return app
 
