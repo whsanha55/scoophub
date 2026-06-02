@@ -25,13 +25,12 @@ async def db():
 
 @pytest_asyncio.fixture
 async def client(db):
-    """FastAPI test client — lifespan re-seeds on startup, so truncate after."""
+    """FastAPI test client with clean DB state."""
     from app.main import create_app
 
     app = create_app(db=db)
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as ac:
-        # Lifespan startup re-seeded crawl_sources, re-truncate for clean state
         pool = await db.pool
         async with pool.acquire() as conn:
             await conn.execute(TRUNCATE_SQL)
