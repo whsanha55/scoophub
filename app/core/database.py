@@ -80,6 +80,23 @@ CREATE TABLE IF NOT EXISTS crawl_logs (
 );
 
 CREATE INDEX IF NOT EXISTS idx_crawl_logs_crawler ON crawl_logs(crawler, started_at DESC);
+
+-- Crawl Sources (generic, multi-crawler)
+CREATE TABLE IF NOT EXISTS crawl_sources (
+    id SERIAL PRIMARY KEY,
+    crawler TEXT NOT NULL,
+    name TEXT NOT NULL,
+    url TEXT NOT NULL,
+    active BOOLEAN DEFAULT TRUE NOT NULL,
+    config JSONB DEFAULT '{}',
+    created_at TIMESTAMPTZ DEFAULT NOW() NOT NULL,
+    updated_at TIMESTAMPTZ DEFAULT NOW() NOT NULL
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_crawl_sources_crawler_url
+    ON crawl_sources(crawler, url);
+CREATE INDEX IF NOT EXISTS idx_crawl_sources_crawler_active
+    ON crawl_sources(crawler) WHERE active = TRUE;
 """
 
 

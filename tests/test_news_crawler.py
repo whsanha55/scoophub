@@ -1,17 +1,25 @@
 # tests/test_news_crawler.py
 import pytest
+from datetime import datetime, timezone
+from email.utils import format_datetime
 from unittest.mock import AsyncMock, patch, MagicMock
 from app.news.crawler import NewsCrawler
 
 
 @pytest.mark.asyncio
 async def test_crawler_stores_articles(db):
+    # Insert a source for the crawler to find
+    await db.execute(
+        "INSERT INTO crawl_sources (crawler, name, url, active) VALUES ('news', 'Test', 'https://test.com/rss', TRUE)"
+    )
+
+    now_str = format_datetime(datetime.now(timezone.utc))
     mock_entries = [
         MagicMock(
             title="대통령 국회 연설",
             link="https://example.com/pres-speech",
             summary="대통령이 국회에서 연설",
-            published="Mon, 02 Jun 2026 10:00:00 GMT",
+            published=now_str,
             published_parsed=None,
         )
     ]
