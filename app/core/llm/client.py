@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 class LLMClient:
     """OpenAI Chat Completions 호환 API 호출 클라이언트."""
 
-    def __init__(self, timeout: int = 60) -> None:
+    def __init__(self, timeout: int = 600) -> None:
         self._client = httpx.AsyncClient(timeout=timeout)
 
     async def chat(self, system_prompt: str, user_prompt: str) -> str:
@@ -28,9 +28,8 @@ class LLMClient:
         if settings.LLM_API_KEY:
             headers["Authorization"] = f"Bearer {settings.LLM_API_KEY}"
 
-        url = settings.LLM_API_URL.rstrip("/") + "/chat/completions"
         try:
-            response = await self._client.post(url, json=payload, headers=headers)
+            response = await self._client.post(settings.LLM_API_URL, json=payload, headers=headers)
             response.raise_for_status()
         except httpx.TimeoutException as e:
             logger.error("LLM request timed out: %s", e)
