@@ -62,13 +62,15 @@ class NewsCrawler(BaseCrawler):
         total_fetched = 0
         total_new = 0
         errors: list[str] = []
+        all_new_ids: list[int] = []
 
         async with httpx.AsyncClient(timeout=self.timeout) as client:
             for source in sources:
                 try:
-                    items, new = await self._fetch_source(client, source)
+                    items, new, new_ids = await self._fetch_source(client, source)
                     total_fetched += items
                     total_new += new
+                    all_new_ids.extend(new_ids)
                 except Exception as e:
                     msg = f"[{source.name}] {e}"
                     logger.warning(msg)
@@ -78,16 +80,18 @@ class NewsCrawler(BaseCrawler):
             items_fetched=total_fetched,
             items_new=total_new,
             errors=errors,
+            new_article_ids=all_new_ids,
         )
 
     async def _fetch_source(
         self, client: httpx.AsyncClient, source: RssSource
-    ) -> tuple[int, int]:
+    ) -> tuple[int, int, list[int]]:
         response = await client.get(source.url)
         feed = feedparser.parse(response.text)
 
         fetched = 0
         new = 0
+        new_ids: list[int] = []
         for entry in feed.entries:
             title = _strip_html(getattr(entry, "title", ""))
             url = getattr(entry, "link", "")
@@ -106,10 +110,11 @@ class NewsCrawler(BaseCrawler):
 
             fetched += 1
             try:
-                await self.db.execute(
+                inserted_id = await self.db.fetchval(
                     "INSERT INTO news_articles (source, title, description, url, published_at, fetched_at, category, importance) "
                     "VALUES ($1, $2, $3, $4, $5, NOW(), $6, $7) "
-                    "ON CONFLICT (url) DO NOTHING",
+                    "ON CONFLICT (url) DO NOTHING "
+                    "RETURNING id",
                     source.name,
                     title,
                     description or None,
@@ -118,8 +123,10 @@ class NewsCrawler(BaseCrawler):
                     classification.category,
                     classification.importance,
                 )
-                new += 1
+                if inserted_id is not None:
+                    new += 1
+                    new_ids.append(inserted_id)
             except Exception as e:
                 logger.warning(f"DB insert failed for {url}: {e}")
 
-        return fetched, new
+        return fetched, new, new_ids

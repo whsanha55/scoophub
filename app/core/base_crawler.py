@@ -18,6 +18,7 @@ class CrawlResult:
     items_fetched: int = 0
     items_new: int = 0
     errors: list[str] = field(default_factory=list)
+    new_article_ids: list[int] = field(default_factory=list)
 
 
 class BaseCrawler(ABC):

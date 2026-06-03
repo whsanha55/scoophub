@@ -24,6 +24,19 @@ def register_jobs(
 
         await NewsCrawler(db, cutoff_minutes=cutoff_minutes).run()
 
+        # Summarize newly crawled articles
+        try:
+            from app.core.llm import LLMClient
+            from app.news.summarizer import NewsSummarizer
+
+            async with LLMClient() as llm:
+                summarizer = NewsSummarizer(db, llm)
+                count = await summarizer.summarize_pending()
+                if count:
+                    logger.info("Summarized %d articles", count)
+        except Exception as e:
+            logger.error("Summarization failed: %s", e)
+
     scheduler.add_job(
         _run_news_crawl,
         trigger=IntervalTrigger(minutes=schedule_minutes),

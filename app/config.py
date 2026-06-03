@@ -10,6 +10,11 @@ class Settings(BaseSettings):
     PORT: int = 8000
     LOG_LEVEL: str = "info"
 
+    # LLM Configuration
+    LLM_API_URL: str = "https://openrouter.ai/api/v1"
+    LLM_API_KEY: str = ""
+    LLM_MODEL: str = "google/gemini-2.0-flash-001"
+
     @property
     def database_url(self) -> str:
         return (

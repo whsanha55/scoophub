@@ -97,6 +97,12 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_crawl_sources_crawler_url
     ON crawl_sources(crawler, url);
 CREATE INDEX IF NOT EXISTS idx_crawl_sources_crawler_active
     ON crawl_sources(crawler) WHERE active = TRUE;
+
+-- Add summary column for LLM-generated summaries
+ALTER TABLE news_articles ADD COLUMN IF NOT EXISTS summary TEXT DEFAULT NULL;
+
+-- Partial index for pending summarization
+CREATE INDEX IF NOT EXISTS idx_news_summary_pending ON news_articles(id) WHERE summary IS NULL;
 """
 
 

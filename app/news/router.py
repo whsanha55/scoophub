@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends, Query
 from fastapi.responses import JSONResponse
 
 from app.core.database import Database
-from app.core.models import ApiResponse
+from app.core.models import ApiResponse, ErrorBody
 
 router = APIRouter(prefix="/api", tags=["News"])
 
@@ -132,3 +132,28 @@ async def crawling_news(db: Database = Depends(_get_db)):
         "items_new": result.items_new,
         "errors": result.errors or None,
     })
+
+
+# ────────────────────────────────────────────────────────────
+#  수동 요약 트리거
+# ────────────────────────────────────────────────────────────
+
+
+@router.post(
+    "/crawling/news/summarize",
+    summary="뉴스 요약 수동 실행",
+    description="요약되지 않은 뉴스 기사를 LLM으로 요약합니다.",
+    tags=["News Crawling"],
+)
+async def summarize_news(db: Database = Depends(_get_db)):
+    try:
+        from app.core.llm import LLMClient
+        from app.news.summarizer import NewsSummarizer
+
+        async with LLMClient() as llm:
+            summarizer = NewsSummarizer(db, llm)
+            count = await summarizer.summarize_pending()
+    except Exception as e:
+        return ApiResponse(success=False, error={"code": "summarize_failed", "message": f"요약 실패: {e}"})
+
+    return ApiResponse(success=True, data={"summarized_count": count})
