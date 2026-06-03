@@ -40,14 +40,21 @@ async def _ensure_test_db() -> None:
 
 
 async def _ensure_schema(database: Database) -> None:
-    """Apply Flyway SQL migrations directly to the test DB (no Flyway binary)."""
+    """Apply migration SQL to the test DB once, only if the schema is missing.
+
+    Flyway never runs in tests; the migration files are applied directly. If the
+    test DB already has the schema, this is a no-op (subsequent runs just TRUNCATE).
+    Add a migration → drop the test DB (DROP DATABASE scoophub_test) to re-init.
+    """
     global _migrated
     if _migrated:
         return
     pool = await database.pool
     async with pool.acquire() as conn:
-        for sql_file in sorted(_MIGRATION_DIR.glob("V*.sql")):
-            await conn.execute(sql_file.read_text(encoding="utf-8"))
+        already = await conn.fetchval("SELECT to_regclass('public.news_articles')")
+        if already is None:
+            for sql_file in sorted(_MIGRATION_DIR.glob("V*.sql")):
+                await conn.execute(sql_file.read_text(encoding="utf-8"))
     _migrated = True
 
 
