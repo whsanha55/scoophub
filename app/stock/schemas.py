@@ -75,6 +75,22 @@ class WatchlistItemIn(BaseModel):
     memo: str | None = Field(None, description="메모 (선택)")
 
 
+class SigmaDataOut(BaseModel):
+    ticker: str = Field(..., description="주식 티커")
+    sigma_type: str = Field(..., description="시그마 타입 (daily | weekly)")
+    current_price: float = Field(..., description="현재가")
+    atm_iv: float = Field(..., description="ATM 내재변동성")
+    dte: int = Field(..., description="만기까지 일수")
+    daily_sigma: float = Field(..., description="일간 시그마 (절대값)")
+    daily_sigma_pct: float = Field(..., description="일간 시그마 (%)")
+    expected_move_high: float = Field(..., description="예상 상방 가격")
+    expected_move_low: float = Field(..., description="예상 하방 가격")
+    expected_move_pct: float = Field(..., description="예상 변동폭 (%)")
+    expiry_date: str | None = Field(None, description="옵션 만기일 (ISO 8601)")
+    source: str = Field(..., description="데이터 출처")
+    created_at: str | None = Field(None, description="생성 일시 (ISO 8601)")
+
+
 class WatchlistItemOut(BaseModel):
     id: str = Field(..., description="종목 고유 ID")
     ticker: str = Field(..., description="주식 티커")

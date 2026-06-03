@@ -16,5 +16,8 @@ class ProviderRouter:
     async def quote(self, ticker: str) -> dict:
         return await self._yfinance.quote(ticker)
 
+    async def options_chain(self, ticker: str, expiry: str | None = None) -> dict | None:
+        return await self._yfinance.options_chain(ticker, expiry)
+
     async def close(self) -> None:
         await self._yfinance.close()

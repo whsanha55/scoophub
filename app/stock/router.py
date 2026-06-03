@@ -19,6 +19,7 @@ if TYPE_CHECKING:
 from app.stock.schemas import (
     AnalyzeResponse,
     AnalyzeResult,
+    SigmaDataOut,
     StockReport,
     StockSummary,
     TechnicalOut,
@@ -276,6 +277,7 @@ async def stock_report(
                 "expected_move_pct": wem.expected_move_pct,
                 "expected_move_high": wem.expected_move_high,
                 "expected_move_low": wem.expected_move_low,
+                "source": "usstocksigma_html",
                 "weekly_moves": [
                     {
                         "week_start": str(w.week_start) if w.week_start else None,
@@ -343,6 +345,7 @@ async def stock_report_all(
                     "expected_move_pct": wem.expected_move_pct,
                     "expected_move_high": wem.expected_move_high,
                     "expected_move_low": wem.expected_move_low,
+                    "source": "usstocksigma_html",
                     "weekly_moves": [
                         {
                             "week_start": str(w.week_start) if w.week_start else None,
@@ -403,6 +406,52 @@ async def stock_report_all(
         ))
 
     return ApiResponse(success=True, data=summaries)
+
+
+# ── Sigma (Options IV) ────────────────────────────────────────────────────────
+
+
+@router.get(
+    "/stock/sigma",
+    tags=["Stock"],
+    summary="시그마 조회",
+    description=(
+        "Yahoo Finance 옵션 체인 IV 기반 시그마 데이터 조회.\n\n"
+        "- `ticker`: 단일 티커 (예: AAPL)\n"
+        "- `type`: daily 또는 weekly (기본: daily)\n"
+        "- 데이터 출처: `yfinance_options`"
+    ),
+)
+async def get_sigma(
+    ticker: str = Query(..., description="주식 티커 (예: AAPL)"),
+    type: str = Query("daily", description="시그마 타입 (daily | weekly)"),
+    db: Database = Depends(_get_db),
+):
+    from app.stock.repository import SigmaRepo
+
+    sigma_type = type if type in ("daily", "weekly") else "daily"
+    repo = SigmaRepo(db)
+    result = await repo.get_latest(ticker.upper(), sigma_type)
+    if not result:
+        return ApiResponse(success=True, data=None)
+
+    created_at = None
+    # SigmaResult doesn't store created_at directly; return id-based data
+    return ApiResponse(success=True, data=SigmaDataOut(
+        ticker=result.ticker,
+        sigma_type=result.sigma_type,
+        current_price=result.current_price,
+        atm_iv=result.atm_iv,
+        dte=result.dte,
+        daily_sigma=result.daily_sigma,
+        daily_sigma_pct=result.daily_sigma_pct,
+        expected_move_high=result.expected_move_high,
+        expected_move_low=result.expected_move_low,
+        expected_move_pct=result.expected_move_pct,
+        expiry_date=str(result.expiry_date) if result.expiry_date else None,
+        source=result.source,
+        created_at=created_at,
+    ))
 
 
 # ── Market Status ────────────────────────────────────────────────────────────

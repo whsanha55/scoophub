@@ -117,6 +117,61 @@ class YFinanceProvider:
             logging.warning("yfinance quote(%s) failed: %s", ticker, e)
             return {}
 
+    async def options_chain(
+        self,
+        ticker: str,
+        expiry: str | None = None,
+    ) -> dict | None:
+        """Fetch options chain for a ticker.
+
+        Returns dict with keys: expiries, expiry, calls, puts.
+        Each call/put entry: contractSymbol, strike, impliedVolatility, volume, openInterest.
+        Returns None on failure.
+        """
+        await self._throttle()
+
+        def _fetch() -> dict | None:
+            t = yf.Ticker(ticker)
+            expiries = t.options
+            if not expiries:
+                return None
+
+            chosen = expiry or expiries[0]
+            chain = t.option_chain(chosen)
+
+            calls = []
+            for _, row in chain.calls.iterrows():
+                calls.append({
+                    "contractSymbol": str(row.get("contractSymbol", "")),
+                    "strike": float(row.get("strike", 0)),
+                    "impliedVolatility": float(row.get("impliedVolatility", 0)),
+                    "volume": int(row.get("volume", 0) or 0),
+                    "openInterest": int(row.get("openInterest", 0) or 0),
+                })
+
+            puts = []
+            for _, row in chain.puts.iterrows():
+                puts.append({
+                    "contractSymbol": str(row.get("contractSymbol", "")),
+                    "strike": float(row.get("strike", 0)),
+                    "impliedVolatility": float(row.get("impliedVolatility", 0)),
+                    "volume": int(row.get("volume", 0) or 0),
+                    "openInterest": int(row.get("openInterest", 0) or 0),
+                })
+
+            return {
+                "expiries": list(expiries),
+                "expiry": chosen,
+                "calls": calls,
+                "puts": puts,
+            }
+
+        try:
+            return await asyncio.to_thread(_fetch)
+        except Exception as e:
+            logging.warning("yfinance options_chain(%s) failed: %s", ticker, e)
+            return None
+
     async def close(self) -> None:
         """No persistent connection to close."""
         pass

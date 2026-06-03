@@ -35,6 +35,25 @@ class WeeklyExpectedMove:
     updated_at: date | None = None
 
 
+@dataclass
+class SigmaResult:
+    """Sigma computed from Yahoo Finance options chain IV."""
+
+    id: int | None = None
+    ticker: str = ""
+    current_price: float = 0.0
+    atm_iv: float = 0.0
+    dte: int = 0
+    daily_sigma: float = 0.0
+    daily_sigma_pct: float = 0.0
+    expected_move_high: float = 0.0
+    expected_move_low: float = 0.0
+    expected_move_pct: float = 0.0
+    sigma_type: str = "daily"        # daily | weekly
+    expiry_date: date | None = None
+    source: str = "yfinance_options"
+
+
 class SigmaPosition(StrEnum):
     ABOVE_1SIGMA = "ABOVE_1SIGMA"
     WITHIN_UPPER = "WITHIN_UPPER"
