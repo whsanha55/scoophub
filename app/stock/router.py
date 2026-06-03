@@ -31,7 +31,7 @@ logger = logging.getLogger(__name__)
 
 VALID_TIMEFRAMES = {"1D"}
 
-router = APIRouter(prefix="/api", tags=["Stock"])
+router = APIRouter(prefix="/api")
 
 # ── Provider router (module-level singleton) ────────────────────────────────
 
@@ -184,12 +184,21 @@ def _watchlist_item_to_out(item) -> WatchlistItemOut:
 # ── Stock Analysis ───────────────────────────────────────────────────────────
 
 
-@router.post("/stock/analyze", summary="분석 실행")
+@router.post(
+    "/stock/analyze",
+    tags=["Stock"],
+    summary="분석 실행",
+    description=(
+        "watchlist 종목의 기술 분석 실행 + 결과 저장.\n\n"
+        "캔들 동기화 → Sigma 크롤 → 기술 분석 순서로 자동 실행됩니다.\n\n"
+        "- `tickers` 생략 시 활성 watchlist 전체 대상\n"
+        "- 자동 스케줄: 평일 06:00 (KST)"
+    ),
+)
 async def analyze(
-    tickers: list[str] | None = Query(None),
+    tickers: list[str] | None = Query(None, description="분석할 티커 목록. 생략 시 전체 watchlist"),
     db: Database = Depends(_get_db),
 ):
-    """watchlist 종목의 기술 분석 실행 + 결과 저장."""
     from app.stock.repository import WatchlistRepo
 
     wl_repo = WatchlistRepo(db)
@@ -203,6 +212,16 @@ async def analyze(
     if not target_tickers:
         return ApiResponse(success=True, data=AnalyzeResponse(total=0, ok=0, errors=0, results=[]))
 
+    # Auto-crawl: sync candles + sigma before analysis
+    try:
+        await _do_sync_candles(db)
+    except Exception:
+        logger.warning("Auto candle sync failed", exc_info=True)
+    try:
+        await _do_crawl_sigma(db)
+    except Exception:
+        logger.warning("Auto sigma crawl failed", exc_info=True)
+
     resp = await _run_analysis_for_tickers(target_tickers, db)
     return ApiResponse(success=True, data=resp)
 
@@ -210,7 +229,17 @@ async def analyze(
 # ── Stock Report ─────────────────────────────────────────────────────────────
 
 
-@router.get("/stock/report", summary="종목 리포트")
+@router.get(
+    "/stock/report",
+    tags=["Stock"],
+    summary="종목 리포트",
+    description=(
+        "저장된 분석 결과 + Sigma 데이터로 종목 리포트 반환.\n\n"
+        "- `tickers`: 콤마로 구분 (예: `AAPL,MSFT,GOOGL`)\n"
+        "- Sigma: 최근 4주 예상 변동폭 + 현재 가격 위치\n"
+        "- `is_stale=true`: 마지막 분석이 24시간 이전"
+    ),
+)
 async def stock_report(
     tickers: str = "",
     timeframe: str = "1D",
@@ -271,7 +300,16 @@ async def stock_report(
     return ApiResponse(success=True, data=reports)
 
 
-@router.get("/stock/report/all", summary="전체 리포트")
+@router.get(
+    "/stock/report/all",
+    tags=["Stock"],
+    summary="전체 리포트",
+    description=(
+        "전체 종목 리포트 반환.\n\n"
+        "- `summarize=false` (기본): 기술 분석 + Sigma 전체 데이터\n"
+        "- `summarize=true`: 시그널/점수/위치만 요약"
+    ),
+)
 async def stock_report_all(
     summarize: bool = False,
     timeframe: str = "1D",
@@ -373,9 +411,13 @@ async def stock_report_all(
 # ── Market Status ────────────────────────────────────────────────────────────
 
 
-@router.get("/stock/market-status", summary="시장 상태")
+@router.get(
+    "/stock/market-status",
+    tags=["Stock"],
+    summary="시장 상태",
+    description="US 주식 시장(NYSE/NASDAQ) 열림 여부. 기준: 평일 14:30–21:00 UTC (9:30 AM–4:00 PM ET).",
+)
 async def market_status():
-    """US 주식 시장 상태 (단순 체크)."""
     from datetime import time as dt_time
 
     now_utc = datetime.now(timezone.utc)
@@ -396,9 +438,13 @@ async def market_status():
 # ── Watchlist ────────────────────────────────────────────────────────────────
 
 
-@router.get("/stock/watchlist", tags=["Stock Watchlist"])
+@router.get(
+    "/stock/watchlist",
+    tags=["Stock Watchlist"],
+    summary="관심종목 전체 조회",
+    description="watchlist에 등록된 전체 종목 목록을 반환합니다.",
+)
 async def get_watchlist(db: Database = Depends(_get_db)):
-    """전체 watchlist 조회."""
     from app.stock.repository import WatchlistRepo
 
     repo = WatchlistRepo(db)
@@ -407,9 +453,13 @@ async def get_watchlist(db: Database = Depends(_get_db)):
     return ApiResponse(success=True, data=data)
 
 
-@router.post("/stock/watchlist", tags=["Stock Watchlist"])
+@router.post(
+    "/stock/watchlist",
+    tags=["Stock Watchlist"],
+    summary="관심종목 추가",
+    description="watchlist에 새 종목을 추가합니다. 티커는 자동 대문자 변환.",
+)
 async def add_watchlist(item: WatchlistItemIn, db: Database = Depends(_get_db)):
-    """watchlist에 종목 추가."""
     from app.stock.models import WatchlistItem
     from app.stock.repository import WatchlistRepo
 
@@ -427,13 +477,17 @@ async def add_watchlist(item: WatchlistItemIn, db: Database = Depends(_get_db)):
     return ApiResponse(success=True, data=_watchlist_item_to_out(created))
 
 
-@router.put("/stock/watchlist/{item_id}", tags=["Stock Watchlist"])
+@router.put(
+    "/stock/watchlist/{item_id}",
+    tags=["Stock Watchlist"],
+    summary="관심종목 수정",
+    description="watchlist 종목의 필드를 부분 수정합니다. `is_active=false`로 비활성화 가능.",
+)
 async def update_watchlist(
     item_id: int,
     item: WatchlistUpdateIn,
     db: Database = Depends(_get_db),
 ):
-    """watchlist 종목 수정."""
     from app.stock.repository import WatchlistRepo
 
     repo = WatchlistRepo(db)
@@ -456,9 +510,13 @@ async def update_watchlist(
     return ApiResponse(success=True, data=_watchlist_item_to_out(updated))
 
 
-@router.delete("/stock/watchlist/{item_id}", tags=["Stock Watchlist"])
+@router.delete(
+    "/stock/watchlist/{item_id}",
+    tags=["Stock Watchlist"],
+    summary="관심종목 삭제",
+    description="watchlist에서 종목을 영구 삭제합니다.",
+)
 async def delete_watchlist(item_id: int, db: Database = Depends(_get_db)):
-    """watchlist에서 종목 삭제."""
     from app.stock.repository import WatchlistRepo
 
     repo = WatchlistRepo(db)
@@ -471,16 +529,56 @@ async def delete_watchlist(item_id: int, db: Database = Depends(_get_db)):
     return ApiResponse(success=True, data={"deleted": item_id})
 
 
+# ── Crawl Helpers (shared with analyze auto-crawl) ─────────────────────────
+
+
+async def _do_crawl_sigma(db: Database) -> int:
+    """Crawl sigma data. Returns items_new count."""
+    from app.stock.crawler import SigmaCrawler
+
+    result = await SigmaCrawler(db).run()
+    return result.items_new if result else 0
+
+
+async def _do_sync_candles(db: Database) -> int:
+    """Sync candle data for active watchlist. Returns total saved count."""
+    from app.stock.repository import CandleRepo, WatchlistRepo
+
+    provider = get_provider_router()
+    wl_repo = WatchlistRepo(db)
+    candle_repo = CandleRepo(db)
+
+    items = await wl_repo.find_all(active_only=True)
+    if not items:
+        return 0
+
+    total_saved = 0
+    for item in items:
+        try:
+            candles = await provider.chart(item.ticker, "1D")
+            if candles:
+                saved = await candle_repo.save_batch(candles)
+                total_saved += saved
+        except Exception as e:
+            logger.warning("Candle sync failed for %s: %s", item.ticker, e)
+
+    return total_saved
+
+
 # ── Manual Crawl Triggers ────────────────────────────────────────────────────
 
 
 @router.post(
     "/crawling/stock/sigma",
-    summary="Sigma 크롤 수동 실행",
     tags=["Stock Crawling"],
+    summary="Sigma 크롤 수동 실행",
+    description=(
+        "usstocksigma.com에서 주간 예상 변동폭(1σ) 크롤링.\n\n"
+        "- 자동 스케줄: 매주 월요일 03:00 (KST)\n"
+        "- 데이터: Ticker, 예상 변동률, -1σ, +1σ 가격"
+    ),
 )
 async def crawling_sigma(db: Database = Depends(_get_db)):
-    """usstocksigma.com 크롤링 수동 실행."""
     from app.stock.crawler import SigmaCrawler
 
     result = await SigmaCrawler(db).run()
@@ -496,38 +594,16 @@ async def crawling_sigma(db: Database = Depends(_get_db)):
 
 @router.post(
     "/crawling/stock/sync",
-    summary="캔들 동기화 수동 실행",
     tags=["Stock Crawling"],
+    summary="캔들 동기화 수동 실행",
+    description=(
+        "watchlist 종목의 일봉(OHLCV) 캔들 데이터를 yfinance에서 동기화.\n\n"
+        "- 자동 스케줄: 60분 간격\n"
+        "- 대상: 활성 watchlist 전체 종목"
+    ),
 )
 async def crawling_sync(db: Database = Depends(_get_db)):
-    """watchlist 종목의 캔들 데이터 동기화 수동 실행."""
-    from app.stock.repository import CandleRepo, WatchlistRepo
-
-    provider = get_provider_router()
-    wl_repo = WatchlistRepo(db)
-    candle_repo = CandleRepo(db)
-
-    items = await wl_repo.find_all(active_only=True)
-    if not items:
-        return ApiResponse(success=True, data={"synced": 0, "tickers": []})
-
-    total_saved = 0
-    synced_tickers: list[str] = []
-    errors_list: list[str] = []
-
-    for item in items:
-        try:
-            candles = await provider.chart(item.ticker, "1D")
-            if candles:
-                saved = await candle_repo.save_batch(candles)
-                total_saved += saved
-                synced_tickers.append(item.ticker)
-        except Exception as e:
-            logger.warning("Candle sync failed for %s: %s", item.ticker, e)
-            errors_list.append(f"{item.ticker}: {e}")
-
+    total_saved = await _do_sync_candles(db)
     return ApiResponse(success=True, data={
         "synced": total_saved,
-        "tickers": synced_tickers,
-        "errors": errors_list or None,
     })
