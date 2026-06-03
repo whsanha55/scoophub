@@ -39,7 +39,16 @@ def create_app(db: Database | None = None) -> FastAPI:
         await _db.close()
         logger.info("Shutdown complete")
 
-    app = FastAPI(title="ScoopHub", lifespan=lifespan)
+    tags_metadata = [
+        {"name": "News", "description": "뉴스 기사 조회 API"},
+        {"name": "News Sources", "description": "RSS 뉴스 소스 관리 API"},
+        {"name": "News Crawling", "description": "뉴스 크롤 수동 실행 API"},
+        {"name": "Weather", "description": "날씨 데이터 조회 API"},
+        {"name": "Weather Crawling", "description": "날씨 크롤 수동 실행 API"},
+        {"name": "System", "description": "시스템 상태 및 크롤 로그 API"},
+    ]
+
+    app = FastAPI(title="ScoopHub", lifespan=lifespan, openapi_tags=tags_metadata)
 
     # Dependency override for DB
     from app.system.router import get_db

@@ -7,9 +7,9 @@ from fastapi import APIRouter, Depends, Query
 from fastapi.responses import JSONResponse
 
 from app.core.database import Database
-from app.core.models import ApiResponse, ErrorBody
+from app.core.models import ApiResponse
 
-router = APIRouter(prefix="/api")
+router = APIRouter(prefix="/api", tags=["News"])
 
 
 def _get_db() -> Database:
@@ -96,3 +96,39 @@ def _row_to_dict(row) -> dict:
         if isinstance(val, datetime):
             d[key] = val.isoformat()
     return d
+
+
+# ────────────────────────────────────────────────────────────
+#  수동 크롤 트리거
+# ────────────────────────────────────────────────────────────
+
+
+@router.post(
+    "/crawling/news",
+    summary="뉴스 크롤 수동 실행",
+    description="RSS 피드를 수집해 뉴스 기사를 저장합니다.",
+    tags=["News Crawling"],
+)
+async def crawling_news(db: Database = Depends(_get_db)):
+    """
+    ## 📰 뉴스 크롤러
+
+    | 항목      | 값         |
+    |-----------|-----------|
+    | 스케줄    | 매 15분   |
+    | 소스      | RSS 피드  |
+    | 저장 테이블 | `news_articles` |
+
+    `config/settings.yaml` → `crawlers.news` 참조.
+    """
+    from app.news.crawler import NewsCrawler
+
+    result = await NewsCrawler(db, cutoff_minutes=30).run()
+    if result is None:
+        return ApiResponse(success=False, error={"code": "crawl_failed", "message": "뉴스 크롤 실패"})
+    return ApiResponse(success=True, data={
+        "crawler": "news",
+        "items_fetched": result.items_fetched,
+        "items_new": result.items_new,
+        "errors": result.errors or None,
+    })
