@@ -8,6 +8,10 @@ crawlers:
   weather:
     schedule_minutes: 30
     source_timeout_seconds: 15
+  stock:
+    sync_interval_minutes: 60
+    sigma_schedule: "0 3 * * 1"       # 월요일 03:00 (KST)
+    analyze_schedule: "0 6 * * 1-5"   # 평일 06:00 (KST)
 
 api:
   default_minutes: 30

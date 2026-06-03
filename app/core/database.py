@@ -97,6 +97,79 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_crawl_sources_crawler_url
     ON crawl_sources(crawler, url);
 CREATE INDEX IF NOT EXISTS idx_crawl_sources_crawler_active
     ON crawl_sources(crawler) WHERE active = TRUE;
+
+-- Stock Context
+CREATE TABLE IF NOT EXISTS stock_watchlist (
+    id SERIAL PRIMARY KEY,
+    ticker TEXT NOT NULL,
+    exchange TEXT NOT NULL DEFAULT 'NAS',
+    name TEXT NOT NULL DEFAULT '',
+    memo TEXT,
+    is_active BOOLEAN DEFAULT TRUE NOT NULL,
+    added_at TIMESTAMPTZ DEFAULT NOW() NOT NULL
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_stock_watchlist_ticker ON stock_watchlist(ticker) WHERE is_active = TRUE;
+
+CREATE TABLE IF NOT EXISTS stock_weekly_expected_moves (
+    id SERIAL PRIMARY KEY,
+    ticker TEXT NOT NULL,
+    week_start DATE NOT NULL,
+    week_end DATE NOT NULL,
+    expected_move_high REAL NOT NULL DEFAULT 0,
+    expected_move_low REAL NOT NULL DEFAULT 0,
+    expected_move_pct REAL NOT NULL DEFAULT 0,
+    created_at TIMESTAMPTZ DEFAULT NOW() NOT NULL,
+    updated_at TIMESTAMPTZ DEFAULT NOW() NOT NULL
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_stock_wem_ticker_week ON stock_weekly_expected_moves(ticker, week_end);
+CREATE INDEX IF NOT EXISTS idx_stock_wem_ticker ON stock_weekly_expected_moves(ticker, week_start DESC);
+
+CREATE TABLE IF NOT EXISTS stock_candles (
+    id SERIAL PRIMARY KEY,
+    ticker TEXT NOT NULL,
+    interval TEXT NOT NULL DEFAULT '1D',
+    date DATE NOT NULL,
+    open REAL NOT NULL,
+    high REAL NOT NULL,
+    low REAL NOT NULL,
+    close REAL NOT NULL,
+    volume REAL NOT NULL DEFAULT 0
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_stock_candles_ticker_interval_date ON stock_candles(ticker, interval, date);
+
+CREATE TABLE IF NOT EXISTS stock_analysis_results (
+    id SERIAL PRIMARY KEY,
+    ticker TEXT NOT NULL,
+    exchange TEXT NOT NULL DEFAULT 'NAS',
+    timeframe TEXT NOT NULL DEFAULT '1D',
+    signal TEXT NOT NULL,
+    total_score REAL NOT NULL DEFAULT 0,
+    confidence REAL NOT NULL DEFAULT 0,
+    market_regime TEXT NOT NULL DEFAULT 'RANGING',
+    price REAL NOT NULL DEFAULT 0,
+    change REAL NOT NULL DEFAULT 0,
+    change_rate REAL NOT NULL DEFAULT 0,
+    technical_scores JSONB DEFAULT '{}',
+    technical_details JSONB DEFAULT '{}',
+    analyzed_at TIMESTAMPTZ DEFAULT NOW() NOT NULL
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_stock_analysis_ticker_timeframe ON stock_analysis_results(ticker, timeframe);
+CREATE INDEX IF NOT EXISTS idx_stock_analysis_time ON stock_analysis_results(analyzed_at DESC);
+
+CREATE TABLE IF NOT EXISTS stock_ticker_params (
+    id SERIAL PRIMARY KEY,
+    ticker TEXT NOT NULL UNIQUE,
+    weights JSONB DEFAULT '{}',
+    entry_threshold REAL,
+    exit_threshold REAL,
+    position_size_pct REAL,
+    in_sample_sharpe REAL,
+    in_sample_sortino REAL,
+    out_sample_sharpe REAL,
+    out_sample_sortino REAL,
+    is_adopted BOOLEAN DEFAULT FALSE NOT NULL,
+    tuned_at TIMESTAMPTZ
+);
 """
 
 
