@@ -18,11 +18,18 @@ def register_jobs(
     db: Database,
     schedule_minutes: int,
     cutoff_minutes: int,
+    title_similarity: float = 0.85,
+    dedup_window_hours: int = 24,
 ) -> None:
     async def _run_news_crawl() -> None:
         from app.news.crawler import NewsCrawler
 
-        await NewsCrawler(db, cutoff_minutes=cutoff_minutes).run()
+        await NewsCrawler(
+            db,
+            cutoff_minutes=cutoff_minutes,
+            title_similarity=title_similarity,
+            dedup_window_hours=dedup_window_hours,
+        ).run()
 
         # Summarize newly crawled articles
         try:

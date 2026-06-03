@@ -48,4 +48,7 @@ async def test_crawler_stores_articles(db):
 
     rows = await db.fetch("SELECT * FROM news_articles")
     assert len(rows) >= 1
-    assert rows[0]["category"] == "politics"
+    # category/importance는 크롤 시점엔 미정 (LLM 요약이 채움)
+    assert rows[0]["category"] is None
+    assert rows[0]["summary_status"] == "pending"
+    assert rows[0]["normalized_url"] is not None

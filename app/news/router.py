@@ -145,3 +145,27 @@ async def crawling_news(db: Database = Depends(_get_db)):
         "errors": result.errors or None,
         "summary": summary,
     })
+
+
+# ────────────────────────────────────────────────────────────
+#  수동 요약 트리거 (pending 재처리)
+# ────────────────────────────────────────────────────────────
+
+
+@router.post(
+    "/crawling/news/summarize",
+    summary="뉴스 요약 수동 실행",
+    description="아직 요약되지 않은(summary_status='pending') 기사를 20개 단위로 LLM 요약합니다.",
+    tags=["News Crawling"],
+)
+async def summarize_news(db: Database = Depends(_get_db)):
+    try:
+        from app.core.llm import LLMClient
+        from app.news.summarizer import NewsSummarizer
+
+        async with LLMClient() as llm:
+            result = await NewsSummarizer(db, llm).summarize_pending()
+    except Exception as e:
+        return ApiResponse(success=False, error={"code": "summarize_failed", "message": f"요약 실패: {e}"})
+
+    return ApiResponse(success=True, data=result)
