@@ -191,7 +191,7 @@ def _watchlist_item_to_out(item) -> WatchlistItemOut:
     description=(
         "watchlist 종목의 기술 분석 수동 실행 + 결과 저장.\n\n"
         "- `tickers` 생략 시 활성 watchlist 전체 대상\n"
-        "- 자동 스케줄: 평일 06:00 (KST, 장마감 직후)"
+        "- 자동 스케줄: 화-토 06:00 (KST, 미국장 종료 직후)"
     ),
 )
 async def analyze(
@@ -571,7 +571,7 @@ async def _do_sync_candles(db: Database) -> int:
         "| -1σ 가격 | 현재가 기준 하방 1표준편차 가격 |\n"
         "| +1σ 가격 | 현재가 기준 상방 1표준편차 가격 |\n\n"
         "### 자동 스케줄\n"
-        "- 평일 06:00(KST) 장 분석 파이프라인 내 step으로 자동 실행\n"
+        "- 매주 월요일 03:00(KST) 자동 실행\n"
         "- 이 엔드포인트는 수동 트리거용입니다."
     ),
     responses={
