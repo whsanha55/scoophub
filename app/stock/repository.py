@@ -154,12 +154,17 @@ class WatchlistRepo:
         count = await self._db.fetchval("SELECT COUNT(*) FROM stock_watchlist")
         if count and count > 0:
             return 0
-        values = ", ".join(
-            f"('{ticker}', '{exchange}', '{name}', 'M7', TRUE)"
-            for ticker, exchange, name in M7_DEFAULTS
-        )
+        parts: list[str] = []
+        params: list[object] = []
+        idx = 1
+        for ticker, exchange, name in M7_DEFAULTS:
+            parts.append(f"(${idx}, ${idx+1}, ${idx+2}, ${idx+3}, ${idx+4})")
+            params.extend([ticker, exchange, name, "M7", True])
+            idx += 5
         await self._db.execute(
-            "INSERT INTO stock_watchlist (ticker, exchange, name, memo, is_active) VALUES " + values
+            "INSERT INTO stock_watchlist (ticker, exchange, name, memo, is_active) "
+            "VALUES " + ", ".join(parts),
+            *params,
         )
         return len(M7_DEFAULTS)
 
@@ -195,21 +200,30 @@ class WeeklyExpectedMoveRepo:
     async def save_batch(self, items: list[WeeklyExpectedMove]) -> int:
         if not items:
             return 0
-        values = ", ".join(
-            f"('{_esc(item.ticker)}', '{item.week_start}', '{item.week_end}', "
-            f"{item.expected_move_high}, {item.expected_move_low}, {item.expected_move_pct})"
-            for item in items
-        )
+        # Build batch VALUES with positional params
+        parts: list[str] = []
+        params: list[object] = []
+        idx = 1
+        for item in items:
+            parts.append(
+                f"(${idx}, ${idx+1}, ${idx+2}, ${idx+3}, ${idx+4}, ${idx+5})"
+            )
+            params.extend([
+                item.ticker, item.week_start, item.week_end,
+                item.expected_move_high, item.expected_move_low, item.expected_move_pct,
+            ])
+            idx += 6
         await self._db.execute(
             "INSERT INTO stock_weekly_expected_moves "
             "(ticker, week_start, week_end, expected_move_high, expected_move_low, expected_move_pct) "
-            "VALUES " + values + " "
+            "VALUES " + ", ".join(parts) + " "
             "ON CONFLICT (ticker, week_end) DO UPDATE SET "
             "week_start = EXCLUDED.week_start, "
             "expected_move_high = EXCLUDED.expected_move_high, "
             "expected_move_low = EXCLUDED.expected_move_low, "
             "expected_move_pct = EXCLUDED.expected_move_pct, "
-            "updated_at = NOW()"
+            "updated_at = NOW()",
+            *params,
         )
         return len(items)
 
@@ -445,8 +459,3 @@ class TickerParamsRepo:
             params.is_adopted,
         )
         return _row_to_stock_ticker_params(row)
-
-
-def _esc(s: str) -> str:
-    """Escape single quotes for inline SQL values."""
-    return s.replace("'", "''")

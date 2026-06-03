@@ -229,6 +229,9 @@ async def stock_report(
     if not ticker_list:
         return ApiResponse(success=True, data=[])
 
+    from app.stock.repository import AnalysisResultRepo, WeeklyExpectedMoveRepo
+    from app.stock.models import compute_sigma_range, generate_sigma_signal
+
     repo = AnalysisResultRepo(db)
     wem_repo = WeeklyExpectedMoveRepo(db)
     rows = await repo.find_by_tickers(ticker_list, timeframe)
@@ -378,7 +381,7 @@ async def market_status():
     is_weekday = now_ny.weekday() < 5
     hour = now_ny.hour
     # US market hours roughly 14:30-21:00 UTC
-    is_market_hours = 14 <= hour <= 21
+    is_market_hours = 13 <= hour <= 21
     is_open = is_weekday and is_market_hours
 
     return ApiResponse(success=True, data={
