@@ -99,7 +99,7 @@ CREATE INDEX IF NOT EXISTS idx_crawl_sources_crawler_active
     ON crawl_sources(crawler) WHERE active = TRUE;
 
 -- Stock Context
-CREATE TABLE IF NOT EXISTS watchlist (
+CREATE TABLE IF NOT EXISTS stock_watchlist (
     id SERIAL PRIMARY KEY,
     ticker TEXT NOT NULL,
     exchange TEXT NOT NULL DEFAULT 'NAS',
@@ -108,9 +108,9 @@ CREATE TABLE IF NOT EXISTS watchlist (
     is_active BOOLEAN DEFAULT TRUE NOT NULL,
     added_at TIMESTAMPTZ DEFAULT NOW() NOT NULL
 );
-CREATE UNIQUE INDEX IF NOT EXISTS idx_watchlist_ticker ON watchlist(ticker) WHERE is_active = TRUE;
+CREATE UNIQUE INDEX IF NOT EXISTS idx_stock_watchlist_ticker ON stock_watchlist(ticker) WHERE is_active = TRUE;
 
-CREATE TABLE IF NOT EXISTS weekly_expected_moves (
+CREATE TABLE IF NOT EXISTS stock_weekly_expected_moves (
     id SERIAL PRIMARY KEY,
     ticker TEXT NOT NULL,
     week_start DATE NOT NULL,
@@ -121,10 +121,10 @@ CREATE TABLE IF NOT EXISTS weekly_expected_moves (
     created_at TIMESTAMPTZ DEFAULT NOW() NOT NULL,
     updated_at TIMESTAMPTZ DEFAULT NOW() NOT NULL
 );
-CREATE UNIQUE INDEX IF NOT EXISTS idx_wem_ticker_week ON weekly_expected_moves(ticker, week_end);
-CREATE INDEX IF NOT EXISTS idx_wem_ticker ON weekly_expected_moves(ticker, week_start DESC);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_stock_wem_ticker_week ON stock_weekly_expected_moves(ticker, week_end);
+CREATE INDEX IF NOT EXISTS idx_stock_wem_ticker ON stock_weekly_expected_moves(ticker, week_start DESC);
 
-CREATE TABLE IF NOT EXISTS candles (
+CREATE TABLE IF NOT EXISTS stock_candles (
     id SERIAL PRIMARY KEY,
     ticker TEXT NOT NULL,
     interval TEXT NOT NULL DEFAULT '1D',
@@ -135,9 +135,9 @@ CREATE TABLE IF NOT EXISTS candles (
     close REAL NOT NULL,
     volume REAL NOT NULL DEFAULT 0
 );
-CREATE UNIQUE INDEX IF NOT EXISTS idx_candles_ticker_interval_date ON candles(ticker, interval, date);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_stock_candles_ticker_interval_date ON stock_candles(ticker, interval, date);
 
-CREATE TABLE IF NOT EXISTS analysis_results (
+CREATE TABLE IF NOT EXISTS stock_analysis_results (
     id SERIAL PRIMARY KEY,
     ticker TEXT NOT NULL,
     exchange TEXT NOT NULL DEFAULT 'NAS',
@@ -153,10 +153,10 @@ CREATE TABLE IF NOT EXISTS analysis_results (
     technical_details JSONB DEFAULT '{}',
     analyzed_at TIMESTAMPTZ DEFAULT NOW() NOT NULL
 );
-CREATE UNIQUE INDEX IF NOT EXISTS idx_analysis_ticker_timeframe ON analysis_results(ticker, timeframe);
-CREATE INDEX IF NOT EXISTS idx_analysis_time ON analysis_results(analyzed_at DESC);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_stock_analysis_ticker_timeframe ON stock_analysis_results(ticker, timeframe);
+CREATE INDEX IF NOT EXISTS idx_stock_analysis_time ON stock_analysis_results(analyzed_at DESC);
 
-CREATE TABLE IF NOT EXISTS ticker_params (
+CREATE TABLE IF NOT EXISTS stock_ticker_params (
     id SERIAL PRIMARY KEY,
     ticker TEXT NOT NULL UNIQUE,
     weights JSONB DEFAULT '{}',

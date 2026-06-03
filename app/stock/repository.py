@@ -57,7 +57,7 @@ def _row_to_candle(row: object) -> Candle:
     )
 
 
-def _row_to_ticker_params(row: object) -> TickerParams:
+def _row_to_stock_ticker_params(row: object) -> TickerParams:
     weights = row["weights"]
     if isinstance(weights, str):
         weights = json.loads(weights)
@@ -97,25 +97,25 @@ class WatchlistRepo:
     async def find_all(self, active_only: bool = False) -> list[WatchlistItem]:
         if active_only:
             rows = await self._db.fetch(
-                "SELECT * FROM watchlist WHERE is_active = TRUE ORDER BY added_at"
+                "SELECT * FROM stock_watchlist WHERE is_active = TRUE ORDER BY added_at"
             )
         else:
-            rows = await self._db.fetch("SELECT * FROM watchlist ORDER BY added_at")
+            rows = await self._db.fetch("SELECT * FROM stock_watchlist ORDER BY added_at")
         return [_row_to_watchlist(r) for r in rows]
 
     async def find_by_id(self, item_id: int) -> WatchlistItem | None:
-        row = await self._db.fetchrow("SELECT * FROM watchlist WHERE id = $1", item_id)
+        row = await self._db.fetchrow("SELECT * FROM stock_watchlist WHERE id = $1", item_id)
         return _row_to_watchlist(row) if row else None
 
     async def find_by_ticker(self, ticker: str) -> WatchlistItem | None:
         row = await self._db.fetchrow(
-            "SELECT * FROM watchlist WHERE ticker = $1 AND is_active = TRUE", ticker
+            "SELECT * FROM stock_watchlist WHERE ticker = $1 AND is_active = TRUE", ticker
         )
         return _row_to_watchlist(row) if row else None
 
     async def add(self, item: WatchlistItem) -> WatchlistItem:
         row = await self._db.fetchrow(
-            "INSERT INTO watchlist (ticker, exchange, name, memo, is_active) "
+            "INSERT INTO stock_watchlist (ticker, exchange, name, memo, is_active) "
             "VALUES ($1, $2, $3, $4, $5) RETURNING *",
             item.ticker.upper(),
             item.exchange.upper(),
@@ -141,17 +141,17 @@ class WatchlistRepo:
             return existing
         values.append(item_id)
         row = await self._db.fetchrow(
-            f"UPDATE watchlist SET {', '.join(sets)} WHERE id = ${idx} RETURNING *",
+            f"UPDATE stock_watchlist SET {', '.join(sets)} WHERE id = ${idx} RETURNING *",
             *values,
         )
         return _row_to_watchlist(row) if row else None
 
     async def remove(self, item_id: int) -> bool:
-        result = await self._db.execute("DELETE FROM watchlist WHERE id = $1", item_id)
+        result = await self._db.execute("DELETE FROM stock_watchlist WHERE id = $1", item_id)
         return result == "DELETE 1"
 
     async def seed_defaults(self) -> int:
-        count = await self._db.fetchval("SELECT COUNT(*) FROM watchlist")
+        count = await self._db.fetchval("SELECT COUNT(*) FROM stock_watchlist")
         if count and count > 0:
             return 0
         values = ", ".join(
@@ -159,7 +159,7 @@ class WatchlistRepo:
             for ticker, exchange, name in M7_DEFAULTS
         )
         await self._db.execute(
-            "INSERT INTO watchlist (ticker, exchange, name, memo, is_active) VALUES " + values
+            "INSERT INTO stock_watchlist (ticker, exchange, name, memo, is_active) VALUES " + values
         )
         return len(M7_DEFAULTS)
 
@@ -173,7 +173,7 @@ class WeeklyExpectedMoveRepo:
 
     async def save(self, wem: WeeklyExpectedMove) -> WeeklyExpectedMove:
         row = await self._db.fetchrow(
-            "INSERT INTO weekly_expected_moves "
+            "INSERT INTO stock_weekly_expected_moves "
             "(ticker, week_start, week_end, expected_move_high, expected_move_low, expected_move_pct) "
             "VALUES ($1, $2, $3, $4, $5, $6) "
             "ON CONFLICT (ticker, week_end) DO UPDATE SET "
@@ -201,7 +201,7 @@ class WeeklyExpectedMoveRepo:
             for item in items
         )
         await self._db.execute(
-            "INSERT INTO weekly_expected_moves "
+            "INSERT INTO stock_weekly_expected_moves "
             "(ticker, week_start, week_end, expected_move_high, expected_move_low, expected_move_pct) "
             "VALUES " + values + " "
             "ON CONFLICT (ticker, week_end) DO UPDATE SET "
@@ -215,7 +215,7 @@ class WeeklyExpectedMoveRepo:
 
     async def find_by_ticker(self, ticker: str, limit: int = 52) -> list[WeeklyExpectedMove]:
         rows = await self._db.fetch(
-            "SELECT * FROM weekly_expected_moves WHERE ticker = $1 "
+            "SELECT * FROM stock_weekly_expected_moves WHERE ticker = $1 "
             "ORDER BY week_start DESC LIMIT $2",
             ticker,
             limit,
@@ -224,14 +224,14 @@ class WeeklyExpectedMoveRepo:
 
     async def find_by_week(self, week_start: date) -> list[WeeklyExpectedMove]:
         rows = await self._db.fetch(
-            "SELECT * FROM weekly_expected_moves WHERE week_start = $1",
+            "SELECT * FROM stock_weekly_expected_moves WHERE week_start = $1",
             week_start,
         )
         return [_row_to_wem(r) for r in rows]
 
     async def find_all(self, limit: int = 500) -> list[WeeklyExpectedMove]:
         rows = await self._db.fetch(
-            "SELECT * FROM weekly_expected_moves ORDER BY week_start DESC LIMIT $1",
+            "SELECT * FROM stock_weekly_expected_moves ORDER BY week_start DESC LIMIT $1",
             limit,
         )
         return [_row_to_wem(r) for r in rows]
@@ -261,7 +261,7 @@ class CandleRepo:
             ])
             idx += 8
         await self._db.execute(
-            "INSERT INTO candles (ticker, interval, date, open, high, low, close, volume) "
+            "INSERT INTO stock_candles (ticker, interval, date, open, high, low, close, volume) "
             "VALUES " + ", ".join(parts) + " "
             "ON CONFLICT (ticker, interval, date) DO UPDATE SET "
             "open = EXCLUDED.open, high = EXCLUDED.high, "
@@ -279,7 +279,7 @@ class CandleRepo:
         end_date: date | None = None,
         limit: int = 5000,
     ) -> list[Candle]:
-        query = "SELECT * FROM candles WHERE ticker = $1 AND interval = $2"
+        query = "SELECT * FROM stock_candles WHERE ticker = $1 AND interval = $2"
         params: list[object] = [ticker, interval]
         idx = 3
         if start_date:
@@ -297,14 +297,14 @@ class CandleRepo:
 
     async def find_latest_date(self, ticker: str, interval: str = "1D") -> date | None:
         return await self._db.fetchval(
-            "SELECT date FROM candles WHERE ticker = $1 AND interval = $2 "
+            "SELECT date FROM stock_candles WHERE ticker = $1 AND interval = $2 "
             "ORDER BY date DESC LIMIT 1",
             ticker,
             interval,
         )
 
     async def count(self, ticker: str | None = None, interval: str | None = None) -> int:
-        query = "SELECT COUNT(*) FROM candles WHERE TRUE"
+        query = "SELECT COUNT(*) FROM stock_candles WHERE TRUE"
         params: list[object] = []
         idx = 1
         if ticker:
@@ -342,7 +342,7 @@ class AnalysisResultRepo:
         technical_details: dict,
     ) -> int:
         row_id = await self._db.fetchval(
-            "INSERT INTO analysis_results "
+            "INSERT INTO stock_analysis_results "
             "(ticker, exchange, timeframe, signal, total_score, confidence, "
             "market_regime, price, change, change_rate, technical_scores, technical_details) "
             "VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) "
@@ -378,7 +378,7 @@ class AnalysisResultRepo:
         self, tickers: list[str], timeframe: str = "1D"
     ) -> list[dict]:
         rows = await self._db.fetch(
-            "SELECT * FROM analysis_results "
+            "SELECT * FROM stock_analysis_results "
             "WHERE ticker = ANY($1) AND timeframe = $2 "
             "ORDER BY analyzed_at DESC",
             tickers,
@@ -388,7 +388,7 @@ class AnalysisResultRepo:
 
     async def find_all(self, timeframe: str = "1D") -> list[dict]:
         rows = await self._db.fetch(
-            "SELECT * FROM analysis_results WHERE timeframe = $1 "
+            "SELECT * FROM stock_analysis_results WHERE timeframe = $1 "
             "ORDER BY analyzed_at DESC",
             timeframe,
         )
@@ -404,20 +404,20 @@ class TickerParamsRepo:
 
     async def find_by_ticker(self, ticker: str) -> TickerParams | None:
         row = await self._db.fetchrow(
-            "SELECT * FROM ticker_params WHERE ticker = $1", ticker
+            "SELECT * FROM stock_ticker_params WHERE ticker = $1", ticker
         )
-        return _row_to_ticker_params(row) if row else None
+        return _row_to_stock_ticker_params(row) if row else None
 
     async def find_all_adopted(self) -> list[TickerParams]:
         rows = await self._db.fetch(
-            "SELECT * FROM ticker_params WHERE is_adopted = TRUE"
+            "SELECT * FROM stock_ticker_params WHERE is_adopted = TRUE"
         )
-        return [_row_to_ticker_params(r) for r in rows]
+        return [_row_to_stock_ticker_params(r) for r in rows]
 
     async def save(self, params: TickerParams) -> TickerParams:
         weights_json = json.dumps(params.weights) if params.weights else None
         row = await self._db.fetchrow(
-            "INSERT INTO ticker_params "
+            "INSERT INTO stock_ticker_params "
             "(ticker, weights, entry_threshold, exit_threshold, position_size_pct, "
             "in_sample_sharpe, in_sample_sortino, out_sample_sharpe, out_sample_sortino, "
             "is_adopted) "
@@ -444,7 +444,7 @@ class TickerParamsRepo:
             params.out_sample_sortino,
             params.is_adopted,
         )
-        return _row_to_ticker_params(row)
+        return _row_to_stock_ticker_params(row)
 
 
 def _esc(s: str) -> str:
