@@ -9,14 +9,14 @@ from fastapi import APIRouter, Depends, Query
 from app.core.database import Database
 from app.core.models import ApiResponse
 
-router = APIRouter(prefix="/api", tags=["Weather"])
+router = APIRouter(prefix="/api")
 
 
 def _get_db() -> Database:
     raise NotImplementedError
 
 
-@router.get("/weather")
+@router.get("/weather", tags=["Weather"])
 async def get_weather(
     minutes: int | None = None,
     fr: datetime | None = Query(None, alias="from"),
@@ -49,7 +49,7 @@ async def get_weather(
     return ApiResponse(success=True, data=_row_to_dict(row), meta={"total": 1, "returned": 1})
 
 
-@router.get("/weather/forecast")
+@router.get("/weather/forecast", tags=["Weather"])
 async def get_weather_forecast(
     location: str = "seoul",
     limit: int = 3,

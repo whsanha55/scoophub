@@ -9,14 +9,14 @@ from fastapi.responses import JSONResponse
 from app.core.database import Database
 from app.core.models import ApiResponse, ErrorBody
 
-router = APIRouter(prefix="/api", tags=["News"])
+router = APIRouter(prefix="/api")
 
 
 def _get_db() -> Database:
     raise NotImplementedError
 
 
-@router.get("/news")
+@router.get("/news", tags=["News"])
 async def get_news(
     minutes: int | None = None,
     fr: datetime | None = Query(None, alias="from"),
@@ -68,7 +68,7 @@ async def get_news(
     )
 
 
-@router.get("/news/{article_id}")
+@router.get("/news/{article_id}", tags=["News"])
 async def get_news_by_id(
     article_id: int,
     db: Database = Depends(_get_db),
