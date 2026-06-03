@@ -142,7 +142,6 @@ def create_app(db: Database | None = None) -> FastAPI:
         _db,
         provider_router,
         sync_interval_minutes=stock_cfg["sync_interval_minutes"],
-        sigma_schedule=stock_cfg["sigma_schedule"],
         analyze_schedule=stock_cfg["analyze_schedule"],
     )
 

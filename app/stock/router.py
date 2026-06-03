@@ -560,12 +560,38 @@ async def _do_sync_candles(db: Database) -> int:
 @router.post(
     "/crawling/stock/sigma",
     tags=["Stock Crawling"],
-    summary="Sigma 크롤 수동 실행",
+    summary="Sigma(1σ) 주간 예상 변동폭 크롤 수동 실행",
     description=(
-        "usstocksigma.com에서 주간 예상 변동폭(1σ) 크롤링.\n\n"
-        "- 자동 스케줄: 매주 월요일 03:00 (KST)\n"
-        "- 데이터: Ticker, 예상 변동률, -1σ, +1σ 가격"
+        "usstocksigma.com에서 이번 주 **예상 주간 변동폭(1σ)** 데이터를 크롤링합니다.\n\n"
+        "### 크롤링 데이터\n"
+        "| 항목 | 설명 |\n"
+        "|------|------|\n"
+        "| Ticker | 미국 주식 티커 (예: AAPL, TSLA) |\n"
+        "| 예상 변동률 | 주간 예상 변동률 (% Weekly Expected Move) |\n"
+        "| -1σ 가격 | 현재가 기준 하방 1표준편차 가격 |\n"
+        "| +1σ 가격 | 현재가 기준 상방 1표준편차 가격 |\n\n"
+        "### 자동 스케줄\n"
+        "- 평일 06:00(KST) 장 분석 파이프라인 내 step으로 자동 실행\n"
+        "- 이 엔드포인트는 수동 트리거용입니다."
     ),
+    responses={
+        200: {
+            "description": "크롤링 결과",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "success": True,
+                        "data": {
+                            "crawler": "stock_sigma",
+                            "items_fetched": 150,
+                            "items_new": 12,
+                            "errors": None,
+                        },
+                    }
+                }
+            },
+        },
+    },
 )
 async def crawling_sigma(db: Database = Depends(_get_db)):
     from app.stock.crawler import SigmaCrawler

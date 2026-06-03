@@ -13,14 +13,11 @@ if TYPE_CHECKING:
     from app.stock.provider.router import ProviderRouter
 
 logger = logging.getLogger(__name__)
-
-
 def register_jobs(
     scheduler: AsyncIOScheduler,
     db: Database,
     provider_router: ProviderRouter,
     sync_interval_minutes: int = 60,
-    sigma_schedule: str = "0 3 * * 1",      # cron: 월요일 03:00
     analyze_schedule: str = "0 6 * * 1-5",   # cron: 평일 06:00
 ) -> None:
     """Register stock scheduler jobs."""
@@ -53,22 +50,6 @@ def register_jobs(
         replace_existing=True,
     )
     logger.info("Scheduled 'stock_sync' every %d minutes", sync_interval_minutes)
-
-    async def _crawl_sigma() -> None:
-        from app.stock.crawler import SigmaCrawler
-
-        result = await SigmaCrawler(db).run()
-        if result:
-            logger.info("Sigma crawl: %d fetched, %d new", result.items_fetched, result.items_new)
-
-    parts = sigma_schedule.split()
-    scheduler.add_job(
-        _crawl_sigma,
-        trigger=CronTrigger(minute=parts[0], hour=parts[1], day=parts[2], month=parts[3], day_of_week=parts[4]),
-        id="stock_sigma",
-        replace_existing=True,
-    )
-    logger.info("Scheduled 'stock_sigma' with cron '%s'", sigma_schedule)
 
     async def _run_analysis() -> None:
         from app.stock.repository import WatchlistRepo
