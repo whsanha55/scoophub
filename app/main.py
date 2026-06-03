@@ -32,8 +32,11 @@ def create_app(db: Database | None = None) -> FastAPI:
     async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         await _db.initialize()
         logger.info("Database initialized")
-        scheduler.start()
-        logger.info("Scheduler started")
+        if settings.ENABLE_SCHEDULER:
+            scheduler.start()
+            logger.info("Scheduler started")
+        else:
+            logger.info("Scheduler disabled (ENABLE_SCHEDULER=false)")
 
         # Seed M7 watchlist defaults
         try:
@@ -53,7 +56,8 @@ def create_app(db: Database | None = None) -> FastAPI:
             await pr.close()
         except Exception:
             pass
-        scheduler.shutdown(wait=False)
+        if settings.ENABLE_SCHEDULER:
+            scheduler.shutdown(wait=False)
         await _db.close()
         logger.info("Shutdown complete")
 
@@ -101,12 +105,13 @@ def create_app(db: Database | None = None) -> FastAPI:
     with open("config/settings.yaml") as f:
         cfg = yaml.safe_load(f)
     news_cfg = cfg["crawlers"]["news"]
-    news_register_jobs(
-        scheduler,
-        _db,
-        schedule_minutes=news_cfg["schedule_minutes"],
-        cutoff_minutes=news_cfg["cutoff_minutes"],
-    )
+    if settings.ENABLE_SCHEDULER:
+        news_register_jobs(
+            scheduler,
+            _db,
+            schedule_minutes=news_cfg["schedule_minutes"],
+            cutoff_minutes=news_cfg["cutoff_minutes"],
+        )
 
     # Weather Context
     from app.weather.router import router as weather_router, _get_db as weather_get_db
@@ -116,11 +121,12 @@ def create_app(db: Database | None = None) -> FastAPI:
     app.include_router(weather_router)
 
     weather_cfg = cfg["crawlers"]["weather"]
-    weather_register_jobs(
-        scheduler,
-        _db,
-        schedule_minutes=weather_cfg["schedule_minutes"],
-    )
+    if settings.ENABLE_SCHEDULER:
+        weather_register_jobs(
+            scheduler,
+            _db,
+            schedule_minutes=weather_cfg["schedule_minutes"],
+        )
 
     # Stock Context
     from app.stock.router import router as stock_router, _get_db as stock_get_db, set_provider_router
@@ -137,13 +143,14 @@ def create_app(db: Database | None = None) -> FastAPI:
     set_provider_router(provider_router)
 
     stock_cfg = cfg["crawlers"]["stock"]
-    stock_register_jobs(
-        scheduler,
-        _db,
-        provider_router,
-        sync_interval_minutes=stock_cfg["sync_interval_minutes"],
-        analyze_schedule=stock_cfg["analyze_schedule"],
-    )
+    if settings.ENABLE_SCHEDULER:
+        stock_register_jobs(
+            scheduler,
+            _db,
+            provider_router,
+            sync_interval_minutes=stock_cfg["sync_interval_minutes"],
+            analyze_schedule=stock_cfg["analyze_schedule"],
+        )
 
     return app
 

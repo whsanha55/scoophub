@@ -9,6 +9,7 @@ class Settings(BaseSettings):
     DB_PASSWORD: str = "changeme"
     PORT: int = 8000
     LOG_LEVEL: str = "info"
+    ENABLE_SCHEDULER: bool = True
 
     # LLM Configuration
     LLM_API_URL: str = "https://openrouter.ai/api/v1"
