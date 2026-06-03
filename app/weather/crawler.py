@@ -109,7 +109,8 @@ class WeatherCrawler(BaseCrawler):
                 pm10 = pm10_list[idx] if idx < len(pm10_list) else None
                 pm25 = pm25_list[idx] if idx < len(pm25_list) else None
                 ozone = ozone_list[idx] if idx < len(ozone_list) else None
-                uv_index = max(uv_list) if uv_list else None
+                uv_clean = [v for v in uv_list if v is not None]
+                uv_index = max(uv_clean) if uv_clean else None
 
         weekly = wttr_data.get("weather", [])[:3]
 
