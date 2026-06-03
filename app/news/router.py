@@ -106,7 +106,7 @@ def _row_to_dict(row) -> dict:
 @router.post(
     "/crawling/news",
     summary="뉴스 크롤 수동 실행",
-    description="RSS 피드를 수집해 뉴스 기사를 저장합니다.",
+    description="RSS 피드를 수집해 뉴스 기사를 저장하고, 신규 기사를 LLM으로 요약합니다.",
     tags=["News Crawling"],
 )
 async def crawling_news(db: Database = Depends(_get_db)):
@@ -119,6 +119,7 @@ async def crawling_news(db: Database = Depends(_get_db)):
     | 소스      | RSS 피드  |
     | 저장 테이블 | `news_articles` |
 
+    크롤 후 `summary_status='pending'` 기사를 20개 단위로 LLM 요약합니다.
     `config/settings.yaml` → `crawlers.news` 참조.
     """
     from app.news.crawler import NewsCrawler
@@ -126,34 +127,21 @@ async def crawling_news(db: Database = Depends(_get_db)):
     result = await NewsCrawler(db, cutoff_minutes=30).run()
     if result is None:
         return ApiResponse(success=False, error={"code": "crawl_failed", "message": "뉴스 크롤 실패"})
-    return ApiResponse(success=True, data={
-        "crawler": "news",
-        "items_fetched": result.items_fetched,
-        "items_new": result.items_new,
-        "errors": result.errors or None,
-    })
 
-
-# ────────────────────────────────────────────────────────────
-#  수동 요약 트리거
-# ────────────────────────────────────────────────────────────
-
-
-@router.post(
-    "/crawling/news/summarize",
-    summary="뉴스 요약 수동 실행",
-    description="요약되지 않은 뉴스 기사를 LLM으로 요약합니다.",
-    tags=["News Crawling"],
-)
-async def summarize_news(db: Database = Depends(_get_db)):
+    summary = None
     try:
         from app.core.llm import LLMClient
         from app.news.summarizer import NewsSummarizer
 
         async with LLMClient() as llm:
-            summarizer = NewsSummarizer(db, llm)
-            result = await summarizer.summarize_pending()
+            summary = await NewsSummarizer(db, llm).summarize_pending()
     except Exception as e:
-        return ApiResponse(success=False, error={"code": "summarize_failed", "message": f"요약 실패: {e}"})
+        summary = {"error": f"요약 실패: {e}"}
 
-    return ApiResponse(success=True, data=result)
+    return ApiResponse(success=True, data={
+        "crawler": "news",
+        "items_fetched": result.items_fetched,
+        "items_new": result.items_new,
+        "errors": result.errors or None,
+        "summary": summary,
+    })
