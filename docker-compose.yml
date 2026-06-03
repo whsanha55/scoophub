@@ -1,7 +1,7 @@
 services:
   flyway:
     image: flyway/flyway:11-alpine
-    command: -connectRetries=10 migrate
+    command: -connectRetries=10 -baselineOnMigrate=true -baselineVersion=0 migrate
     env_file: .env
     environment:
       FLYWAY_URL: jdbc:postgresql://postgres:5432/${DB_NAME:-scoophub}
