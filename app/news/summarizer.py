@@ -16,8 +16,11 @@ logger = logging.getLogger(__name__)
 CHUNK_SIZE = 20
 _HANGUL = re.compile(r"[가-힣]")
 
-# 허용 category 집합 (LLM은 이 중 하나로 분류, 불명확하면 other)
-CATEGORIES = ("politics", "economy", "tech", "disaster", "global", "other")
+# 허용 category 집합 (LLM은 이 중 하나로 분류, 불명확할 때만 other)
+CATEGORIES = (
+    "politics", "economy", "markets", "tech", "society",
+    "world", "disaster", "science", "culture", "other",
+)
 
 SYSTEM_PROMPT = """당신은 한국어 뉴스 요약 도우미입니다.
 입력으로 여러 개의 뉴스 기사가 주어집니다. 각 기사는 idx, 제목, 본문을 가집니다.
@@ -25,11 +28,21 @@ SYSTEM_PROMPT = """당신은 한국어 뉴스 요약 도우미입니다.
 각 기사마다 다음을 생성하세요:
 - summary_ko: 한국어로 3-5문장 요약
 - importance: 중요도 정수 1~5 (5=속보·매우중요, 1=단순·일상)
-- category: 다음 중 하나 (politics, economy, tech, disaster, global, other)
+- category: 다음 중 하나만 선택 (애매할 때만 other):
+    politics : 정치·선거·정부·외교부
+    economy  : 거시경제·정책·금리·고용·무역·환율
+    markets  : 증시·기업실적·M&A·코인·원자재
+    tech     : IT·AI·반도체·플랫폼
+    society  : 사건·사고·범죄·노동·교육·복지 (재난 제외)
+    world    : 국제·분쟁·해외정세
+    disaster : 지진·태풍·홍수·화재·테러 등 재난
+    science  : 과학·보건의료·환경기후
+    culture  : 문화·예술·스포츠·연예·라이프
+    other    : 위 어디에도 안 맞을 때만
 - title_ko: 제목이 한국어가 아닌 경우에만 한국어 번역 제목. 이미 한국어면 생략
 
 반드시 아래 형식의 JSON 배열만 출력하세요. 설명·코드블록 없이 JSON만:
-[{"idx": 1, "summary_ko": "...", "importance": 3, "category": "economy", "title_ko": "..."}, ...]"""
+[{"idx": 1, "summary_ko": "...", "importance": 3, "category": "markets", "title_ko": "..."}, ...]"""
 
 
 class NewsSummarizer:
