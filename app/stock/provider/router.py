@@ -5,10 +5,7 @@ from app.stock.models import Candle
 
 
 class ProviderRouter:
-    """Routes data requests to available providers.
-
-    Currently only YFinance. TwelveData is TODO.
-    """
+    """Routes data requests to available providers."""
 
     def __init__(self, yfinance_provider) -> None:
         self._yfinance = yfinance_provider
