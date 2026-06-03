@@ -21,7 +21,7 @@ def register_jobs(
     provider_router: ProviderRouter,
     sync_interval_minutes: int = 60,
     sigma_schedule: str = "0 3 * * 1",      # cron: 월요일 03:00
-    analyze_schedule: str = "0 6 * * 1-5",   # cron: 평일 06:00
+    analyze_schedule: str = "0 6 * * 2-6",   # cron: 화-토 06:00 (KST, 미국장 종료)
 ) -> None:
     """Register stock scheduler jobs."""
 
@@ -72,23 +72,8 @@ def register_jobs(
 
     async def _run_analysis() -> None:
         from app.stock.repository import WatchlistRepo
-        from app.stock.router import _run_analysis_for_tickers, _do_sync_candles, _do_crawl_sigma
+        from app.stock.router import _run_analysis_for_tickers
 
-        # 1) Sync candles for latest data
-        try:
-            synced = await _do_sync_candles(db)
-            logger.info("Market-close candle sync: %d candles", synced)
-        except Exception:
-            logger.warning("Market-close candle sync failed", exc_info=True)
-
-        # 2) Crawl sigma data
-        try:
-            sigma_new = await _do_crawl_sigma(db)
-            logger.info("Market-close sigma crawl: %d new", sigma_new)
-        except Exception:
-            logger.warning("Market-close sigma crawl failed", exc_info=True)
-
-        # 3) Run analysis
         wl_repo = WatchlistRepo(db)
         items = await wl_repo.find_all(active_only=True)
         tickers = [it.ticker for it in items]
