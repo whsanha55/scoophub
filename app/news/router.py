@@ -22,7 +22,7 @@ async def get_news(
     fr: datetime | None = Query(None, alias="from"),
     to: datetime | None = Query(None, alias="to"),
     category: str | None = None,
-    importance: str | None = None,
+    min_importance: int | None = None,
     limit: int = 20,
     db: Database = Depends(_get_db),
 ):
@@ -31,23 +31,23 @@ async def get_news(
     idx = 1
 
     if minutes is not None:
-        conditions.append(f"fetched_at >= NOW() - interval '{int(minutes)} minutes'")
+        conditions.append(f"created_at >= NOW() - interval '{int(minutes)} minutes'")
     elif fr is not None and to is not None:
-        conditions.append(f"fetched_at BETWEEN ${idx} AND ${idx + 1}")
+        conditions.append(f"created_at BETWEEN ${idx} AND ${idx + 1}")
         params.extend([fr, to])
         idx += 2
     else:
         # Default: last 30 minutes
-        conditions.append("fetched_at >= NOW() - interval '30 minutes'")
+        conditions.append("created_at >= NOW() - interval '30 minutes'")
 
     if category:
         conditions.append(f"category = ${idx}")
         params.append(category)
         idx += 1
 
-    if importance:
-        conditions.append(f"importance = ${idx}")
-        params.append(importance)
+    if min_importance is not None:
+        conditions.append(f"importance >= ${idx}")
+        params.append(min_importance)
         idx += 1
 
     where = " AND ".join(conditions)
@@ -56,7 +56,7 @@ async def get_news(
 
     params.append(limit)
     rows = await db.fetch(
-        f"SELECT * FROM news_articles WHERE {where} ORDER BY fetched_at DESC LIMIT ${idx}",
+        f"SELECT * FROM news_articles WHERE {where} ORDER BY created_at DESC LIMIT ${idx}",
         *params,
     )
 
@@ -106,7 +106,7 @@ def _row_to_dict(row) -> dict:
 @router.post(
     "/crawling/news",
     summary="뉴스 크롤 수동 실행",
-    description="RSS 피드를 수집해 뉴스 기사를 저장합니다.",
+    description="RSS 피드를 수집해 뉴스 기사를 저장하고, 신규 기사를 LLM으로 요약합니다.",
     tags=["News Crawling"],
 )
 async def crawling_news(db: Database = Depends(_get_db)):
@@ -119,6 +119,7 @@ async def crawling_news(db: Database = Depends(_get_db)):
     | 소스      | RSS 피드  |
     | 저장 테이블 | `news_articles` |
 
+    크롤 후 `summary_status='pending'` 기사를 20개 단위로 LLM 요약합니다.
     `config/settings.yaml` → `crawlers.news` 참조.
     """
     from app.news.crawler import NewsCrawler
@@ -126,23 +127,35 @@ async def crawling_news(db: Database = Depends(_get_db)):
     result = await NewsCrawler(db, cutoff_minutes=30).run()
     if result is None:
         return ApiResponse(success=False, error={"code": "crawl_failed", "message": "뉴스 크롤 실패"})
+
+    summary = None
+    try:
+        from app.core.llm import LLMClient
+        from app.news.summarizer import NewsSummarizer
+
+        async with LLMClient() as llm:
+            summary = await NewsSummarizer(db, llm).summarize_pending()
+    except Exception as e:
+        summary = {"error": f"요약 실패: {e}"}
+
     return ApiResponse(success=True, data={
         "crawler": "news",
         "items_fetched": result.items_fetched,
         "items_new": result.items_new,
         "errors": result.errors or None,
+        "summary": summary,
     })
 
 
 # ────────────────────────────────────────────────────────────
-#  수동 요약 트리거
+#  수동 요약 트리거 (pending 재처리)
 # ────────────────────────────────────────────────────────────
 
 
 @router.post(
     "/crawling/news/summarize",
     summary="뉴스 요약 수동 실행",
-    description="요약되지 않은 뉴스 기사를 LLM으로 요약합니다.",
+    description="아직 요약되지 않은(summary_status='pending') 기사를 20개 단위로 LLM 요약합니다.",
     tags=["News Crawling"],
 )
 async def summarize_news(db: Database = Depends(_get_db)):
@@ -151,9 +164,8 @@ async def summarize_news(db: Database = Depends(_get_db)):
         from app.news.summarizer import NewsSummarizer
 
         async with LLMClient() as llm:
-            summarizer = NewsSummarizer(db, llm)
-            count = await summarizer.summarize_pending()
+            result = await NewsSummarizer(db, llm).summarize_pending()
     except Exception as e:
         return ApiResponse(success=False, error={"code": "summarize_failed", "message": f"요약 실패: {e}"})
 
-    return ApiResponse(success=True, data={"summarized_count": count})
+    return ApiResponse(success=True, data=result)

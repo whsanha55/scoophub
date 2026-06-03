@@ -1,6 +1,4 @@
--- Seed: Initial RSS news sources
--- Run once after database migration: psql -d scoophub -f scripts/seed_sources.sql
-
+-- Seed: initial RSS news sources
 INSERT INTO crawl_sources (crawler, name, url, active) VALUES
     ('news', 'Google KR', 'https://news.google.com/rss?hl=ko&gl=KR&ceid=KR:ko', TRUE),
     ('news', '매일경제', 'https://www.mk.co.kr/rss/30100041/', TRUE),

@@ -19,6 +19,10 @@ logger = logging.getLogger(__name__)
 
 
 def create_app(db: Database | None = None) -> FastAPI:
+    logging.basicConfig(
+        level=getattr(logging, settings.LOG_LEVEL.upper(), logging.INFO),
+        format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+    )
     _db = db or Database(settings.database_url)
     scheduler = AsyncIOScheduler(
         job_defaults={
@@ -111,6 +115,8 @@ def create_app(db: Database | None = None) -> FastAPI:
             _db,
             schedule_minutes=news_cfg["schedule_minutes"],
             cutoff_minutes=news_cfg["cutoff_minutes"],
+            title_similarity=news_cfg.get("title_similarity", 0.85),
+            dedup_window_hours=news_cfg.get("dedup_window_hours", 24),
         )
 
     # Weather Context

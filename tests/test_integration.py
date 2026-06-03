@@ -6,13 +6,13 @@ import pytest
 async def test_full_news_flow(client, db):
     """Insert via DB, retrieve via API."""
     await db.execute(
-        "INSERT INTO news_articles (source, title, url, fetched_at, category, importance) "
-        "VALUES ($1, $2, $3, NOW(), $4, $5)",
+        "INSERT INTO news_articles (source, title, url, category, importance) "
+        "VALUES ($1, $2, $3, $4, $5)",
         "test",
         "통합테스트 대통령 연설",
         "https://example.com/integration-1",
         "politics",
-        "high",
+        4,
     )
     # List
     resp = await client.get("/api/news")
@@ -49,13 +49,13 @@ async def test_full_weather_flow(client, db):
 @pytest.mark.asyncio
 async def test_health_with_data(client, db):
     await db.execute(
-        "INSERT INTO news_articles (source, title, url, fetched_at, category, importance) "
-        "VALUES ($1, $2, $3, NOW(), $4, $5)",
+        "INSERT INTO news_articles (source, title, url, category, importance) "
+        "VALUES ($1, $2, $3, $4, $5)",
         "test",
         "Health test",
         "https://example.com/health-test",
         "tech",
-        "low",
+        2,
     )
     resp = await client.get("/api/health")
     body = resp.json()
