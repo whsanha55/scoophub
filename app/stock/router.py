@@ -149,7 +149,8 @@ def _analysis_row_to_report(row: dict) -> StockReport:
 
     is_stale = None
     if analyzed_at and isinstance(analyzed_at, datetime):
-        hours_diff = (datetime.now(timezone.utc) - analyzed_at).total_seconds() / 3600
+        aware_at = analyzed_at if analyzed_at.tzinfo else analyzed_at.replace(tzinfo=timezone.utc)
+        hours_diff = (datetime.now(timezone.utc) - aware_at).total_seconds() / 3600
         is_stale = hours_diff > 24
 
     return StockReport(
@@ -328,7 +329,8 @@ async def stock_report_all(
         data_date = analyzed_at.isoformat() if isinstance(analyzed_at, datetime) else str(analyzed_at) if analyzed_at else None
         is_stale = None
         if analyzed_at and isinstance(analyzed_at, datetime):
-            hours_diff = (datetime.now(timezone.utc) - analyzed_at).total_seconds() / 3600
+            aware_at = analyzed_at if analyzed_at.tzinfo else analyzed_at.replace(tzinfo=timezone.utc)
+            hours_diff = (datetime.now(timezone.utc) - aware_at).total_seconds() / 3600
             is_stale = hours_diff > 24
 
         # Sigma enrichment
@@ -376,18 +378,18 @@ async def market_status():
     """US 주식 시장 상태 (단순 체크)."""
     from datetime import time as dt_time
 
-    now_ny = datetime.now(timezone.utc)  # Simplified; can use zoneinfo later
-    # Basic check: weekday 0-4
-    is_weekday = now_ny.weekday() < 5
-    hour = now_ny.hour
-    # US market hours roughly 14:30-21:00 UTC
-    is_market_hours = 13 <= hour <= 21
+    now_utc = datetime.now(timezone.utc)
+    is_weekday = now_utc.weekday() < 5
+    hour = now_utc.hour
+    minute = now_utc.minute
+    # US market hours: 14:30–21:00 UTC (9:30 AM–4:00 PM ET)
+    is_market_hours = (hour == 14 and minute >= 30) or (15 <= hour <= 20)
     is_open = is_weekday and is_market_hours
 
     return ApiResponse(success=True, data={
         "is_open": is_open,
         "is_weekday": is_weekday,
-        "current_utc": now_ny.isoformat(),
+        "current_utc": now_utc.isoformat(),
     })
 
 
