@@ -185,14 +185,13 @@ def _watchlist_item_to_out(item) -> WatchlistItemOut:
 
 
 @router.post(
-    "/stock/analyze",
-    tags=["Stock"],
-    summary="분석 실행",
+    "/crawling/stock/analyze",
+    tags=["Stock Crawling"],
+    summary="분석 수동 실행",
     description=(
-        "watchlist 종목의 기술 분석 실행 + 결과 저장.\n\n"
-        "캔들 동기화 → Sigma 크롤 → 기술 분석 순서로 자동 실행됩니다.\n\n"
+        "watchlist 종목의 기술 분석 수동 실행 + 결과 저장.\n\n"
         "- `tickers` 생략 시 활성 watchlist 전체 대상\n"
-        "- 자동 스케줄: 평일 06:00 (KST)"
+        "- 자동 스케줄: 평일 06:00 (KST, 장마감 직후)"
     ),
 )
 async def analyze(

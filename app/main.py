@@ -65,7 +65,7 @@ def create_app(db: Database | None = None) -> FastAPI:
         {"name": "Weather Crawling", "description": "날씨 크롤 수동 실행 API"},
         {"name": "Stock", "description": "주식 분석 API"},
         {"name": "Stock Watchlist", "description": "관심종목 관리 API"},
-        {"name": "Stock Crawling", "description": "주식 데이터 크롤 수동 실행 API"},
+        {"name": "Stock Crawling", "description": "주식 데이터 크롤 및 분석 수동 실행 API"},
         {"name": "System", "description": "시스템 상태 및 크롤 로그 API"},
     ]
 
