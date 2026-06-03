@@ -436,7 +436,8 @@ async def get_sigma(
         return ApiResponse(success=True, data=None)
 
     created_at = None
-    # SigmaResult doesn't store created_at directly; return id-based data
+    if result.created_at:
+        created_at = result.created_at.isoformat() if isinstance(result.created_at, datetime) else str(result.created_at)
     return ApiResponse(success=True, data=SigmaDataOut(
         ticker=result.ticker,
         sigma_type=result.sigma_type,

@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import date
+from datetime import date, datetime
 from enum import StrEnum
 
 
@@ -52,6 +52,7 @@ class SigmaResult:
     sigma_type: str = "daily"        # daily | weekly
     expiry_date: date | None = None
     source: str = "yfinance_options"
+    created_at: datetime | None = None
 
 
 class SigmaPosition(StrEnum):

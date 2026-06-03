@@ -29,6 +29,7 @@ def _row_to_sigma(row: dict) -> SigmaResult:
         sigma_type=row.get("sigma_type", "daily"),
         expiry_date=expiry,
         source=row.get("source", "yfinance_options"),
+        created_at=row.get("created_at"),
     )
 
 
