@@ -34,4 +34,12 @@ docker run --rm \
   -baselineVersion=0 \
   migrate
 
-uv run uvicorn app.main:create_app --factory --host 127.0.0.1 --port "${PORT:-20010}" --reload
+# Kill any process already bound to the target port.
+PORT="${PORT:-20010}"
+if lsof -ti "tcp:${PORT}" >/dev/null 2>&1; then
+  echo "[run_local] killing existing process on :${PORT}"
+  lsof -ti "tcp:${PORT}" | xargs kill -9 2>/dev/null || true
+  sleep 1
+fi
+
+uv run uvicorn app.main:create_app --factory --host 127.0.0.1 --port "${PORT}" --reload

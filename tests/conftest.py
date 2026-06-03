@@ -1,12 +1,20 @@
 # tests/conftest.py
 import pathlib
 
+import asyncpg
 import pytest
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
 
 from app.config import settings
 from app.core.database import Database
+
+# Tests run against a DEDICATED database so they never touch dev data.
+TEST_DB_NAME = f"{settings.DB_NAME}_test"
+TEST_DB_URL = (
+    f"postgresql://{settings.DB_USER}:{settings.DB_PASSWORD}"
+    f"@{settings.DB_HOST}:{settings.DB_PORT}/{TEST_DB_NAME}"
+)
 
 TRUNCATE_SQL = (
     "TRUNCATE news_articles, weather_snapshots, crawl_logs, "
@@ -15,6 +23,20 @@ TRUNCATE_SQL = (
 
 _MIGRATION_DIR = pathlib.Path(__file__).resolve().parent.parent / "db" / "migration"
 _migrated = False
+
+
+async def _ensure_test_db() -> None:
+    """Create the test database if it does not exist."""
+    admin = await asyncpg.connect(
+        user=settings.DB_USER, password=settings.DB_PASSWORD,
+        host=settings.DB_HOST, port=settings.DB_PORT, database="postgres",
+    )
+    try:
+        exists = await admin.fetchval("SELECT 1 FROM pg_database WHERE datname = $1", TEST_DB_NAME)
+        if not exists:
+            await admin.execute(f'CREATE DATABASE "{TEST_DB_NAME}"')
+    finally:
+        await admin.close()
 
 
 async def _ensure_schema(database: Database) -> None:
@@ -31,7 +53,8 @@ async def _ensure_schema(database: Database) -> None:
 
 @pytest_asyncio.fixture
 async def db():
-    database = Database(settings.database_url)
+    await _ensure_test_db()
+    database = Database(TEST_DB_URL)
     await _ensure_schema(database)
     pool = await database.pool
     async with pool.acquire() as conn:
