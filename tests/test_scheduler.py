@@ -11,7 +11,7 @@ from app.weather.scheduler import register_jobs as weather_register_jobs
 def test_news_register_jobs_adds_job():
     scheduler = AsyncIOScheduler()
     db = MagicMock()
-    news_register_jobs(scheduler, db, schedule_minutes=15, cutoff_minutes=30)
+    news_register_jobs(scheduler, db, schedule_minutes=15, max_lookback_hours=24)
     jobs = scheduler.get_jobs()
     assert len(jobs) == 1
     assert jobs[0].id == "news_crawler"
@@ -33,8 +33,8 @@ async def test_news_register_jobs_replace_existing():
     scheduler = AsyncIOScheduler()
     scheduler.start()
     db = MagicMock()
-    news_register_jobs(scheduler, db, schedule_minutes=15, cutoff_minutes=30)
-    news_register_jobs(scheduler, db, schedule_minutes=10, cutoff_minutes=20)
+    news_register_jobs(scheduler, db, schedule_minutes=15, max_lookback_hours=24)
+    news_register_jobs(scheduler, db, schedule_minutes=10, max_lookback_hours=12)
     jobs = scheduler.get_jobs()
     assert len(jobs) == 1
     assert jobs[0].id == "news_crawler"

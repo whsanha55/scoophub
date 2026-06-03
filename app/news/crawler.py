@@ -3,14 +3,14 @@ from __future__ import annotations
 
 import logging
 import re
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from email.utils import parsedate_to_datetime
 
 import feedparser
 import httpx
 
 from app.news.dedup import is_duplicate_title, normalize_url
-from app.news.filter_rules import is_within_cutoff
+from app.news.filter_rules import passes_cutoff
 from app.news.sources import RssSource
 from app.core.base_crawler import BaseCrawler, CrawlResult
 
@@ -47,15 +47,27 @@ class NewsCrawler(BaseCrawler):
         self,
         db,
         timeout: int = 10,
-        cutoff_minutes: int = 30,
+        max_lookback_hours: int = 24,
         title_similarity: float = 0.85,
         dedup_window_hours: int = 24,
     ):
         super().__init__(db)
         self.timeout = timeout
-        self.cutoff_minutes = cutoff_minutes
+        self.max_lookback_hours = max_lookback_hours
         self.title_similarity = title_similarity
         self.dedup_window_hours = dedup_window_hours
+
+    async def _compute_cutoff(self) -> datetime:
+        """Cutoff = 직전 성공 크롤 이후. 없거나 오래됐으면 now - max_lookback_hours.
+
+        24h 상한이 fallback 겸용 (첫 실행/장기 다운 시 백로그 폭발 방지)."""
+        floor = datetime.now(timezone.utc) - timedelta(hours=self.max_lookback_hours)
+        last = await self.db.fetchval(
+            "SELECT max(finished_at) FROM crawl_logs "
+            "WHERE crawler = $1 AND status IN ('success', 'partial')",
+            self.name,
+        )
+        return max(last, floor) if last else floor
 
     async def _get_sources(self) -> list[RssSource]:
         """Load active sources from DB."""
@@ -84,12 +96,13 @@ class NewsCrawler(BaseCrawler):
         # Shared dedup state across all sources in this run.
         seen_urls: set[str] = set()
         titles: list[str] = await self._recent_titles()
+        cutoff = await self._compute_cutoff()
 
         async with httpx.AsyncClient(timeout=self.timeout) as client:
             for source in sources:
                 try:
                     items, new, deduped, new_ids = await self._fetch_source(
-                        client, source, seen_urls, titles
+                        client, source, seen_urls, titles, cutoff
                     )
                     total_fetched += items
                     total_new += new
@@ -116,6 +129,7 @@ class NewsCrawler(BaseCrawler):
         source: RssSource,
         seen_urls: set[str],
         titles: list[str],
+        cutoff: datetime,
     ) -> tuple[int, int, int, list[int]]:
         response = await client.get(source.url)
         feed = feedparser.parse(response.text)
@@ -133,7 +147,7 @@ class NewsCrawler(BaseCrawler):
             description = _strip_html(getattr(entry, "summary", ""))
             published_at = _parse_published(entry)
 
-            if not is_within_cutoff(published_at, self.cutoff_minutes):
+            if not passes_cutoff(published_at, cutoff):
                 continue
 
             fetched += 1

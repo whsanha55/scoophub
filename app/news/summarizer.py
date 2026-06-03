@@ -14,6 +14,8 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 CHUNK_SIZE = 20
+# 재시도 대상 시간 윈도우 (오래된 실패 무한 재시도/비용 폭주 방지)
+RETRY_WINDOW_HOURS = 24
 _HANGUL = re.compile(r"[가-힣]")
 
 # 허용 category 집합 (LLM은 이 중 하나로 분류, 불명확할 때만 other)
@@ -50,14 +52,18 @@ class NewsSummarizer:
         self.db = db
         self.llm = llm
 
-    async def summarize_pending(self) -> dict:
-        """Summarize all pending articles in chunks. Returns counts per outcome."""
+    async def summarize_incomplete(self) -> dict:
+        """Summarize not-yet-succeeded articles (pending/failed/error) from the last
+        RETRY_WINDOW_HOURS, in chunks. Returns counts per outcome.
+
+        The recency bound is a safety guard against retrying stale failures forever."""
         rows = await self.db.fetch(
             "SELECT id, title, summary, importance, category FROM news_articles "
-            "WHERE summary_status = 'pending' ORDER BY id"
+            f"WHERE summary_status <> 'success' AND created_at >= NOW() - interval '{RETRY_WINDOW_HOURS} hours' "
+            "ORDER BY id"
         )
         if not rows:
-            logger.info("No pending articles to summarize")
+            logger.info("No incomplete articles to summarize")
             return {"success": 0, "failed": 0, "error": 0, "total": 0}
 
         counts = {"success": 0, "failed": 0, "error": 0}
