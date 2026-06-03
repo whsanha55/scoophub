@@ -114,7 +114,7 @@ def create_app(db: Database | None = None) -> FastAPI:
             scheduler,
             _db,
             schedule_minutes=news_cfg["schedule_minutes"],
-            cutoff_minutes=news_cfg["cutoff_minutes"],
+            max_lookback_hours=news_cfg.get("max_lookback_hours", 24),
             title_similarity=news_cfg.get("title_similarity", 0.85),
             dedup_window_hours=news_cfg.get("dedup_window_hours", 24),
         )

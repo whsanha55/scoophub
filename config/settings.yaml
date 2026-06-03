@@ -1,7 +1,7 @@
 crawlers:
   news:
     schedule_minutes: 15
-    cutoff_minutes: 30
+    max_lookback_hours: 24        # cutoff 상한·fallback (직전 성공 크롤 이후, 없으면 now-24h)
     source_timeout_seconds: 10
     retry_count: 3
     retry_delay_seconds: 10

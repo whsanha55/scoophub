@@ -17,7 +17,7 @@ def register_jobs(
     scheduler: AsyncIOScheduler,
     db: Database,
     schedule_minutes: int,
-    cutoff_minutes: int,
+    max_lookback_hours: int = 24,
     title_similarity: float = 0.85,
     dedup_window_hours: int = 24,
 ) -> None:
@@ -26,7 +26,7 @@ def register_jobs(
 
         await NewsCrawler(
             db,
-            cutoff_minutes=cutoff_minutes,
+            max_lookback_hours=max_lookback_hours,
             title_similarity=title_similarity,
             dedup_window_hours=dedup_window_hours,
         ).run()
@@ -38,7 +38,7 @@ def register_jobs(
 
             async with LLMClient() as llm:
                 summarizer = NewsSummarizer(db, llm)
-                result = await summarizer.summarize_pending()
+                result = await summarizer.summarize_incomplete()
                 if result["total"]:
                     logger.info("Summarized %s", result)
         except Exception as e:
