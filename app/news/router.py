@@ -1,6 +1,7 @@
 # news/router.py
 from __future__ import annotations
 
+import logging
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, Query
@@ -8,6 +9,8 @@ from fastapi.responses import JSONResponse
 
 from app.core.database import Database
 from app.core.models import ApiResponse, ErrorDetail
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api")
 
@@ -35,6 +38,7 @@ async def get_news(
     limit: int = Query(20, ge=1, le=200, description="조회할 최대 기사 수"),
     db: Database = Depends(_get_db),
 ):
+    logger.info("get_news 시작 - minutes=%s, category=%s, min_importance=%s, limit=%d", minutes, category, min_importance, limit)
     conditions = []
     params: list = []
     idx = 1
@@ -70,6 +74,7 @@ async def get_news(
     )
 
     articles = [_row_to_dict(r) for r in rows]
+    logger.info("get_news 완료 - total=%d, returned=%d", total, len(articles))
     return ApiResponse(
         success=True,
         data=articles,
@@ -87,6 +92,7 @@ async def get_news_by_id(
     article_id: int,
     db: Database = Depends(_get_db),
 ):
+    logger.info("get_news_by_id 시작 - article_id=%d", article_id)
     row = await db.fetchrow("SELECT * FROM news_articles WHERE id = $1", article_id)
     if not row:
         return JSONResponse(
@@ -136,6 +142,7 @@ async def crawling_news(db: Database = Depends(_get_db)):
     크롤 후 `summary_status='pending'` 기사를 20개 단위로 LLM 요약합니다.
     `config/settings.yaml` → `crawlers.news` 참조.
     """
+    logger.info("crawling_news 시작 - 뉴스 크롤 수동 실행")
     from app.news.crawler import NewsCrawler
 
     result = await NewsCrawler(db).run()
@@ -152,6 +159,7 @@ async def crawling_news(db: Database = Depends(_get_db)):
     except Exception as e:
         summary = {"error": f"요약 실패: {e}"}
 
+    logger.info("crawling_news 완료 - items_fetched=%d, items_new=%d", result.items_fetched, result.items_new)
     return ApiResponse(success=True, data={
         "crawler": "news",
         "items_fetched": result.items_fetched,
@@ -173,6 +181,7 @@ async def crawling_news(db: Database = Depends(_get_db)):
     tags=["News Crawling"],
 )
 async def summarize_news_retry(db: Database = Depends(_get_db)):
+    logger.info("summarize_news_retry 시작 - 미완료 기사 요약 재시도")
     try:
         from app.core.llm import LLMClient
         from app.news.summarizer import NewsSummarizer
@@ -182,4 +191,5 @@ async def summarize_news_retry(db: Database = Depends(_get_db)):
     except Exception as e:
         return ApiResponse(success=False, error=ErrorDetail(code="summarize_failed", message=f"요약 실패: {e}"))
 
+    logger.info("summarize_news_retry 완료 - result=%s", result)
     return ApiResponse(success=True, data=result)
