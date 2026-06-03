@@ -9,7 +9,7 @@ from email.utils import parsedate_to_datetime
 import feedparser
 import httpx
 
-from app.news.dedup import is_duplicate_title, normalize_url
+from app.news.dedup import normalize_url
 from app.news.filter_rules import passes_cutoff
 from app.news.sources import RssSource
 from app.core.base_crawler import BaseCrawler, CrawlResult
@@ -48,14 +48,10 @@ class NewsCrawler(BaseCrawler):
         db,
         timeout: int = 10,
         max_lookback_hours: int = 24,
-        title_similarity: float = 0.85,
-        dedup_window_hours: int = 24,
     ):
         super().__init__(db)
         self.timeout = timeout
         self.max_lookback_hours = max_lookback_hours
-        self.title_similarity = title_similarity
-        self.dedup_window_hours = dedup_window_hours
 
     async def _compute_cutoff(self) -> datetime:
         """Cutoff = 직전 성공 크롤 이후. 없거나 오래됐으면 now - max_lookback_hours.
@@ -77,14 +73,6 @@ class NewsCrawler(BaseCrawler):
         )
         return [RssSource(name=r["name"], url=r["url"], active=r["active"]) for r in rows]
 
-    async def _recent_titles(self) -> list[str]:
-        """Titles from the dedup window, for similarity comparison."""
-        rows = await self.db.fetch(
-            f"SELECT title FROM news_articles "
-            f"WHERE created_at >= NOW() - interval '{int(self.dedup_window_hours)} hours'"
-        )
-        return [r["title"] for r in rows]
-
     async def fetch(self) -> CrawlResult:
         sources = await self._get_sources()
         total_fetched = 0
@@ -95,14 +83,13 @@ class NewsCrawler(BaseCrawler):
 
         # Shared dedup state across all sources in this run.
         seen_urls: set[str] = set()
-        titles: list[str] = await self._recent_titles()
         cutoff = await self._compute_cutoff()
 
         async with httpx.AsyncClient(timeout=self.timeout) as client:
             for source in sources:
                 try:
                     items, new, deduped, new_ids = await self._fetch_source(
-                        client, source, seen_urls, titles, cutoff
+                        client, source, seen_urls, cutoff
                     )
                     total_fetched += items
                     total_new += new
@@ -114,7 +101,7 @@ class NewsCrawler(BaseCrawler):
                     errors.append(msg)
 
         if total_deduped:
-            logger.info("news dedup: skipped %d duplicates", total_deduped)
+            logger.info("news URL dedup: skipped %d duplicates", total_deduped)
 
         return CrawlResult(
             items_fetched=total_fetched,
@@ -128,7 +115,6 @@ class NewsCrawler(BaseCrawler):
         client: httpx.AsyncClient,
         source: RssSource,
         seen_urls: set[str],
-        titles: list[str],
         cutoff: datetime,
     ) -> tuple[int, int, int, list[int]]:
         response = await client.get(source.url)
@@ -152,9 +138,9 @@ class NewsCrawler(BaseCrawler):
 
             fetched += 1
 
-            # Dedup: exact normalized URL, then title similarity within the window.
+            # Dedup: exact normalized URL only. Title dedup handled by LLM.
             nurl = normalize_url(url)
-            if nurl in seen_urls or is_duplicate_title(title, titles, self.title_similarity):
+            if nurl in seen_urls:
                 deduped += 1
                 continue
 
@@ -175,7 +161,6 @@ class NewsCrawler(BaseCrawler):
                     new += 1
                     new_ids.append(inserted_id)
                     seen_urls.add(nurl)
-                    titles.append(title)
                 else:
                     deduped += 1
             except Exception as e:

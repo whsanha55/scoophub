@@ -18,20 +18,32 @@ def register_jobs(
     db: Database,
     schedule_minutes: int,
     max_lookback_hours: int = 24,
-    title_similarity: float = 0.85,
     dedup_window_hours: int = 24,
 ) -> None:
     async def _run_news_crawl() -> None:
         from app.news.crawler import NewsCrawler
 
-        await NewsCrawler(
+        crawler = NewsCrawler(
             db,
             max_lookback_hours=max_lookback_hours,
-            title_similarity=title_similarity,
-            dedup_window_hours=dedup_window_hours,
-        ).run()
+        )
+        crawl_result = await crawler.run()
 
-        # Summarize newly crawled articles
+        # LLM dedup: 신규 삽입 기사 중 중복 판별
+        new_ids = crawl_result.new_article_ids if crawl_result else []
+        if new_ids:
+            try:
+                from app.core.llm import LLMClient
+                from app.news.dedup import llm_dedup
+
+                async with LLMClient() as llm:
+                    deduped_count = await llm_dedup(db, llm, new_ids, dedup_window_hours)
+                    if deduped_count:
+                        logger.info("LLM dedup marked %d duplicates", deduped_count)
+            except Exception as e:
+                logger.error("LLM dedup failed: %s", e)
+
+        # Summarize non-duplicate articles
         try:
             from app.core.llm import LLMClient
             from app.news.summarizer import NewsSummarizer
