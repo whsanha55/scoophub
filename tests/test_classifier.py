@@ -37,19 +37,6 @@ def test_classify_unknown(classifier):
     assert classifier.classify_category("일반 뉴스 아무내용") is None
 
 
-def test_classify_importance_high(classifier):
-    assert classifier.classify_importance("지진 대통령 급락") == "high"
-
-
-def test_classify_importance_medium(classifier):
-    assert classifier.classify_importance("GDP 실업률 반도체") == "medium"
-
-
-def test_classify_importance_low(classifier):
-    result = classifier.classify_importance("일반 경제 동향 전망")
-    assert result == "low"
-
-
 def test_should_exclude(classifier):
     assert classifier.should_exclude("스포츠 축구 결승전") is True
     assert classifier.should_exclude("연예인 아이돌 예능") is True
@@ -57,11 +44,8 @@ def test_should_exclude(classifier):
 
 
 def test_classify_full(classifier):
-    result = classifier.classify("대통령 국회 외교 회담")
-    assert result.category == "politics"
-    assert result.importance == "high"
+    assert classifier.classify("대통령 국회 외교 회담") == "politics"
 
 
 def test_classify_excluded_returns_none(classifier):
-    result = classifier.classify("스포츠 축구 결승전 결과")
-    assert result is None
+    assert classifier.classify("스포츠 축구 결승전 결과") is None

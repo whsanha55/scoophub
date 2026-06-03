@@ -25,8 +25,8 @@ async def test_insert_news_article(db):
     pool = await db.pool
     async with pool.acquire() as conn:
         row = await conn.fetchrow(
-            "INSERT INTO news_articles (source, title, url, fetched_at) "
-            "VALUES ($1, $2, $3, NOW()) RETURNING *",
+            "INSERT INTO news_articles (source, title, url) "
+            "VALUES ($1, $2, $3) RETURNING *",
             "test_source",
             "Test Title",
             "https://example.com/test",
@@ -42,16 +42,16 @@ async def test_duplicate_url_rejected(db):
     pool = await db.pool
     async with pool.acquire() as conn:
         await conn.execute(
-            "INSERT INTO news_articles (source, title, url, fetched_at) "
-            "VALUES ($1, $2, $3, NOW())",
+            "INSERT INTO news_articles (source, title, url) "
+            "VALUES ($1, $2, $3)",
             "src",
             "t1",
             "https://example.com/dup",
         )
         with pytest.raises(Exception):
             await conn.execute(
-                "INSERT INTO news_articles (source, title, url, fetched_at) "
-                "VALUES ($1, $2, $3, NOW())",
+                "INSERT INTO news_articles (source, title, url) "
+                "VALUES ($1, $2, $3)",
                 "src",
                 "t2",
                 "https://example.com/dup",

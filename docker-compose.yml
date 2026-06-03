@@ -1,4 +1,17 @@
 services:
+  flyway:
+    image: flyway/flyway:11-alpine
+    command: -connectRetries=10 migrate
+    env_file: .env
+    environment:
+      FLYWAY_URL: jdbc:postgresql://postgres:5432/${DB_NAME:-scoophub}
+      FLYWAY_USER: ${DB_USER:-scoophub}
+      FLYWAY_PASSWORD: ${DB_PASSWORD:-changeme}
+    volumes:
+      - ./db/migration:/flyway/sql:ro
+    networks:
+      - infra
+
   app:
     build: .
     restart: unless-stopped
@@ -8,6 +21,9 @@ services:
       PORT: "20010"
     ports:
       - "127.0.0.1:20010:20010"
+    depends_on:
+      flyway:
+        condition: service_completed_successfully
     networks:
       - infra
 

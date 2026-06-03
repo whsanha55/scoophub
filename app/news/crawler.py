@@ -104,24 +104,23 @@ class NewsCrawler(BaseCrawler):
             if not is_within_cutoff(published_at, self.cutoff_minutes):
                 continue
 
-            classification = self.classifier.classify(title)
-            if classification is None:
+            category = self.classifier.classify(title)
+            if category is None:
                 continue
 
             fetched += 1
             try:
                 inserted_id = await self.db.fetchval(
-                    "INSERT INTO news_articles (source, title, description, url, published_at, fetched_at, category, importance) "
-                    "VALUES ($1, $2, $3, $4, $5, NOW(), $6, $7) "
+                    "INSERT INTO news_articles (source, category, title, summary, url, published_at) "
+                    "VALUES ($1, $2, $3, $4, $5, $6) "
                     "ON CONFLICT (url) DO NOTHING "
                     "RETURNING id",
                     source.name,
+                    category,
                     title,
                     description or None,
                     url,
                     published_at,
-                    classification.category,
-                    classification.importance,
                 )
                 if inserted_id is not None:
                     new += 1

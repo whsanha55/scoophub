@@ -1,16 +1,9 @@
 # news/classifier.py
 from __future__ import annotations
 
-from dataclasses import dataclass
 from pathlib import Path
 
 import yaml
-
-
-@dataclass
-class ClassificationResult:
-    category: str
-    importance: str
 
 
 class NewsClassifier:
@@ -19,9 +12,6 @@ class NewsClassifier:
             data = yaml.safe_load(f)
         self._categories: dict[str, list[str]] = {
             name: cfg["keywords"] for name, cfg in data["categories"].items()
-        }
-        self._importance: dict[str, list[str]] = {
-            name: cfg["keywords"] for name, cfg in data["importance"].items()
         }
         self._exclude: list[str] = data["exclude"]["keywords"]
 
@@ -36,22 +26,12 @@ class NewsClassifier:
                 best = cat
         return best
 
-    def classify_importance(self, text: str) -> str:
-        text_lower = text.lower()
-        for level in ("high", "medium", "low"):
-            if any(kw.lower() in text_lower for kw in self._importance[level]):
-                return level
-        return "low"
-
     def should_exclude(self, text: str) -> bool:
         text_lower = text.lower()
         return any(kw.lower() in text_lower for kw in self._exclude)
 
-    def classify(self, text: str) -> ClassificationResult | None:
+    def classify(self, text: str) -> str | None:
+        """Return category name, or None if excluded / uncategorized."""
         if self.should_exclude(text):
             return None
-        category = self.classify_category(text)
-        if category is None:
-            return None
-        importance = self.classify_importance(text)
-        return ClassificationResult(category=category, importance=importance)
+        return self.classify_category(text)

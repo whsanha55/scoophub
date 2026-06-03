@@ -1,4 +1,6 @@
 # tests/conftest.py
+import pathlib
+
 import pytest
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
@@ -11,11 +13,26 @@ TRUNCATE_SQL = (
     "crawler_metadata, crawl_sources RESTART IDENTITY CASCADE"
 )
 
+_MIGRATION_DIR = pathlib.Path(__file__).resolve().parent.parent / "db" / "migration"
+_migrated = False
+
+
+async def _ensure_schema(database: Database) -> None:
+    """Apply Flyway SQL migrations directly to the test DB (no Flyway binary)."""
+    global _migrated
+    if _migrated:
+        return
+    pool = await database.pool
+    async with pool.acquire() as conn:
+        for sql_file in sorted(_MIGRATION_DIR.glob("V*.sql")):
+            await conn.execute(sql_file.read_text(encoding="utf-8"))
+    _migrated = True
+
 
 @pytest_asyncio.fixture
 async def db():
     database = Database(settings.database_url)
-    await database.initialize()
+    await _ensure_schema(database)
     pool = await database.pool
     async with pool.acquire() as conn:
         await conn.execute(TRUNCATE_SQL)

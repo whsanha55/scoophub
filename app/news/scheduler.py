@@ -31,9 +31,9 @@ def register_jobs(
 
             async with LLMClient() as llm:
                 summarizer = NewsSummarizer(db, llm)
-                count = await summarizer.summarize_pending()
-                if count:
-                    logger.info("Summarized %d articles", count)
+                result = await summarizer.summarize_pending()
+                if result["total"]:
+                    logger.info("Summarized %s", result)
         except Exception as e:
             logger.error("Summarization failed: %s", e)
 

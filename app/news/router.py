@@ -22,7 +22,7 @@ async def get_news(
     fr: datetime | None = Query(None, alias="from"),
     to: datetime | None = Query(None, alias="to"),
     category: str | None = None,
-    importance: str | None = None,
+    min_importance: int | None = None,
     limit: int = 20,
     db: Database = Depends(_get_db),
 ):
@@ -31,23 +31,23 @@ async def get_news(
     idx = 1
 
     if minutes is not None:
-        conditions.append(f"fetched_at >= NOW() - interval '{int(minutes)} minutes'")
+        conditions.append(f"created_at >= NOW() - interval '{int(minutes)} minutes'")
     elif fr is not None and to is not None:
-        conditions.append(f"fetched_at BETWEEN ${idx} AND ${idx + 1}")
+        conditions.append(f"created_at BETWEEN ${idx} AND ${idx + 1}")
         params.extend([fr, to])
         idx += 2
     else:
         # Default: last 30 minutes
-        conditions.append("fetched_at >= NOW() - interval '30 minutes'")
+        conditions.append("created_at >= NOW() - interval '30 minutes'")
 
     if category:
         conditions.append(f"category = ${idx}")
         params.append(category)
         idx += 1
 
-    if importance:
-        conditions.append(f"importance = ${idx}")
-        params.append(importance)
+    if min_importance is not None:
+        conditions.append(f"importance >= ${idx}")
+        params.append(min_importance)
         idx += 1
 
     where = " AND ".join(conditions)
@@ -56,7 +56,7 @@ async def get_news(
 
     params.append(limit)
     rows = await db.fetch(
-        f"SELECT * FROM news_articles WHERE {where} ORDER BY fetched_at DESC LIMIT ${idx}",
+        f"SELECT * FROM news_articles WHERE {where} ORDER BY created_at DESC LIMIT ${idx}",
         *params,
     )
 
@@ -152,8 +152,8 @@ async def summarize_news(db: Database = Depends(_get_db)):
 
         async with LLMClient() as llm:
             summarizer = NewsSummarizer(db, llm)
-            count = await summarizer.summarize_pending()
+            result = await summarizer.summarize_pending()
     except Exception as e:
         return ApiResponse(success=False, error={"code": "summarize_failed", "message": f"요약 실패: {e}"})
 
-    return ApiResponse(success=True, data={"summarized_count": count})
+    return ApiResponse(success=True, data=result)
