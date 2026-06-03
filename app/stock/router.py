@@ -560,7 +560,7 @@ async def _do_sync_candles(db: Database) -> int:
 @router.post(
     "/crawling/stock/sigma",
     tags=["Stock Crawling"],
-    summary="Sigma(1σ) 주간 예상 변동폭 크롤 수동 실행",
+    summary="Sigma(1σ) 주간 예상 변동폭 크롤 (월 03:00 자동 / 수동 트리거)",
     description=(
         "usstocksigma.com에서 이번 주 **예상 주간 변동폭(1σ)** 데이터를 크롤링합니다.\n\n"
         "### 크롤링 데이터\n"
@@ -571,8 +571,8 @@ async def _do_sync_candles(db: Database) -> int:
         "| -1σ 가격 | 현재가 기준 하방 1표준편차 가격 |\n"
         "| +1σ 가격 | 현재가 기준 상방 1표준편차 가격 |\n\n"
         "### 자동 스케줄\n"
-        "- 매주 월요일 03:00(KST) 자동 실행\n"
-        "- 이 엔드포인트는 수동 트리거용입니다."
+        "- 매주 월요일 03:00(KST) 스케줄러가 자동 실행합니다.\n"
+        "- 본 엔드포인트는 스케줄과 별개로 즉시 재크롤이 필요할 때 쓰는 수동 트리거입니다."
     ),
     responses={
         200: {
