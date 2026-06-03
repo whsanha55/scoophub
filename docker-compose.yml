@@ -5,8 +5,9 @@ services:
     env_file: .env
     environment:
       DB_HOST: postgres
+      PORT: "20010"
     ports:
-      - "127.0.0.1:8000:8000"
+      - "127.0.0.1:20010:20010"
     networks:
       - infra
 
