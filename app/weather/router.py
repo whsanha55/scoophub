@@ -7,7 +7,7 @@ from datetime import datetime
 from fastapi import APIRouter, Depends, Query
 
 from app.core.database import Database
-from app.core.models import ApiResponse
+from app.core.models import ApiResponse, ErrorDetail
 
 router = APIRouter(prefix="/api")
 
@@ -16,12 +16,21 @@ def _get_db() -> Database:
     raise NotImplementedError
 
 
-@router.get("/weather", tags=["Weather"])
+@router.get(
+    "/weather",
+    tags=["Weather"],
+    summary="현재 날씨 조회",
+    description=(
+        "지정한 지역의 최신 날씨 스냅샷을 반환합니다.\n\n"
+        "- 시간 필터: `minutes` 또는 `from`/`to` 범위 (둘 다 없으면 최근 30분)\n"
+        "- 해당 기간에 데이터가 없으면 `data=null`"
+    ),
+)
 async def get_weather(
-    minutes: int | None = None,
-    fr: datetime | None = Query(None, alias="from"),
-    to: datetime | None = Query(None, alias="to"),
-    location: str = "seoul",
+    minutes: int | None = Query(None, ge=1, description="최근 N분 이내 데이터 조회"),
+    fr: datetime | None = Query(None, alias="from", description="조회 시작 시각 (ISO 8601)"),
+    to: datetime | None = Query(None, alias="to", description="조회 종료 시각 (ISO 8601)"),
+    location: str = Query("seoul", description="지역 이름 (예: seoul, busan)"),
     db: Database = Depends(_get_db),
 ):
     conditions = ["location = $1"]
@@ -49,10 +58,15 @@ async def get_weather(
     return ApiResponse(success=True, data=_row_to_dict(row), meta={"total": 1, "returned": 1})
 
 
-@router.get("/weather/forecast", tags=["Weather"])
+@router.get(
+    "/weather/forecast",
+    tags=["Weather"],
+    summary="주간 날씨 예보 조회",
+    description="지정한 지역의 주간 예보 데이터를 반환합니다. 최대 limit일치까지.",
+)
 async def get_weather_forecast(
-    location: str = "seoul",
-    limit: int = 3,
+    location: str = Query("seoul", description="지역 이름 (예: seoul, busan)"),
+    limit: int = Query(3, ge=1, le=7, description="조회할 최대 일수"),
     db: Database = Depends(_get_db),
 ):
     row = await db.fetchrow(
@@ -103,7 +117,7 @@ async def crawling_weather(db: Database = Depends(_get_db)):
 
     result = await WeatherCrawler(db).run()
     if result is None:
-        return ApiResponse(success=False, error={"code": "crawl_failed", "message": "날씨 크롤 실패"})
+        return ApiResponse(success=False, error=ErrorDetail(code="crawl_failed", message="날씨 크롤 실패"))
     return ApiResponse(success=True, data={
         "crawler": "weather",
         "items_fetched": result.items_fetched,

@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends, Query
 from fastapi.responses import JSONResponse
 
 from app.core.database import Database
-from app.core.models import ApiResponse, ErrorBody
+from app.core.models import ApiResponse, ErrorDetail
 
 router = APIRouter(prefix="/api")
 
@@ -16,14 +16,23 @@ def _get_db() -> Database:
     raise NotImplementedError
 
 
-@router.get("/news", tags=["News"])
+@router.get(
+    "/news",
+    tags=["News"],
+    summary="뉴스 기사 목록 조회",
+    description=(
+        "수집된 뉴스 기사를 최신순으로 반환합니다.\n\n"
+        "- 시간 필터: `minutes` 또는 `from`/`to` 범위 지정 (둘 다 없으면 최근 30분)\n"
+        "- `minutes`와 `from`/`to` 중 `minutes`가 우선"
+    ),
+)
 async def get_news(
-    minutes: int | None = None,
-    fr: datetime | None = Query(None, alias="from"),
-    to: datetime | None = Query(None, alias="to"),
-    category: str | None = None,
-    min_importance: int | None = None,
-    limit: int = 20,
+    minutes: int | None = Query(None, ge=1, description="최근 N분 이내 기사 조회"),
+    fr: datetime | None = Query(None, alias="from", description="조회 시작 시각 (ISO 8601)"),
+    to: datetime | None = Query(None, alias="to", description="조회 종료 시각 (ISO 8601)"),
+    category: str | None = Query(None, description="카테고리 필터"),
+    min_importance: int | None = Query(None, ge=1, le=10, description="최소 중요도 (1~10)"),
+    limit: int = Query(20, ge=1, le=200, description="조회할 최대 기사 수"),
     db: Database = Depends(_get_db),
 ):
     conditions = []
@@ -68,7 +77,12 @@ async def get_news(
     )
 
 
-@router.get("/news/{article_id}", tags=["News"])
+@router.get(
+    "/news/{article_id}",
+    tags=["News"],
+    summary="뉴스 기사 단건 조회",
+    description="ID로 특정 뉴스 기사를 조회합니다.",
+)
 async def get_news_by_id(
     article_id: int,
     db: Database = Depends(_get_db),
@@ -79,7 +93,7 @@ async def get_news_by_id(
             status_code=404,
             content=ApiResponse(
                 success=False,
-                error=ErrorBody(
+                error=ErrorDetail(
                     code="NOT_FOUND",
                     message=f"Article {article_id} not found",
                     detail="No news article exists with the given ID",
@@ -126,7 +140,7 @@ async def crawling_news(db: Database = Depends(_get_db)):
 
     result = await NewsCrawler(db).run()
     if result is None:
-        return ApiResponse(success=False, error={"code": "crawl_failed", "message": "뉴스 크롤 실패"})
+        return ApiResponse(success=False, error=ErrorDetail(code="crawl_failed", message="뉴스 크롤 실패"))
 
     summary = None
     try:
@@ -166,6 +180,6 @@ async def summarize_news_retry(db: Database = Depends(_get_db)):
         async with LLMClient() as llm:
             result = await NewsSummarizer(db, llm).summarize_incomplete()
     except Exception as e:
-        return ApiResponse(success=False, error={"code": "summarize_failed", "message": f"요약 실패: {e}"})
+        return ApiResponse(success=False, error=ErrorDetail(code="summarize_failed", message=f"요약 실패: {e}"))
 
     return ApiResponse(success=True, data=result)

@@ -11,7 +11,7 @@ from fastapi import APIRouter, Depends, Query
 from fastapi.responses import JSONResponse
 
 from app.core.database import Database
-from app.core.models import ApiResponse
+from app.core.models import ApiResponse, ErrorDetail
 
 if TYPE_CHECKING:
     from app.stock.provider.router import ProviderRouter
@@ -230,15 +230,19 @@ async def analyze(
     ),
 )
 async def stock_report(
-    tickers: str = "",
-    timeframe: str = "1D",
+    tickers: str = Query("", description="조회할 티커 목록 (콤마 구분, 예: AAPL,MSFT,GOOGL)"),
+    timeframe: str = Query("1D", description="시간 프레임 (현재 1D만 지원)"),
     db: Database = Depends(_get_db),
 ):
     """저장된 분석 결과로 종목 리포트 반환."""
     if timeframe not in VALID_TIMEFRAMES:
         return JSONResponse(
             status_code=400,
-            content=ApiResponse(success=False, error={"code": "INVALID_TIMEFRAME", "message": f"Invalid timeframe '{timeframe}'. Valid: {sorted(VALID_TIMEFRAMES)}"}).model_dump(mode="json"),
+            content=ApiResponse(success=False, error=ErrorDetail(
+                code="INVALID_TIMEFRAME",
+                message=f"Invalid timeframe '{timeframe}'",
+                detail=f"Valid values: {sorted(VALID_TIMEFRAMES)}",
+            )).model_dump(mode="json"),
         )
 
     if not tickers:
@@ -300,15 +304,19 @@ async def stock_report(
     ),
 )
 async def stock_report_all(
-    summarize: bool = False,
-    timeframe: str = "1D",
+    summarize: bool = Query(False, description="true 시 시그널/점수/위치만 요약 반환"),
+    timeframe: str = Query("1D", description="시간 프레임 (현재 1D만 지원)"),
     db: Database = Depends(_get_db),
 ):
     """전체 종목 리포트 반환. summarize=True 시 요약 버전."""
     if timeframe not in VALID_TIMEFRAMES:
         return JSONResponse(
             status_code=400,
-            content=ApiResponse(success=False, error={"code": "INVALID_TIMEFRAME", "message": f"Invalid timeframe '{timeframe}'. Valid: {sorted(VALID_TIMEFRAMES)}"}).model_dump(mode="json"),
+            content=ApiResponse(success=False, error=ErrorDetail(
+                code="INVALID_TIMEFRAME",
+                message=f"Invalid timeframe '{timeframe}'",
+                detail=f"Valid values: {sorted(VALID_TIMEFRAMES)}",
+            )).model_dump(mode="json"),
         )
 
     from app.stock.repository import AnalysisResultRepo, WeeklyExpectedMoveRepo
@@ -462,7 +470,7 @@ async def add_watchlist(item: WatchlistItemIn, db: Database = Depends(_get_db)):
     )
     created = await repo.add(new_item)
     if created is None:
-        return ApiResponse(success=False, error={"code": "duplicate", "message": f"{item.ticker} already in watchlist"})
+        return ApiResponse(success=False, error=ErrorDetail(code="duplicate", message=f"{item.ticker} already in watchlist"))
     return ApiResponse(success=True, data=_watchlist_item_to_out(created))
 
 
@@ -486,7 +494,7 @@ async def update_watchlist(
         if not existing:
             return JSONResponse(
                 status_code=404,
-                content=ApiResponse(success=False, error={"code": "NOT_FOUND", "message": f"Watchlist item {item_id} not found"}).model_dump(mode="json"),
+                content=ApiResponse(success=False, error=ErrorDetail(code="NOT_FOUND", message=f"Watchlist item {item_id} not found")).model_dump(mode="json"),
             )
         return ApiResponse(success=True, data=_watchlist_item_to_out(existing))
 
@@ -494,7 +502,7 @@ async def update_watchlist(
     if updated is None:
         return JSONResponse(
             status_code=404,
-            content=ApiResponse(success=False, error={"code": "NOT_FOUND", "message": f"Watchlist item {item_id} not found"}).model_dump(mode="json"),
+            content=ApiResponse(success=False, error=ErrorDetail(code="NOT_FOUND", message=f"Watchlist item {item_id} not found")).model_dump(mode="json"),
         )
     return ApiResponse(success=True, data=_watchlist_item_to_out(updated))
 
@@ -513,7 +521,7 @@ async def delete_watchlist(item_id: int, db: Database = Depends(_get_db)):
     if not deleted:
         return JSONResponse(
             status_code=404,
-            content=ApiResponse(success=False, error={"code": "NOT_FOUND", "message": f"Watchlist item {item_id} not found"}).model_dump(mode="json"),
+            content=ApiResponse(success=False, error=ErrorDetail(code="NOT_FOUND", message=f"Watchlist item {item_id} not found")).model_dump(mode="json"),
         )
     return ApiResponse(success=True, data={"deleted": item_id})
 
@@ -598,7 +606,7 @@ async def crawling_sigma(db: Database = Depends(_get_db)):
 
     result = await SigmaCrawler(db).run()
     if result is None:
-        return ApiResponse(success=False, error={"code": "crawl_failed", "message": "Sigma 크롤 실패"})
+        return ApiResponse(success=False, error=ErrorDetail(code="crawl_failed", message="Sigma 크롤 실패"))
     return ApiResponse(success=True, data={
         "crawler": "stock_sigma",
         "items_fetched": result.items_fetched,

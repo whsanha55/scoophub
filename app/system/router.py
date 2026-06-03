@@ -3,18 +3,18 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from fastapi import APIRouter, Depends
-from pydantic import BaseModel
+from fastapi import APIRouter, Depends, Query
+from pydantic import BaseModel, Field
 
 from app.core.database import Database
-from app.core.models import ApiResponse
+from app.core.models import ApiResponse, ErrorDetail
 
 router = APIRouter(prefix="/api", tags=["System"])
 
 
 class LLMTestRequest(BaseModel):
-    message: str
-    system: str = "You are a helpful assistant."
+    message: str = Field(..., description="LLM에 전송할 사용자 메시지")
+    system: str = Field("You are a helpful assistant.", description="시스템 프롬프트")
 
 
 def get_db() -> Database:
@@ -22,7 +22,11 @@ def get_db() -> Database:
     raise NotImplementedError
 
 
-@router.get("/health")
+@router.get(
+    "/health",
+    summary="헬스 체크",
+    description="서비스 상태와 주요 테이블 레코드 수를 반환합니다.",
+)
 async def health(db: Database = Depends(get_db)):
     news_count = await db.fetchval("SELECT COUNT(*) FROM news_articles")
     weather_count = await db.fetchval("SELECT COUNT(*) FROM weather_snapshots")
@@ -38,7 +42,7 @@ async def health(db: Database = Depends(get_db)):
 @router.post(
     "/llm/test",
     summary="LLM 호출 테스트",
-    description="요청 body의 message를 그대로 LLM에 보내 응답을 반환합니다. (LLM 키·모델·연결 점검용)",
+    description="요청 body의 message를 LLM에 전송해 응답을 반환합니다. LLM 키·모델·연결 상태 점검용.",
 )
 async def llm_test(body: LLMTestRequest):
     from app.config import settings
@@ -50,15 +54,19 @@ async def llm_test(body: LLMTestRequest):
     except Exception as e:
         return ApiResponse(
             success=False,
-            error={"code": "llm_failed", "message": str(e) or type(e).__name__},
+            error=ErrorDetail(code="llm_failed", message=str(e) or type(e).__name__),
         )
     return ApiResponse(success=True, data={"model": settings.LLM_MODEL, "content": content})
 
 
-@router.get("/crawl-logs")
+@router.get(
+    "/crawl-logs",
+    summary="크롤 실행 로그 조회",
+    description="크롤러 실행 이력을 최신순으로 반환합니다. 크롤러 이름으로 필터링 가능.",
+)
 async def crawl_logs(
-    crawler: str | None = None,
-    limit: int = 20,
+    crawler: str | None = Query(None, description="크롤러 이름 필터 (예: news, weather, stock_sigma)"),
+    limit: int = Query(20, ge=1, le=200, description="조회할 최대 로그 수"),
     db: Database = Depends(get_db),
 ):
     if crawler:
