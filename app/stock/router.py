@@ -212,16 +212,6 @@ async def analyze(
     if not target_tickers:
         return ApiResponse(success=True, data=AnalyzeResponse(total=0, ok=0, errors=0, results=[]))
 
-    # Auto-crawl: sync candles + sigma before analysis
-    try:
-        await _do_sync_candles(db)
-    except Exception:
-        logger.warning("Auto candle sync failed", exc_info=True)
-    try:
-        await _do_crawl_sigma(db)
-    except Exception:
-        logger.warning("Auto sigma crawl failed", exc_info=True)
-
     resp = await _run_analysis_for_tickers(target_tickers, db)
     return ApiResponse(success=True, data=resp)
 

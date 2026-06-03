@@ -72,8 +72,23 @@ def register_jobs(
 
     async def _run_analysis() -> None:
         from app.stock.repository import WatchlistRepo
-        from app.stock.router import _run_analysis_for_tickers
+        from app.stock.router import _run_analysis_for_tickers, _do_sync_candles, _do_crawl_sigma
 
+        # 1) Sync candles for latest data
+        try:
+            synced = await _do_sync_candles(db)
+            logger.info("Market-close candle sync: %d candles", synced)
+        except Exception:
+            logger.warning("Market-close candle sync failed", exc_info=True)
+
+        # 2) Crawl sigma data
+        try:
+            sigma_new = await _do_crawl_sigma(db)
+            logger.info("Market-close sigma crawl: %d new", sigma_new)
+        except Exception:
+            logger.warning("Market-close sigma crawl failed", exc_info=True)
+
+        # 3) Run analysis
         wl_repo = WatchlistRepo(db)
         items = await wl_repo.find_all(active_only=True)
         tickers = [it.ticker for it in items]
