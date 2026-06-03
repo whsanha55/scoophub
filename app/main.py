@@ -19,6 +19,10 @@ logger = logging.getLogger(__name__)
 
 
 def create_app(db: Database | None = None) -> FastAPI:
+    logging.basicConfig(
+        level=getattr(logging, settings.LOG_LEVEL.upper(), logging.INFO),
+        format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+    )
     _db = db or Database(settings.database_url)
     scheduler = AsyncIOScheduler(
         job_defaults={
