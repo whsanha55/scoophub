@@ -34,7 +34,25 @@ def create_app(db: Database | None = None) -> FastAPI:
         logger.info("Database initialized")
         scheduler.start()
         logger.info("Scheduler started")
+
+        # Seed M7 watchlist defaults
+        try:
+            from app.stock.repository import WatchlistRepo
+            wl_repo = WatchlistRepo(_db)
+            count = await wl_repo.seed_defaults()
+            if count:
+                logger.info("Seeded %d M7 watchlist items", count)
+        except Exception:
+            logger.warning("Watchlist seed skipped")
+
         yield
+        # Stock cleanup
+        from app.stock.router import get_provider_router
+        try:
+            pr = get_provider_router()
+            await pr.close()
+        except Exception:
+            pass
         scheduler.shutdown(wait=False)
         await _db.close()
         logger.info("Shutdown complete")
@@ -45,6 +63,9 @@ def create_app(db: Database | None = None) -> FastAPI:
         {"name": "News Crawling", "description": "뉴스 크롤 수동 실행 API"},
         {"name": "Weather", "description": "날씨 데이터 조회 API"},
         {"name": "Weather Crawling", "description": "날씨 크롤 수동 실행 API"},
+        {"name": "Stock", "description": "주식 분석 API"},
+        {"name": "Stock Watchlist", "description": "관심종목 관리 API"},
+        {"name": "Stock Crawling", "description": "주식 데이터 크롤 및 분석 수동 실행 API"},
         {"name": "System", "description": "시스템 상태 및 크롤 로그 API"},
     ]
 
@@ -101,7 +122,30 @@ def create_app(db: Database | None = None) -> FastAPI:
         schedule_minutes=weather_cfg["schedule_minutes"],
     )
 
-    # Phase 2/3 routers will be added here
+    # Stock Context
+    from app.stock.router import router as stock_router, _get_db as stock_get_db, set_provider_router
+    from app.stock.scheduler import register_jobs as stock_register_jobs
+    from app.stock.provider.yfinance import YFinanceProvider
+    from app.stock.provider.router import ProviderRouter
+
+    app.dependency_overrides[stock_get_db] = lambda: _db
+    app.include_router(stock_router)
+
+    # Provider setup (yfinance only)
+    yf_provider = YFinanceProvider()
+    provider_router = ProviderRouter(yfinance_provider=yf_provider)
+    set_provider_router(provider_router)
+
+    stock_cfg = cfg["crawlers"]["stock"]
+    stock_register_jobs(
+        scheduler,
+        _db,
+        provider_router,
+        sync_interval_minutes=stock_cfg["sync_interval_minutes"],
+        sigma_schedule=stock_cfg["sigma_schedule"],
+        analyze_schedule=stock_cfg["analyze_schedule"],
+    )
+
     return app
 
 
