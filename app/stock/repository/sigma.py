@@ -1,4 +1,4 @@
-# stock/repository/sigma.py — Repository for stock_sigma table.
+# stock/repository/sigma.py — Repository for stock_sigma table (ATM straddle).
 from __future__ import annotations
 
 from datetime import date, datetime
@@ -15,20 +15,35 @@ def _row_to_sigma(row: dict) -> SigmaResult:
     expiry = row.get("expiry_date")
     if isinstance(expiry, datetime):
         expiry = expiry.date()
+
+    snap_date = row.get("snapshot_date")
+    if isinstance(snap_date, datetime):
+        snap_date = snap_date.date()
+
+    snap_at = row.get("snapshot_at")
+
+    pcr = row.get("put_call_volume_ratio")
+    if pcr is not None:
+        pcr = float(pcr)
+
     return SigmaResult(
         id=row.get("id"),
         ticker=row["ticker"],
         current_price=float(row.get("current_price", 0)),
-        atm_iv=float(row.get("atm_iv", 0)),
-        dte=int(row.get("dte", 0) or 0),
-        daily_sigma=float(row.get("daily_sigma", 0)),
-        daily_sigma_pct=float(row.get("daily_sigma_pct", 0)),
-        expected_move_high=float(row.get("expected_move_high", 0)),
-        expected_move_low=float(row.get("expected_move_low", 0)),
-        expected_move_pct=float(row.get("expected_move_pct", 0)),
-        sigma_type=row.get("sigma_type", "daily"),
         expiry_date=expiry,
-        source=row.get("source", "yfinance_options"),
+        atm_strike=float(row.get("atm_strike", 0)),
+        atm_call=float(row.get("atm_call", 0)),
+        atm_put=float(row.get("atm_put", 0)),
+        expected_move=float(row.get("expected_move", 0)),
+        expected_move_pct=float(row.get("expected_move_pct", 0)),
+        snapshot_date=snap_date,
+        snapshot_at=snap_at,
+        source=row.get("source", "yfinance_straddle"),
+        total_call_volume=int(row.get("total_call_volume", 0) or 0),
+        total_put_volume=int(row.get("total_put_volume", 0) or 0),
+        put_call_volume_ratio=pcr,
+        atm_call_volume=int(row.get("atm_call_volume", 0) or 0),
+        atm_put_volume=int(row.get("atm_put_volume", 0) or 0),
         created_at=row.get("created_at"),
     )
 
@@ -41,53 +56,61 @@ class SigmaRepo:
         """Upsert a sigma result into stock_sigma."""
         row = await self._db.fetchrow(
             "INSERT INTO stock_sigma "
-            "(ticker, sigma_type, current_price, atm_iv, expiry_date, dte, "
-            " daily_sigma, daily_sigma_pct, expected_move_high, expected_move_low, expected_move_pct) "
-            "VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) "
-            "ON CONFLICT (ticker, sigma_type, COALESCE(expiry_date, '1970-01-01'::date)) DO UPDATE SET "
+            "(ticker, expiry_date, snapshot_date, snapshot_at, current_price, "
+            " atm_strike, atm_call, atm_put, expected_move, expected_move_pct, "
+            " total_call_volume, total_put_volume, put_call_volume_ratio, "
+            " atm_call_volume, atm_put_volume) "
+            "VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15) "
+            "ON CONFLICT (ticker, expiry_date, snapshot_date) DO UPDATE SET "
             " current_price = EXCLUDED.current_price, "
-            " atm_iv = EXCLUDED.atm_iv, "
-            " dte = EXCLUDED.dte, "
-            " daily_sigma = EXCLUDED.daily_sigma, "
-            " daily_sigma_pct = EXCLUDED.daily_sigma_pct, "
-            " expected_move_high = EXCLUDED.expected_move_high, "
-            " expected_move_low = EXCLUDED.expected_move_low, "
+            " atm_strike = EXCLUDED.atm_strike, "
+            " atm_call = EXCLUDED.atm_call, "
+            " atm_put = EXCLUDED.atm_put, "
+            " expected_move = EXCLUDED.expected_move, "
             " expected_move_pct = EXCLUDED.expected_move_pct, "
+            " snapshot_at = EXCLUDED.snapshot_at, "
+            " total_call_volume = EXCLUDED.total_call_volume, "
+            " total_put_volume = EXCLUDED.total_put_volume, "
+            " put_call_volume_ratio = EXCLUDED.put_call_volume_ratio, "
+            " atm_call_volume = EXCLUDED.atm_call_volume, "
+            " atm_put_volume = EXCLUDED.atm_put_volume, "
             " updated_at = NOW() "
             "RETURNING *",
             sigma.ticker,
-            sigma.sigma_type,
-            sigma.current_price,
-            sigma.atm_iv,
             sigma.expiry_date,
-            sigma.dte,
-            sigma.daily_sigma,
-            sigma.daily_sigma_pct,
-            sigma.expected_move_high,
-            sigma.expected_move_low,
+            sigma.snapshot_date,
+            sigma.snapshot_at,
+            sigma.current_price,
+            sigma.atm_strike,
+            sigma.atm_call,
+            sigma.atm_put,
+            sigma.expected_move,
             sigma.expected_move_pct,
+            sigma.total_call_volume,
+            sigma.total_put_volume,
+            sigma.put_call_volume_ratio,
+            sigma.atm_call_volume,
+            sigma.atm_put_volume,
         )
         return _row_to_sigma(row)
 
-    async def get_latest(self, ticker: str, sigma_type: str = "daily") -> SigmaResult | None:
-        """Get the most recent sigma for a ticker + type."""
+    async def get_latest(self, ticker: str) -> SigmaResult | None:
+        """Get the most recent sigma for a ticker."""
         row = await self._db.fetchrow(
             "SELECT * FROM stock_sigma "
-            "WHERE ticker = $1 AND sigma_type = $2 "
-            "ORDER BY created_at DESC LIMIT 1",
+            "WHERE ticker = $1 "
+            "ORDER BY snapshot_date DESC, expiry_date ASC LIMIT 1",
             ticker,
-            sigma_type,
         )
         return _row_to_sigma(row) if row else None
 
-    async def get_all(self, ticker: str, sigma_type: str = "daily", limit: int = 30) -> list[SigmaResult]:
+    async def get_all(self, ticker: str, limit: int = 30) -> list[SigmaResult]:
         """Get recent sigma history for a ticker."""
         rows = await self._db.fetch(
             "SELECT * FROM stock_sigma "
-            "WHERE ticker = $1 AND sigma_type = $2 "
-            "ORDER BY created_at DESC LIMIT $3",
+            "WHERE ticker = $1 "
+            "ORDER BY snapshot_date DESC, expiry_date ASC LIMIT $2",
             ticker,
-            sigma_type,
             limit,
         )
         return [_row_to_sigma(r) for r in rows]

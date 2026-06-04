@@ -1,10 +1,10 @@
-# stock/sigma.py — Compute sigma from Yahoo Finance options chain IV.
+# stock/sigma.py — Compute sigma from ATM straddle prices (Yahoo Finance options chain).
 from __future__ import annotations
 
 import logging
-import math
 from datetime import date, datetime, timezone
 from typing import TYPE_CHECKING
+from zoneinfo import ZoneInfo
 
 if TYPE_CHECKING:
     from app.stock.provider.router import ProviderRouter
@@ -13,130 +13,122 @@ from app.stock.models import SigmaResult
 
 logger = logging.getLogger(__name__)
 
-
-def extract_atm_iv(
-    calls: list[dict],
-    puts: list[dict],
-    current_price: float,
-) -> float:
-    """Extract ATM implied volatility by averaging nearest-strike call+put IVs.
-
-    Finds the call and put whose strikes are closest to current_price,
-    then returns the average of their implied volatilities.
-    """
-    if not calls or not puts or current_price <= 0:
-        return 0.0
-
-    # Find nearest call by strike distance
-    nearest_call = min(calls, key=lambda c: abs(c["strike"] - current_price))
-    nearest_put = min(puts, key=lambda p: abs(p["strike"] - current_price))
-
-    call_iv = nearest_call.get("impliedVolatility", 0)
-    put_iv = nearest_put.get("impliedVolatility", 0)
-
-    if call_iv <= 0 and put_iv <= 0:
-        return 0.0
-
-    # If one side has no IV, use the other
-    if call_iv <= 0:
-        return put_iv
-    if put_iv <= 0:
-        return call_iv
-
-    return (call_iv + put_iv) / 2
+ET = ZoneInfo("America/New_York")
 
 
-def compute_dte(expiry_str: str) -> int:
-    """Compute days to expiry (calendar days) from expiry string (YYYY-MM-DD)."""
-    try:
-        expiry_date = date.fromisoformat(expiry_str[:10])
-        today = datetime.now(timezone.utc).date()
-        delta = (expiry_date - today).days
-        return max(delta, 0)
-    except (ValueError, IndexError):
-        return 0
+def _option_price(opt: dict) -> float:
+    """Get option price: bid/ask mid if available, else lastPrice."""
+    bid = opt.get("bid", 0) or 0
+    ask = opt.get("ask", 0) or 0
+    if bid > 0 and ask > 0:
+        return (bid + ask) / 2
+    return float(opt.get("lastPrice", 0) or 0)
+
+
+def _find_atm_strike(calls: list[dict], puts: list[dict], current_price: float) -> float | None:
+    """Find ATM strike: closest common strike to current_price."""
+    call_strikes = {c["strike"] for c in calls}
+    put_strikes = {p["strike"] for p in puts}
+    common = call_strikes & put_strikes
+    if not common:
+        return None
+    return min(common, key=lambda s: abs(s - current_price))
+
+
+def _et_date_from_utc(utc_dt: datetime) -> date:
+    """Convert UTC datetime to ET trading date."""
+    et_dt = utc_dt.astimezone(ET)
+    return et_dt.date()
 
 
 async def compute_sigma_from_options(
     provider: ProviderRouter,
     ticker: str,
     current_price: float,
+    snapshot_at: datetime | None = None,
 ) -> list[SigmaResult]:
-    """Compute daily & weekly sigma from options chain ATM IV.
+    """Compute sigma from ATM straddle prices for each expiry.
 
-    Returns a list of SigmaResult (daily first, weekly second).
-    Empty list on failure.
+    Returns a list of SigmaResult (one per expiry). Empty list on failure.
 
-    Formulas:
-        daily_sigma = price × IV × √(1/252)
-        weekly_sigma = price × IV × √(5/252)
-        expected_move (daily) = price × IV × √(DTE/365)
-        expected_move (weekly) = price × IV × √(5/252)  (same as weekly_sigma)
+    Formula:
+        expected_move = ATM_call_price + ATM_put_price
+        expected_move_pct = expected_move / current_price * 100
     """
     if current_price <= 0:
         return []
+
+    if snapshot_at is None:
+        snapshot_at = datetime.now(timezone.utc)
 
     chain = await provider.options_chain(ticker)
     if not chain or not chain.get("calls") or not chain.get("puts"):
         logger.warning("No options chain data for %s", ticker)
         return []
 
-    atm_iv = extract_atm_iv(chain["calls"], chain["puts"], current_price)
-    if atm_iv <= 0:
-        logger.warning("ATM IV is 0 for %s", ticker)
+    calls = chain["calls"]
+    puts = chain["puts"]
+
+    # Find ATM strike from common strikes
+    atm_strike = _find_atm_strike(calls, puts, current_price)
+    if atm_strike is None:
+        logger.warning("No common strikes for %s", ticker)
         return []
 
-    dte = compute_dte(chain["expiry"])
-    expiry_date = None
+    # Find ATM call and put options
+    atm_call = next((c for c in calls if c["strike"] == atm_strike), None)
+    atm_put = next((p for p in puts if p["strike"] == atm_strike), None)
+
+    if atm_call is None or atm_put is None:
+        logger.warning("ATM options not found for %s at strike %s", ticker, atm_strike)
+        return []
+
+    # Get straddle prices
+    call_price = _option_price(atm_call)
+    put_price = _option_price(atm_put)
+
+    # Liquidity filter: skip if no price
+    if call_price <= 0 or put_price <= 0:
+        logger.warning("ATM straddle has zero price for %s (call=%.4f, put=%.4f)", ticker, call_price, put_price)
+        return []
+
+    expected_move = call_price + put_price
+    expected_move_pct = (expected_move / current_price) * 100
+
+    # Volume aggregation (int coercion for float/nullable)
+    total_call_volume = sum(int(c.get("volume", 0) or 0) for c in calls)
+    total_put_volume = sum(int(p.get("volume", 0) or 0) for p in puts)
+    atm_call_volume = int(atm_call.get("volume", 0) or 0)
+    atm_put_volume = int(atm_put.get("volume", 0) or 0)
+
+    # Put-Call Ratio
+    pcr = (total_put_volume / total_call_volume) if total_call_volume > 0 else None
+
+    # Expiry date
+    expiry_date: date | None = None
     try:
         expiry_date = date.fromisoformat(chain["expiry"][:10])
-    except (ValueError, IndexError):
+    except (ValueError, IndexError, TypeError):
         pass
 
-    results: list[SigmaResult] = []
+    # Snapshot date (ET trading day)
+    snapshot_date = _et_date_from_utc(snapshot_at)
 
-    # Daily sigma: price × IV × √(1/252)
-    daily_sigma = current_price * atm_iv * math.sqrt(1 / 252)
-    daily_sigma_pct = (daily_sigma / current_price) * 100
-
-    if dte > 0:
-        daily_expected = current_price * atm_iv * math.sqrt(dte / 365)
-    else:
-        daily_expected = daily_sigma
-    daily_expected_pct = (daily_expected / current_price) * 100
-
-    results.append(SigmaResult(
+    return [SigmaResult(
         ticker=ticker,
         current_price=current_price,
-        atm_iv=atm_iv,
-        dte=dte,
-        daily_sigma=round(daily_sigma, 4),
-        daily_sigma_pct=round(daily_sigma_pct, 4),
-        expected_move_high=round(current_price + daily_expected, 4),
-        expected_move_low=round(current_price - daily_expected, 4),
-        expected_move_pct=round(daily_expected_pct, 4),
-        sigma_type="daily",
         expiry_date=expiry_date,
-        source="yfinance_options",
-    ))
-
-    # Weekly sigma: price × IV × √(5/252)
-    weekly_sigma = current_price * atm_iv * math.sqrt(5 / 252)
-    weekly_sigma_pct = (weekly_sigma / current_price) * 100
-
-    results.append(SigmaResult(
-        ticker=ticker,
-        current_price=current_price,
-        atm_iv=atm_iv,
-        dte=dte,
-        daily_sigma=round(weekly_sigma, 4),
-        daily_sigma_pct=round(weekly_sigma_pct, 4),
-        expected_move_high=round(current_price + weekly_sigma, 4),
-        expected_move_low=round(current_price - weekly_sigma, 4),
-        expected_move_pct=round(weekly_sigma_pct, 4),
-        sigma_type="weekly",
-        expiry_date=expiry_date,
-        source="yfinance_options",
-    ))
-
-    return results
+        atm_strike=atm_strike,
+        atm_call=round(call_price, 4),
+        atm_put=round(put_price, 4),
+        expected_move=round(expected_move, 4),
+        expected_move_pct=round(expected_move_pct, 4),
+        snapshot_date=snapshot_date,
+        snapshot_at=snapshot_at,
+        source="yfinance_straddle",
+        total_call_volume=total_call_volume,
+        total_put_volume=total_put_volume,
+        put_call_volume_ratio=round(pcr, 4) if pcr is not None else None,
+        atm_call_volume=atm_call_volume,
+        atm_put_volume=atm_put_volume,
+    )]

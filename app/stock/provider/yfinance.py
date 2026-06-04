@@ -161,6 +161,9 @@ class YFinanceProvider:
                     "impliedVolatility": float(row.get("impliedVolatility", 0)),
                     "volume": _safe_int(row.get("volume", 0)),
                     "openInterest": _safe_int(row.get("openInterest", 0)),
+                    "bid": float(row.get("bid", 0)),
+                    "ask": float(row.get("ask", 0)),
+                    "lastPrice": float(row.get("lastPrice", 0)),
                 })
 
             puts = []
@@ -171,6 +174,9 @@ class YFinanceProvider:
                     "impliedVolatility": float(row.get("impliedVolatility", 0)),
                     "volume": _safe_int(row.get("volume", 0)),
                     "openInterest": _safe_int(row.get("openInterest", 0)),
+                    "bid": float(row.get("bid", 0)),
+                    "ask": float(row.get("ask", 0)),
+                    "lastPrice": float(row.get("lastPrice", 0)),
                 })
 
             return {

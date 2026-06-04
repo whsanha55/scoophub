@@ -416,41 +416,45 @@ async def stock_report_all(
     tags=["Stock"],
     summary="시그마 조회",
     description=(
-        "Yahoo Finance 옵션 체인 IV 기반 시그마 데이터 조회.\n\n"
+        "ATM straddle 기반 시그마 데이터 조회.\n\n"
         "- `ticker`: 단일 티커 (예: AAPL)\n"
-        "- `type`: daily 또는 weekly (기본: daily)\n"
-        "- 데이터 출처: `yfinance_options`"
+        "- 데이터 출처: `yfinance_straddle`"
     ),
 )
 async def get_sigma(
     ticker: str = Query(..., description="주식 티커 (예: AAPL)"),
-    type: str = Query("daily", description="시그마 타입 (daily | weekly)"),
     db: Database = Depends(_get_db),
 ):
     from app.stock.repository import SigmaRepo
 
-    sigma_type = type if type in ("daily", "weekly") else "daily"
     repo = SigmaRepo(db)
-    result = await repo.get_latest(ticker.upper(), sigma_type)
+    result = await repo.get_latest(ticker.upper())
     if not result:
         return ApiResponse(success=True, data=None)
 
     created_at = None
     if result.created_at:
         created_at = result.created_at.isoformat() if isinstance(result.created_at, datetime) else str(result.created_at)
+    snapshot_at = None
+    if result.snapshot_at:
+        snapshot_at = result.snapshot_at.isoformat() if isinstance(result.snapshot_at, datetime) else str(result.snapshot_at)
     return ApiResponse(success=True, data=SigmaDataOut(
         ticker=result.ticker,
-        sigma_type=result.sigma_type,
         current_price=result.current_price,
-        atm_iv=result.atm_iv,
-        dte=result.dte,
-        daily_sigma=result.daily_sigma,
-        daily_sigma_pct=result.daily_sigma_pct,
-        expected_move_high=result.expected_move_high,
-        expected_move_low=result.expected_move_low,
-        expected_move_pct=result.expected_move_pct,
         expiry_date=str(result.expiry_date) if result.expiry_date else None,
+        atm_strike=result.atm_strike,
+        atm_call=result.atm_call,
+        atm_put=result.atm_put,
+        expected_move=result.expected_move,
+        expected_move_pct=result.expected_move_pct,
+        snapshot_date=str(result.snapshot_date) if result.snapshot_date else None,
+        snapshot_at=snapshot_at,
         source=result.source,
+        total_call_volume=result.total_call_volume,
+        total_put_volume=result.total_put_volume,
+        put_call_volume_ratio=result.put_call_volume_ratio,
+        atm_call_volume=result.atm_call_volume,
+        atm_put_volume=result.atm_put_volume,
         created_at=created_at,
     ))
 
@@ -668,11 +672,11 @@ async def crawling_sigma(db: Database = Depends(_get_db)):
 @router.post(
     "/crawling/stock/sigma/compute",
     tags=["Stock Crawling"],
-    summary="Sigma 즉시 계산 (옵션 IV 기반)",
+    summary="Sigma 즉시 계산 (ATM straddle 기반)",
     description=(
-        "yfinance 옵션 체인 ATM IV 기반 daily/weekly sigma 즉시 계산 + 저장.\n\n"
+        "yfinance 옵션 체인 ATM straddle 기반 sigma 즉시 계산 + 저장.\n\n"
         "- `tickers` 생략 시 활성 watchlist 전체 대상\n"
-        "- 결과: 각 ticker별 daily + weekly sigma 저장\n"
+        "- 결과: 각 ticker별 ATM straddle expected move 저장\n"
         "- 자동 스케줄: 화-토 22:30 UTC (미국장 종료 후)"
     ),
 )
@@ -696,6 +700,7 @@ async def compute_sigma(
     if not target_tickers:
         return ApiResponse(success=True, data={"saved": 0, "tickers": []})
 
+    snapshot_at = datetime.now(timezone.utc)
     saved = 0
     errors = 0
     for ticker in target_tickers:
@@ -705,7 +710,7 @@ async def compute_sigma(
             if price <= 0:
                 errors += 1
                 continue
-            results = await compute_sigma_from_options(provider, ticker, price)
+            results = await compute_sigma_from_options(provider, ticker, price, snapshot_at=snapshot_at)
             for result in results:
                 await sigma_repo.save(result)
                 saved += 1

@@ -27,5 +27,4 @@ docs/
 *.swp
 *.swo
 .DS_Store
-.jplan/
 .claude/
