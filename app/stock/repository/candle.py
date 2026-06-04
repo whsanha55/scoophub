@@ -1,6 +1,7 @@
 # stock/repository/candle.py
 from __future__ import annotations
 
+import logging
 from datetime import date
 from typing import TYPE_CHECKING
 
@@ -10,14 +11,19 @@ if TYPE_CHECKING:
 from app.stock.models import Candle
 from app.stock.repository._helpers import row_to_candle
 
+logger = logging.getLogger(__name__)
+
 
 class CandleRepo:
     def __init__(self, db: Database):
         self._db = db
 
     async def save_batch(self, items: list[Candle]) -> int:
+        logger.info("CandleRepo.save_batch() 진입 — count=%d", len(items))
         if not items:
             return 0
+        # 다중 INSERT: 8개 컬럼(ticker..volume) VALUES 동적 생성 후
+        # (ticker, interval, date) 충돌 시 OHLCV 필드만 갱신
         parts: list[str] = []
         params: list[object] = []
         idx = 1
@@ -39,6 +45,7 @@ class CandleRepo:
             "volume = EXCLUDED.volume",
             *params,
         )
+        logger.info("CandleRepo.save_batch() 완료 — saved=%d", len(items))
         return len(items)
 
     async def find_by_ticker(
@@ -49,6 +56,8 @@ class CandleRepo:
         end_date: date | None = None,
         limit: int = 5000,
     ) -> list[Candle]:
+        logger.info("CandleRepo.find_by_ticker() 진입 — ticker=%s, interval=%s, range=%s~%s", ticker, interval, start_date, end_date)
+        # 동적 WHERE: start_date/end_date가 있으면 범위 조건 추가
         query = "SELECT * FROM stock_candles WHERE ticker = $1 AND interval = $2"
         params: list[object] = [ticker, interval]
         idx = 3

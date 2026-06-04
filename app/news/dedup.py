@@ -10,7 +10,6 @@ from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 if TYPE_CHECKING:
     from app.core.database import Database
     from app.core.llm import LLMClient
-
 logger = logging.getLogger(__name__)
 
 # Query params that carry tracking/session noise, not article identity.
@@ -45,16 +44,20 @@ DEDUP_SYSTEM_PROMPT = """당신은 한국어 뉴스 중복 판단 전문가입�
 def normalize_url(url: str) -> str:
     """Canonicalize a URL for exact-match dedup: lowercase host, drop tracking
     params, sort remaining query, strip fragment and trailing slash."""
+    logger.info("normalize_url 시작 - url=%s", url)
     url = (url or "").strip()
     try:
         parts = urlsplit(url)
     except ValueError:
         return url
 
+    # 스킴과 호스트를 소문자로 통일하여 대소문자 차이로 인한 중복 방지
     scheme = (parts.scheme or "https").lower()
     netloc = parts.netloc.lower()
+    # 경로 끝 슬래시 제거로 /path vs /path/ 동일 취급
     path = parts.path.rstrip("/") or "/"
 
+    # 트래킹 파라미터(utm_*, gclid 등)를 제거한 뒤 정렬하여 쿼리 문자열 정규화
     kept = [
         (k, v)
         for k, v in parse_qsl(parts.query, keep_blank_values=True)
@@ -63,7 +66,9 @@ def normalize_url(url: str) -> str:
     kept.sort()
     query = urlencode(kept)
 
-    return urlunsplit((scheme, netloc, path, query, ""))
+    normalized = urlunsplit((scheme, netloc, path, query, ""))
+    logger.info("normalize_url 완료 - normalized=%s", normalized)
+    return normalized
 
 
 async def llm_dedup(

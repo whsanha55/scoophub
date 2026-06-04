@@ -12,6 +12,7 @@ from app.stock.models import (
 
 
 def row_to_watchlist(row: object) -> WatchlistItem:
+    """DB row -> WatchlistItem 도메인 객체 변환. added_at은 date만 추출."""
     return WatchlistItem(
         id=row["id"],
         ticker=row["ticker"],
@@ -24,6 +25,7 @@ def row_to_watchlist(row: object) -> WatchlistItem:
 
 
 def row_to_wem(row: object) -> WeeklyExpectedMove:
+    """DB row -> WeeklyExpectedMove 도메인 객체 변환. created_at/updated_at은 date만 추출."""
     return WeeklyExpectedMove(
         id=row["id"],
         ticker=row["ticker"],
@@ -38,6 +40,7 @@ def row_to_wem(row: object) -> WeeklyExpectedMove:
 
 
 def row_to_candle(row: object) -> Candle:
+    """DB row -> Candle 도메인 객체 변환. 필드명이 그대로 매핑됨."""
     return Candle(
         ticker=row["ticker"],
         interval=row["interval"],
@@ -51,6 +54,7 @@ def row_to_candle(row: object) -> Candle:
 
 
 def row_to_stock_ticker_params(row: object) -> TickerParams:
+    """DB row -> TickerParams 도메인 객체 변환. weights는 JSON 문자열일 수 있어 파싱 처리."""
     weights = row["weights"]
     if isinstance(weights, str):
         weights = json.loads(weights)

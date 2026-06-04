@@ -1,7 +1,11 @@
 # news/wiring.py
 from __future__ import annotations
 
+import logging
+
 from app.core.context import AppContext
+
+logger = logging.getLogger(__name__)
 
 TAGS = [
     {"name": "News", "description": "뉴스 기사 조회 API"},
@@ -11,6 +15,7 @@ TAGS = [
 
 
 def register(ctx: AppContext) -> None:
+    logger.info("register 시작 - news 도메인 라우터 및 스케줄러 등록")
     from app.news.router import router as news_router, _get_db as news_get_db
     from app.news.sources_router import router as sources_router, _get_db as sources_get_db
     from app.news.scheduler import register_jobs
@@ -22,6 +27,7 @@ def register(ctx: AppContext) -> None:
     # to prevent /api/news/{article_id} from matching "sources"
     ctx.app.include_router(sources_router)
     ctx.app.include_router(news_router)
+    logger.info("register 완료 - news 라우터 등록됨 (sources_router → news_router 순서)")
 
     if ctx.enable_scheduler:
         cfg = ctx.cfg["crawlers"]["news"]

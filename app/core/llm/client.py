@@ -14,8 +14,10 @@ class LLMClient:
 
     def __init__(self, timeout: int = 600) -> None:
         self._client = httpx.AsyncClient(timeout=timeout)
+        logger.info("LLMClient.__init__ 시작 - model=%s, timeout=%ds", settings.LLM_MODEL, timeout)
 
     async def chat(self, system_prompt: str, user_prompt: str) -> str:
+        logger.info("LLMClient.chat 시작 - model=%s", settings.LLM_MODEL)
         payload = {
             "model": settings.LLM_MODEL,
             "messages": [
@@ -25,6 +27,7 @@ class LLMClient:
             "temperature": 0.3,
         }
         headers: dict[str, str] = {"Content-Type": "application/json"}
+        # API 키가 설정된 경우에만 Authorization 헤더 추가
         if settings.LLM_API_KEY:
             headers["Authorization"] = f"Bearer {settings.LLM_API_KEY}"
 
@@ -43,7 +46,10 @@ class LLMClient:
 
         data = response.json()
         try:
-            return data["choices"][0]["message"]["content"]
+            # OpenAI Chat Completions 응답 구조에서 텍스트 추출
+            content = data["choices"][0]["message"]["content"]
+            logger.info("LLMClient.chat 완료 - 응답 길이=%d", len(content))
+            return content
         except (KeyError, IndexError) as e:
             logger.error("Unexpected LLM response structure: %s — data: %s", e, data)
             raise RuntimeError(f"Invalid LLM response structure: {e}") from e

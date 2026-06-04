@@ -1,7 +1,11 @@
 """Provider router — dispatches to available data providers."""
 from __future__ import annotations
 
+import logging
+
 from app.stock.models import Candle
+
+logger = logging.getLogger(__name__)
 
 
 class ProviderRouter:
@@ -11,9 +15,11 @@ class ProviderRouter:
         self._yfinance = yfinance_provider
 
     async def chart(self, ticker: str, interval: str = "1d") -> list[Candle]:
+        logger.info("ProviderRouter.chart() 진입 — ticker=%s, interval=%s", ticker, interval)
         return await self._yfinance.chart(ticker, interval)
 
     async def quote(self, ticker: str) -> dict:
+        logger.info("ProviderRouter.quote() 진입 — ticker=%s", ticker)
         return await self._yfinance.quote(ticker)
 
     async def close(self) -> None:

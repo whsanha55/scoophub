@@ -26,17 +26,24 @@ class BaseCrawler(ABC):
 
     def __init__(self, db: Database):
         self.db = db
+        logger.info("BaseCrawler.__init__ 시작 - crawler=%s", self.name)
 
     @abstractmethod
     async def fetch(self) -> CrawlResult:
         ...
 
     async def run(self) -> CrawlResult | None:
+        logger.info("BaseCrawler.run 시작 - crawler=%s", self.name)
         started_at = datetime.now(timezone.utc)
         try:
             result = await self.fetch()
+            # 에러가 일부 있으면 partial, 없으면 success
             status = "partial" if result.errors else "success"
             await self._log_crawl(status, result, started_at)
+            logger.info(
+                "BaseCrawler.run 완료 - crawler=%s, status=%s, fetched=%d, new=%d",
+                self.name, status, result.items_fetched, result.items_new,
+            )
             return result
         except Exception as e:
             logger.exception(f"[{self.name}] Crawl failed: {e}")

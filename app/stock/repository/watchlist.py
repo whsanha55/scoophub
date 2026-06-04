@@ -1,6 +1,7 @@
 # stock/repository/watchlist.py
 from __future__ import annotations
 
+import logging
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -8,6 +9,8 @@ if TYPE_CHECKING:
 
 from app.stock.models import WatchlistItem
 from app.stock.repository._helpers import row_to_watchlist
+
+logger = logging.getLogger(__name__)
 
 M7_DEFAULTS = [
     ("AAPL", "NAS", "Apple Inc."),
@@ -25,6 +28,7 @@ class WatchlistRepo:
         self._db = db
 
     async def find_all(self, active_only: bool = False) -> list[WatchlistItem]:
+        logger.info("WatchlistRepo.find_all() 진입 — active_only=%s", active_only)
         if active_only:
             rows = await self._db.fetch(
                 "SELECT * FROM stock_watchlist WHERE is_active = TRUE ORDER BY added_at"
@@ -44,6 +48,7 @@ class WatchlistRepo:
         return row_to_watchlist(row) if row else None
 
     async def add(self, item: WatchlistItem) -> WatchlistItem:
+        logger.info("WatchlistRepo.add() 진입 — ticker=%s", item.ticker)
         row = await self._db.fetchrow(
             "INSERT INTO stock_watchlist (ticker, exchange, name, memo, is_active) "
             "VALUES ($1, $2, $3, $4, $5) RETURNING *",
@@ -56,9 +61,11 @@ class WatchlistRepo:
         return row_to_watchlist(row)
 
     async def update(self, item_id: int, **kwargs) -> WatchlistItem | None:
+        logger.info("WatchlistRepo.update() 진입 — item_id=%d, fields=%s", item_id, list(kwargs.keys()))
         existing = await self.find_by_id(item_id)
         if existing is None:
             return None
+        # 동적 SET: kwargs에서 None이 아닌 필드만 UPDATE 대상으로 포함
         sets: list[str] = []
         values: list[object] = []
         idx = 1
@@ -77,10 +84,13 @@ class WatchlistRepo:
         return row_to_watchlist(row) if row else None
 
     async def remove(self, item_id: int) -> bool:
+        logger.info("WatchlistRepo.remove() 진입 — item_id=%d", item_id)
         result = await self._db.execute("DELETE FROM stock_watchlist WHERE id = $1", item_id)
         return result == "DELETE 1"
 
     async def seed_defaults(self) -> int:
+        logger.info("WatchlistRepo.seed_defaults() 진입")
+        # 테이블이 비어있을 때만 M7(Magnificent 7) 기본 종목 일괄 INSERT
         count = await self._db.fetchval("SELECT COUNT(*) FROM stock_watchlist")
         if count and count > 0:
             return 0
