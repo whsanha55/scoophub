@@ -154,6 +154,7 @@ class YFinanceProvider:
         Each call/put entry: contractSymbol, strike, impliedVolatility, volume, openInterest.
         Returns None on failure.
         """
+        logger.info("YFinanceProvider.options_chain() 진입 — ticker=%s, expiry=%s", ticker, expiry)
         await self._throttle()
 
         def _fetch() -> dict | None:
@@ -199,7 +200,15 @@ class YFinanceProvider:
             }
 
         try:
-            return await asyncio.to_thread(_fetch)
+            result = await asyncio.to_thread(_fetch)
+            if result is None:
+                logger.info("YFinanceProvider.options_chain() 완료 — ticker=%s, 만기 없음", ticker)
+            else:
+                logger.info(
+                    "YFinanceProvider.options_chain() 완료 — ticker=%s, expiry=%s, calls=%d, puts=%d",
+                    ticker, result["expiry"], len(result["calls"]), len(result["puts"]),
+                )
+            return result
         except Exception as e:
             logging.warning("yfinance options_chain(%s) failed: %s", ticker, e)
             return None

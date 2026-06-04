@@ -141,6 +141,7 @@ async def compute_sigma_from_options(
         expected_move = ATM_call_price + ATM_put_price
         expected_move_pct = expected_move / current_price * 100
     """
+    logger.info("compute_sigma_from_options() 진입 — ticker=%s, current_price=%.4f", ticker, current_price)
     if current_price <= 0:
         return []
 
@@ -170,4 +171,5 @@ async def compute_sigma_from_options(
     if not results:
         logger.warning("No valid sigma computed for %s across %d expiries", ticker, len(expiries))
 
+    logger.info("compute_sigma_from_options() 완료 — ticker=%s, results=%d", ticker, len(results))
     return results

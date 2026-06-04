@@ -1,6 +1,7 @@
 # stock/repository/sigma.py — Repository for stock_sigma table (ATM straddle).
 from __future__ import annotations
 
+import logging
 from datetime import date, datetime
 from typing import TYPE_CHECKING
 
@@ -8,6 +9,8 @@ if TYPE_CHECKING:
     from app.core.database import Database
 
 from app.stock.models import SigmaResult
+
+logger = logging.getLogger(__name__)
 
 
 def _row_to_sigma(row: dict) -> SigmaResult:
@@ -54,6 +57,8 @@ class SigmaRepo:
 
     async def save(self, sigma: SigmaResult) -> SigmaResult:
         """Upsert a sigma result into stock_sigma."""
+        logger.info("SigmaRepo.save() 진입 — ticker=%s, expiry=%s", sigma.ticker, sigma.expiry_date)
+        # (ticker, expiry_date, snapshot_date) 충돌 시 가격/볼륨 필드만 갱신
         row = await self._db.fetchrow(
             "INSERT INTO stock_sigma "
             "(ticker, expiry_date, snapshot_date, snapshot_at, current_price, "
@@ -92,6 +97,7 @@ class SigmaRepo:
             sigma.atm_call_volume,
             sigma.atm_put_volume,
         )
+        logger.info("SigmaRepo.save() 완료 — ticker=%s, expiry=%s", sigma.ticker, sigma.expiry_date)
         return _row_to_sigma(row)
 
     async def get_latest(self, ticker: str) -> SigmaResult | None:
