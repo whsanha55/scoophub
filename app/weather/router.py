@@ -2,12 +2,15 @@
 from __future__ import annotations
 
 import json
+import logging
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, Query
 
 from app.core.database import Database
 from app.core.models import ApiResponse, ErrorDetail
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api")
 
@@ -33,6 +36,7 @@ async def get_weather(
     location: str = Query("seoul", description="지역 이름 (예: seoul, busan)"),
     db: Database = Depends(_get_db),
 ):
+    logger.info("get_weather requested: location=%s minutes=%s", location, minutes)
     conditions = ["location = $1"]
     params: list = [location]
     idx = 2
@@ -69,6 +73,7 @@ async def get_weather_forecast(
     limit: int = Query(3, ge=1, le=7, description="조회할 최대 일수"),
     db: Database = Depends(_get_db),
 ):
+    logger.info("get_weather_forecast requested: location=%s limit=%d", location, limit)
     row = await db.fetchrow(
         "SELECT weekly_forecast FROM weather_snapshots "
         "WHERE location = $1 AND weekly_forecast IS NOT NULL "
@@ -102,6 +107,7 @@ def _row_to_dict(row) -> dict:
     tags=["Weather Crawling"],
 )
 async def crawling_weather(db: Database = Depends(_get_db)):
+    logger.info("manual weather crawl triggered")
     """
     ## 🌤️ 날씨 크롤러
 

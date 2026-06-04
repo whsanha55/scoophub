@@ -5,8 +5,7 @@ crawlers:
     source_timeout_seconds: 10
     retry_count: 3
     retry_delay_seconds: 10
-    dedup_window_hours: 24        # 제목 유사도 비교 대상 시간 윈도우
-    title_similarity: 0.85        # 제목 유사도 임계값 (>= 이면 중복)
+    dedup_window_hours: 24        # LLM 중복 검사 대상 시간 윈도우
   weather:
     schedule_minutes: 30
     source_timeout_seconds: 15

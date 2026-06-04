@@ -92,6 +92,7 @@ class SigmaCrawler(BaseCrawler):
         self._repo = WeeklyExpectedMoveRepo(db)
 
     async def fetch(self) -> CrawlResult:
+        logger.info("SigmaCrawler.fetch() 시작 — %s", _BASE_URL)
         results: list[WeeklyExpectedMove] = []
 
         async with httpx.AsyncClient(
@@ -104,15 +105,18 @@ class SigmaCrawler(BaseCrawler):
             resp.raise_for_status()
             soup = BeautifulSoup(resp.text, "html.parser")
 
+            # h1.entry-title 에서 만기일(Exp) 추출
             expiry_date = _extract_expiry_date(soup)
 
-            # Select tables by CSS class 'expected-move-table'
+            # CSS class 'expected-move-table' 테이블 각각 파싱
             for table in soup.select("table.expected-move-table"):
                 results.extend(_parse_table(table, expiry_date))
 
         items_fetched = len(results)
         if not results:
+            logger.info("SigmaCrawler.fetch() 완료 — 파싱 결과 없음")
             return CrawlResult(items_fetched=0, items_new=0)
 
         items_new = await self._repo.save_batch(results)
+        logger.info("SigmaCrawler.fetch() 완료 — fetched=%d, new=%d", items_fetched, items_new)
         return CrawlResult(items_fetched=items_fetched, items_new=items_new)

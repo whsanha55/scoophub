@@ -1,7 +1,11 @@
 # weather/wiring.py
 from __future__ import annotations
 
+import logging
+
 from app.core.context import AppContext
+
+logger = logging.getLogger(__name__)
 
 TAGS = [
     {"name": "Weather", "description": "날씨 데이터 조회 API"},
@@ -10,6 +14,7 @@ TAGS = [
 
 
 def register(ctx: AppContext) -> None:
+    logger.info("registering weather module")
     from app.weather.router import router, _get_db as weather_get_db
     from app.weather.scheduler import register_jobs
 

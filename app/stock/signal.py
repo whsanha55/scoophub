@@ -2,10 +2,13 @@
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 from enum import StrEnum
 
 from app.stock.technical import TechnicalResult, analyze, technical_score
+
+logger = logging.getLogger(__name__)
 
 
 class Signal(StrEnum):
@@ -40,13 +43,17 @@ class AnalysisReport:
 
 
 def _detect_regime(result: TechnicalResult, price: float) -> MarketRegime:
-    # Choppy: very low ADX + wide BB (no direction, high volatility noise)
+    logger.info("_detect_regime: adx=%.1f, bb_width=%.4f, price=%.2f, ema12=%.2f", result.adx, result.bb_width, price, result.ema12)
+    # Choppy: 매우 낮은 ADX(방향성 없음) + 넓은 BB(변동성 높음) = 노이즈 시장
     if result.adx < 15 and result.bb_width > 0.06:
         return MarketRegime.CHOPPY
+    # Ranging: 낮은 ADX = 뚜렷한 추세 없음 (박스권)
     if result.adx < 20:
         return MarketRegime.RANGING
+    # TRENDING_UP: 가격 > EMA12 + MACD 선 > 시그널선 (상승 추세 확인)
     if price > result.ema12 and result.macd_line > result.macd_signal:
         return MarketRegime.TRENDING_UP
+    # TRENDING_DOWN: 가격 < EMA12 + MACD 선 < 시그널선 (하락 추세 확인)
     if price < result.ema12 and result.macd_line < result.macd_signal:
         return MarketRegime.TRENDING_DOWN
     return MarketRegime.RANGING
@@ -54,6 +61,8 @@ def _detect_regime(result: TechnicalResult, price: float) -> MarketRegime:
 
 def _dynamic_weights(regime: MarketRegime) -> dict[str, float]:
     """Adjust indicator weights by market regime."""
+    logger.info("_dynamic_weights: regime=%s", regime.value)
+    # 추세장에서는 MACD/MA 가중치 ↑ (추세 추종), RSI/BB/Stochastic 가중치 ↓ (과매수/과매도 신호 약화)
     if regime == MarketRegime.TRENDING_UP:
         return {
             "ma": 1.2,
@@ -64,6 +73,7 @@ def _dynamic_weights(regime: MarketRegime) -> dict[str, float]:
             "adx": 1.0,
             "vwap": 1.0,
         }
+    # 하락 추세에서는 RSI 가중치 ↑ (과매도 반등 포착), MACD 가중치 ↑ (하락 모멘텀 확인)
     if regime == MarketRegime.TRENDING_DOWN:
         return {
             "ma": 1.2,
@@ -74,8 +84,8 @@ def _dynamic_weights(regime: MarketRegime) -> dict[str, float]:
             "adx": 1.0,
             "vwap": 1.0,
         }
+    # Choppy: 모든 지표 신뢰도 낮음 → 가중치 전반적으로 축소
     if regime == MarketRegime.CHOPPY:
-        # Choppy: all indicators unreliable, reduce weights
         return {
             "ma": 0.5,
             "rsi": 0.6,
@@ -85,7 +95,7 @@ def _dynamic_weights(regime: MarketRegime) -> dict[str, float]:
             "adx": 0.3,
             "vwap": 0.5,
         }
-    # Ranging: mean-reversion indicators get higher weight
+    # Ranging: 평균 회귀 지표(RSI, BB, Stochastic) 가중치 ↑ (과매수/과매도 구간 반전 기대)
     return {
         "ma": 0.7,
         "rsi": 1.3,
@@ -106,13 +116,17 @@ def _calc_confidence(
     if not scores:
         return 0.0
 
+    logger.info("_calc_confidence: regime=%s, scores=%s", regime.value, scores)
+
+    # 가중 합산 점수 (방향성 판단의 기준)
     weighted_sum = sum(scores[k] * weights.get(k, 1.0) for k in scores)
+    # 가중 절대값 합 (정규화를 위한 최대 가능 범위)
     max_possible = sum(abs(scores[k]) * weights.get(k, 1.0) for k in scores)
 
     if max_possible == 0:
         return 50.0
 
-    # Agreement: how many indicators agree with the dominant direction
+    # 지표 합의도(Agreement): 주도 방향에 동의하는 지표 비율
     direction = 1 if weighted_sum > 0 else (-1 if weighted_sum < 0 else 0)
     if direction != 0:
         agreeing = sum(
@@ -124,13 +138,13 @@ def _calc_confidence(
     else:
         agreement_ratio = 0.0
 
-    # Strength: directional magnitude
+    # 강도(Strength): 방향성의 절대 크기 (0~1 정규화)
     strength = abs(weighted_sum) / max_possible
 
-    # Base confidence: agreement ratio (0-60%) + strength (0-30%)
+    # 기본 신뢰도 = 합의도(최대 60%) + 강도(최대 30%)
     base_conf = agreement_ratio * 60 + strength * 30
 
-    # Regime boost: trending markets get confidence bump
+    # 시장 국면 보정: 추세장은 신뢰도 보너스(+10), 혼조장은 페널티(-15)
     if regime in (MarketRegime.TRENDING_UP, MarketRegime.TRENDING_DOWN):
         base_conf += 10
     elif regime == MarketRegime.CHOPPY:
@@ -159,6 +173,7 @@ def generate_report(
     daily_candles: list[object],
 ) -> AnalysisReport:
     """Generate full analysis report from technical indicators."""
+    logger.info("generate_report: ticker=%s, price=%.2f, candles=%d", ticker, price, len(daily_candles))
     from app.stock.models import Candle
 
     candles = [c for c in daily_candles if isinstance(c, Candle)]
@@ -173,10 +188,10 @@ def generate_report(
     weights = _dynamic_weights(regime)
     tech_scores = technical_score(tech_result, price, regime=regime.value)
 
-    # Weighted technical total
+    # 가중 기술 분석 총점: 각 지표 점수 × regime 기반 가중치
     tech_total = sum(tech_scores[k] * weights.get(k, 1.0) for k in tech_scores)
 
-    # Volume confirmation: reduce confidence when OBV diverges from signal
+    # 거래량 다이버전스 확인: 시그널 방향과 OBV 방향이 불일치하면 신뢰도 하락
     vol_divergence = False
     if tech_total > 0 and tech_result.obv_trend_dir < 0:
         vol_divergence = True
@@ -188,17 +203,22 @@ def generate_report(
     signal = _score_to_signal(total)
     confidence = _calc_confidence(tech_scores, weights, regime)
 
-    # Volume divergence penalty
+    # Volume divergence penalty: OBV 다이버전스 시 신뢰도 25% 차감
     if vol_divergence:
         confidence = round(confidence * 0.75, 1)
 
-    # Signal quality grade
+    # Signal quality grade: 신뢰도 기준 강도 분류
     if confidence >= 70:
         quality = "strong"
     elif confidence >= 45:
         quality = "moderate"
     else:
         quality = "weak"
+
+    logger.info(
+        "generate_report: completed — ticker=%s, signal=%s, score=%.1f, confidence=%.1f, regime=%s, quality=%s",
+        ticker, signal.value, total, confidence, regime.value, quality,
+    )
 
     return AnalysisReport(
         ticker=ticker,

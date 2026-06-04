@@ -1,14 +1,17 @@
 # news/sources_router.py
 from __future__ import annotations
 
+import json
+import logging
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
-import json
 
 from app.core.database import Database
 from app.core.models import ApiResponse
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api", tags=["News Sources"])
 
@@ -50,6 +53,7 @@ async def list_sources(
     active_only: bool = Query(False, description="활성 소스만 조회"),
     db: Database = Depends(_get_db),
 ):
+    logger.info("list_sources 시작 - active_only=%s", active_only)
     if active_only:
         rows = await db.fetch(
             "SELECT * FROM crawl_sources WHERE crawler='news' AND active=TRUE ORDER BY id"
@@ -59,6 +63,7 @@ async def list_sources(
             "SELECT * FROM crawl_sources WHERE crawler='news' ORDER BY id"
         )
     sources = [_row_to_dict(r) for r in rows]
+    logger.info("list_sources 완료 - total=%d", len(sources))
     return ApiResponse(success=True, data=sources, meta={"total": len(sources), "returned": len(sources)})
 
 
@@ -72,6 +77,7 @@ async def create_source(
     body: SourceCreate,
     db: Database = Depends(_get_db),
 ):
+    logger.info("create_source 시작 - name=%s, url=%s", body.name, body.url)
     config = json.dumps(body.config) if body.config else '{}'
     try:
         row = await db.fetchrow(
@@ -81,6 +87,7 @@ async def create_source(
         )
     except Exception:
         raise HTTPException(status_code=409, detail="Source URL already exists for news crawler")
+    logger.info("create_source 완료 - id=%d", row["id"])
     return ApiResponse(success=True, data=_row_to_dict(row))
 
 
@@ -94,6 +101,7 @@ async def update_source(
     body: SourceUpdate,
     db: Database = Depends(_get_db),
 ):
+    logger.info("update_source 시작 - source_id=%d", source_id)
     existing = await db.fetchrow(
         "SELECT * FROM crawl_sources WHERE id=$1 AND crawler='news'", source_id
     )
@@ -129,6 +137,7 @@ async def update_source(
         f"UPDATE crawl_sources SET {', '.join(sets)} WHERE id=${idx} RETURNING *",
         *params,
     )
+    logger.info("update_source 완료 - source_id=%d", source_id)
     return ApiResponse(success=True, data=_row_to_dict(row))
 
 
@@ -141,9 +150,11 @@ async def delete_source(
     source_id: int,
     db: Database = Depends(_get_db),
 ):
+    logger.info("delete_source 시작 - source_id=%d", source_id)
     result = await db.execute(
         "DELETE FROM crawl_sources WHERE id=$1 AND crawler='news'", source_id
     )
     if result == "DELETE 0":
         raise HTTPException(status_code=404, detail="Source not found")
+    logger.info("delete_source 완료 - source_id=%d", source_id)
     return ApiResponse(success=True, data={"deleted": True})

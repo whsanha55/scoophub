@@ -1,6 +1,7 @@
 # system/router.py
 from __future__ import annotations
 
+import logging
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, Query
@@ -8,6 +9,8 @@ from pydantic import BaseModel, Field
 
 from app.core.database import Database
 from app.core.models import ApiResponse, ErrorDetail
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api", tags=["System"])
 
@@ -28,6 +31,7 @@ def get_db() -> Database:
     description="서비스 상태와 주요 테이블 레코드 수를 반환합니다.",
 )
 async def health(db: Database = Depends(get_db)):
+    logger.info("health check requested")
     news_count = await db.fetchval("SELECT COUNT(*) FROM news_articles")
     weather_count = await db.fetchval("SELECT COUNT(*) FROM weather_snapshots")
     return ApiResponse(
@@ -45,13 +49,16 @@ async def health(db: Database = Depends(get_db)):
     description="요청 body의 message를 LLM에 전송해 응답을 반환합니다. LLM 키·모델·연결 상태 점검용.",
 )
 async def llm_test(body: LLMTestRequest):
+    logger.info("llm test requested: message=%r", body.message)
     from app.config import settings
     from app.core.llm import LLMClient
 
     try:
         async with LLMClient() as llm:
             content = await llm.chat(body.system, body.message)
+        logger.info("llm test success: model=%s", settings.LLM_MODEL)
     except Exception as e:
+        logger.error("llm test failed: %s", e)
         return ApiResponse(
             success=False,
             error=ErrorDetail(code="llm_failed", message=str(e) or type(e).__name__),
@@ -69,6 +76,7 @@ async def crawl_logs(
     limit: int = Query(20, ge=1, le=200, description="조회할 최대 로그 수"),
     db: Database = Depends(get_db),
 ):
+    logger.info("crawl logs requested: crawler=%s limit=%d", crawler, limit)
     if crawler:
         rows = await db.fetch(
             "SELECT * FROM crawl_logs WHERE crawler=$1 ORDER BY started_at DESC LIMIT $2",

@@ -55,11 +55,13 @@ class WeatherCrawler(BaseCrawler):
         self.timeout = timeout
 
     async def fetch(self) -> CrawlResult:
+        logger.info("weather fetch started")
         wttr_data = None
         meteo_data = None
         errors: list[str] = []
 
         async with httpx.AsyncClient(timeout=self.timeout) as client:
+            # wttr.in API 호출 - 서울 현재 날씨 + 주간 예보
             try:
                 resp = await client.get("https://wttr.in/Seoul?format=j1")
                 resp.raise_for_status()
@@ -68,6 +70,7 @@ class WeatherCrawler(BaseCrawler):
                 errors.append(f"wttr.in: {e}")
                 logger.warning(f"wttr.in fetch failed: {e}")
 
+            # Open-Meteo 대기질 API 호출 - PM10, PM2.5, 오존, 자외선
             try:
                 resp = await client.get(
                     "https://air-quality-api.open-meteo.com/v1/air-quality"
@@ -83,9 +86,11 @@ class WeatherCrawler(BaseCrawler):
         if wttr_data is None:
             return CrawlResult(items_fetched=0, items_new=0, errors=errors)
 
+        # wttr.in 현재 날씨 파싱
         cc = wttr_data["current_condition"][0]
         condition_en = cc.get("weatherDesc", [{}])[0].get("value", "")
 
+        # Open-Meteo 시간별 대기질 데이터에서 현재 시각 인덱스 탐색
         pm10 = None
         pm25 = None
         ozone = None
@@ -112,8 +117,10 @@ class WeatherCrawler(BaseCrawler):
                 uv_clean = [v for v in uv_list if v is not None]
                 uv_index = max(uv_clean) if uv_clean else None
 
+        # wttr.in 주간 예보 (최대 3일치)
         weekly = wttr_data.get("weather", [])[:3]
 
+        # 수집된 데이터를 weather_snapshots 테이블에 저장
         await self.db.execute(
             "INSERT INTO weather_snapshots "
             "(location, fetched_at, temperature, feels_like, humidity, wind_speed, wind_direction, "
@@ -140,4 +147,5 @@ class WeatherCrawler(BaseCrawler):
             json.dumps(wttr_data),
         )
 
+        logger.info("weather fetch completed: errors=%d", len(errors))
         return CrawlResult(items_fetched=1, items_new=1, errors=errors)

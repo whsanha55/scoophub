@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import logging
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -9,6 +10,8 @@ if TYPE_CHECKING:
 
 from app.stock.models import TickerParams
 from app.stock.repository._helpers import row_to_stock_ticker_params
+
+logger = logging.getLogger(__name__)
 
 
 class TickerParamsRepo:
@@ -28,6 +31,8 @@ class TickerParamsRepo:
         return [row_to_stock_ticker_params(r) for r in rows]
 
     async def save(self, params: TickerParams) -> TickerParams:
+        logger.info("TickerParamsRepo.save() 진입 — ticker=%s", params.ticker)
+        # UPSERT: ticker 충돌 시 전체 전략 파라미터 갱신
         weights_json = json.dumps(params.weights) if params.weights else None
         row = await self._db.fetchrow(
             "INSERT INTO stock_ticker_params "
@@ -57,4 +62,5 @@ class TickerParamsRepo:
             params.out_sample_sortino,
             params.is_adopted,
         )
+        logger.info("TickerParamsRepo.save() 완료 — ticker=%s", params.ticker)
         return row_to_stock_ticker_params(row)

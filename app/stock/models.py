@@ -1,9 +1,12 @@
 # stock/models.py — Domain models for stock analysis.
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 from datetime import date, datetime
 from enum import StrEnum
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -156,15 +159,20 @@ class TickerParams:
 
 def compute_sigma_range(wem: WeeklyExpectedMove, current_price: float) -> SigmaRange:
     """Compute sigma range from a weekly expected move."""
+    logger.info("compute_sigma_range: ticker=%s, price=%.2f, high=%.2f, low=%.2f", wem.ticker, current_price, wem.expected_move_high, wem.expected_move_low)
+    # 중심가 = 주간 예상 최고가와 최저가의 중간값
     center = (wem.expected_move_high + wem.expected_move_low) / 2
+    # 예상 변동폭의 절반 (1σ 추정의 기준)
     half_range = (wem.expected_move_high - wem.expected_move_low) / 2
-    sigma = half_range / 2  # 1σ ≈ half the expected move range / 2
+    # 1σ ≈ 예상 변동폭 절반의 절반 (정규분포 가정 시 1σ 구간 근사)
+    sigma = half_range / 2
 
     upper_1 = center + sigma
     lower_1 = center - sigma
     upper_2 = center + 2 * sigma
     lower_2 = center - 2 * sigma
 
+    # 현재 가격이 sigma 구간 내 어디에 위치하는지 판별 (5단계 구간)
     if current_price >= upper_1:
         position = SigmaPosition.ABOVE_1SIGMA
     elif current_price >= center + sigma * 0.5:
@@ -192,20 +200,27 @@ def compute_sigma_range(wem: WeeklyExpectedMove, current_price: float) -> SigmaR
 
 def generate_sigma_signal(sigma_range: SigmaRange) -> SigmaSignal:
     """Generate investment signal from sigma position."""
+    logger.info("generate_sigma_signal: ticker=%s, position=%s, price=%.2f", sigma_range.ticker, sigma_range.sigma_position.value, sigma_range.current_price)
+    # sigma 위치 기반 역추세(contrarian) 시그널: 하방 극단 → 매수, 상방 극단 → 매도
     position = sigma_range.sigma_position
 
+    # -1σ 이하: 과매도 구간 → 강한 매수 신호
     if position == SigmaPosition.BELOW_1SIGMA:
         signal = SigmaSignalType.STRONG_BUY
         confidence = 0.8
+    # 하방 0.5σ~1σ: 저가 구간 → 매수 신호
     elif position == SigmaPosition.WITHIN_LOWER:
         signal = SigmaSignalType.BUY
         confidence = 0.6
+    # 중심 ±0.5σ: 중립 구간
     elif position == SigmaPosition.NEAR_CENTER:
         signal = SigmaSignalType.NEUTRAL
         confidence = 0.3
+    # 상방 0.5σ~1σ: 고가 구간 → 매도 신호
     elif position == SigmaPosition.WITHIN_UPPER:
         signal = SigmaSignalType.SELL
         confidence = 0.6
+    # +1σ 이상: 과매수 구간 → 강한 매도 신호
     else:  # ABOVE_1SIGMA
         signal = SigmaSignalType.STRONG_SELL
         confidence = 0.8

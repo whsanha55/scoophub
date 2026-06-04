@@ -12,6 +12,8 @@ import yfinance as yf
 
 from app.stock.models import Candle
 
+logger = logging.getLogger(__name__)
+
 _INTERVAL_MAP: dict[str, str] = {
     "1d": "1D",
     "1wk": "1W",
@@ -61,7 +63,11 @@ class YFinanceProvider:
         self._last_call: float = 0.0
 
     async def _throttle(self) -> None:
-        """Ensure minimum 3 seconds between yfinance API calls."""
+        """Ensure minimum 3 seconds between yfinance API calls.
+
+        마지막 호출 이후 경과 시간을 계산하여, RATE_LIMIT_S(3초) 미만이면
+        남은 시간만큼 대기(sleep)합니다. 이후 _last_call을 갱신합니다.
+        """
         elapsed = time.monotonic() - self._last_call
         wait = self.RATE_LIMIT_S - elapsed
         if wait > 0:
@@ -74,6 +80,7 @@ class YFinanceProvider:
         interval: str = "1d",
     ) -> list[Candle]:
         """Fetch OHLCV candle data via yfinance Ticker.history()."""
+        logger.info("YFinanceProvider.chart() 진입 — ticker=%s, interval=%s", ticker, interval)
         await self._throttle()
 
         def _fetch() -> list[Candle]:
@@ -103,13 +110,16 @@ class YFinanceProvider:
             return candles
 
         try:
-            return await asyncio.to_thread(_fetch)
+            result = await asyncio.to_thread(_fetch)
+            logger.info("YFinanceProvider.chart() 완료 — ticker=%s, candles=%d", ticker, len(result))
+            return result
         except Exception as e:
             logging.warning("yfinance chart(%s) failed: %s", ticker, e)
             return []
 
     async def quote(self, ticker: str) -> dict:
         """Fetch current price / change data via yfinance Ticker.info."""
+        logger.info("YFinanceProvider.quote() 진입 — ticker=%s", ticker)
         await self._throttle()
 
         def _fetch() -> dict:
@@ -126,7 +136,9 @@ class YFinanceProvider:
             }
 
         try:
-            return await asyncio.to_thread(_fetch)
+            result = await asyncio.to_thread(_fetch)
+            logger.info("YFinanceProvider.quote() 완료 — ticker=%s", ticker)
+            return result
         except Exception as e:
             logging.warning("yfinance quote(%s) failed: %s", ticker, e)
             return {}

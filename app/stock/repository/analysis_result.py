@@ -2,10 +2,13 @@
 from __future__ import annotations
 
 import json
+import logging
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from app.core.database import Database
+
+logger = logging.getLogger(__name__)
 
 
 class AnalysisResultRepo:
@@ -27,6 +30,8 @@ class AnalysisResultRepo:
         technical_scores: dict,
         technical_details: dict,
     ) -> int:
+        logger.info("AnalysisResultRepo.save() 진입 — ticker=%s, timeframe=%s", ticker, timeframe)
+        # UPSERT: (ticker, timeframe) 충돌 시 전체 필드 갱신 + analyzed_at 갱신
         row_id = await self._db.fetchval(
             "INSERT INTO stock_analysis_results "
             "(ticker, exchange, timeframe, signal, total_score, confidence, "
@@ -58,11 +63,14 @@ class AnalysisResultRepo:
             json.dumps(technical_scores),
             json.dumps(technical_details),
         )
+        logger.info("AnalysisResultRepo.save() 완료 — ticker=%s, row_id=%s", ticker, row_id)
         return row_id
 
     async def find_by_tickers(
         self, tickers: list[str], timeframe: str = "1D"
     ) -> list[dict]:
+        logger.info("AnalysisResultRepo.find_by_tickers() 진입 — tickers=%s, timeframe=%s", tickers, timeframe)
+        # ANY($1) 배열 매칭으로 여러 티커 한 번에 조회
         rows = await self._db.fetch(
             "SELECT * FROM stock_analysis_results "
             "WHERE ticker = ANY($1) AND timeframe = $2 "
@@ -73,6 +81,7 @@ class AnalysisResultRepo:
         return [dict(r) for r in rows]
 
     async def find_all(self, timeframe: str = "1D") -> list[dict]:
+        logger.info("AnalysisResultRepo.find_all() 진입 — timeframe=%s", timeframe)
         rows = await self._db.fetch(
             "SELECT * FROM stock_analysis_results WHERE timeframe = $1 "
             "ORDER BY analyzed_at DESC",

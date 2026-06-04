@@ -65,6 +65,7 @@ async def _run_analysis_for_tickers(
     db: Database,
 ) -> AnalyzeResponse:
     """Run technical analysis for given tickers and save results."""
+    logger.info("_run_analysis_for_tickers() 진입 — tickers=%s", tickers)
     from app.stock.repository import AnalysisResultRepo, WatchlistRepo
     from app.stock.signal import generate_report
 
@@ -124,6 +125,7 @@ async def _run_analysis_for_tickers(
             results.append(AnalyzeResult(ticker=ticker, status="error", detail=str(e)))
             errors += 1
 
+    logger.info("_run_analysis_for_tickers() 완료 — total=%d, ok=%d, errors=%d", len(tickers), ok, errors)
     return AnalyzeResponse(total=len(tickers), ok=ok, errors=errors, results=results)
 
 
@@ -199,6 +201,7 @@ async def analyze(
     tickers: list[str] | None = Query(None, description="분석할 티커 목록. 생략 시 전체 watchlist"),
     db: Database = Depends(_get_db),
 ):
+    logger.info("analyze 엔드포인트 진입 — tickers=%s", tickers)
     from app.stock.repository import WatchlistRepo
 
     wl_repo = WatchlistRepo(db)
@@ -236,6 +239,7 @@ async def stock_report(
     db: Database = Depends(_get_db),
 ):
     """저장된 분석 결과로 종목 리포트 반환."""
+    logger.info("stock_report 엔드포인트 진입 — tickers=%s, timeframe=%s", tickers, timeframe)
     if timeframe not in VALID_TIMEFRAMES:
         return JSONResponse(
             status_code=400,
@@ -311,6 +315,7 @@ async def stock_report_all(
     db: Database = Depends(_get_db),
 ):
     """전체 종목 리포트 반환. summarize=True 시 요약 버전."""
+    logger.info("stock_report_all 엔드포인트 진입 — summarize=%s, timeframe=%s", summarize, timeframe)
     if timeframe not in VALID_TIMEFRAMES:
         return JSONResponse(
             status_code=400,
@@ -469,6 +474,7 @@ async def get_sigma(
     description="US 주식 시장(NYSE/NASDAQ) 열림 여부. 기준: 평일 14:30–21:00 UTC (9:30 AM–4:00 PM ET).",
 )
 async def market_status():
+    logger.info("market_status 엔드포인트 진입")
     from datetime import time as dt_time
 
     now_utc = datetime.now(timezone.utc)
@@ -496,6 +502,7 @@ async def market_status():
     description="watchlist에 등록된 전체 종목 목록을 반환합니다.",
 )
 async def get_watchlist(db: Database = Depends(_get_db)):
+    logger.info("get_watchlist 엔드포인트 진입")
     from app.stock.repository import WatchlistRepo
 
     repo = WatchlistRepo(db)
@@ -511,6 +518,7 @@ async def get_watchlist(db: Database = Depends(_get_db)):
     description="watchlist에 새 종목을 추가합니다. 티커는 자동 대문자 변환.",
 )
 async def add_watchlist(item: WatchlistItemIn, db: Database = Depends(_get_db)):
+    logger.info("add_watchlist 엔드포인트 진입 — ticker=%s", item.ticker)
     from app.stock.models import WatchlistItem
     from app.stock.repository import WatchlistRepo
 
@@ -539,6 +547,7 @@ async def update_watchlist(
     item: WatchlistUpdateIn,
     db: Database = Depends(_get_db),
 ):
+    logger.info("update_watchlist 엔드포인트 진입 — item_id=%d", item_id)
     from app.stock.repository import WatchlistRepo
 
     repo = WatchlistRepo(db)
@@ -568,6 +577,7 @@ async def update_watchlist(
     description="watchlist에서 종목을 영구 삭제합니다.",
 )
 async def delete_watchlist(item_id: int, db: Database = Depends(_get_db)):
+    logger.info("delete_watchlist 엔드포인트 진입 — item_id=%d", item_id)
     from app.stock.repository import WatchlistRepo
 
     repo = WatchlistRepo(db)
@@ -585,6 +595,7 @@ async def delete_watchlist(item_id: int, db: Database = Depends(_get_db)):
 
 async def _do_crawl_sigma(db: Database) -> int:
     """Crawl sigma data. Returns items_new count."""
+    logger.info("_do_crawl_sigma() 진입")
     from app.stock.crawler import SigmaCrawler
 
     result = await SigmaCrawler(db).run()
@@ -593,6 +604,7 @@ async def _do_crawl_sigma(db: Database) -> int:
 
 async def _do_sync_candles(db: Database) -> int:
     """Sync candle data for active watchlist. Returns total saved count."""
+    logger.info("_do_sync_candles() 진입")
     from app.stock.repository import CandleRepo, WatchlistRepo
 
     provider = get_provider_router()
