@@ -75,6 +75,26 @@ class WatchlistItemIn(BaseModel):
     memo: str | None = Field(None, description="메모 (선택)")
 
 
+class SigmaDataOut(BaseModel):
+    ticker: str = Field(..., description="주식 티커")
+    current_price: float = Field(..., description="현재가")
+    expiry_date: str | None = Field(None, description="옵션 만기일 (ISO 8601)")
+    atm_strike: float = Field(..., description="ATM 행사가")
+    atm_call: float = Field(..., description="ATM 콜 가격 (mid or lastPrice)")
+    atm_put: float = Field(..., description="ATM 풋 가격 (mid or lastPrice)")
+    expected_move: float = Field(..., description="예상 변동폭 (ATM call + put)")
+    expected_move_pct: float = Field(..., description="예상 변동폭 (%)")
+    snapshot_date: str | None = Field(None, description="스냅샷 날짜 (ET 거래일, ISO 8601)")
+    snapshot_at: str | None = Field(None, description="스냅샷 시각 (UTC, ISO 8601)")
+    source: str = Field(..., description="데이터 출처")
+    total_call_volume: int = Field(0, description="만기 전체 콜 거래량")
+    total_put_volume: int = Field(0, description="만기 전체 풋 거래량")
+    put_call_volume_ratio: float | None = Field(None, description="풋/콜 거래량 비율")
+    atm_call_volume: int = Field(0, description="ATM 콜 거래량")
+    atm_put_volume: int = Field(0, description="ATM 풋 거래량")
+    created_at: str | None = Field(None, description="생성 일시 (ISO 8601)")
+
+
 class WatchlistItemOut(BaseModel):
     id: str = Field(..., description="종목 고유 ID")
     ticker: str = Field(..., description="주식 티커")

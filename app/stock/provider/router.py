@@ -22,5 +22,9 @@ class ProviderRouter:
         logger.info("ProviderRouter.quote() 진입 — ticker=%s", ticker)
         return await self._yfinance.quote(ticker)
 
+    async def options_chain(self, ticker: str, expiry: str | None = None) -> dict | None:
+        logger.info("ProviderRouter.options_chain() 진입 — ticker=%s, expiry=%s", ticker, expiry)
+        return await self._yfinance.options_chain(ticker, expiry)
+
     async def close(self) -> None:
         await self._yfinance.close()

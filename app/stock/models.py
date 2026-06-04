@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from datetime import date
+from datetime import date, datetime
 from enum import StrEnum
 
 logger = logging.getLogger(__name__)
@@ -36,6 +36,38 @@ class WeeklyExpectedMove:
     expected_move_pct: float = 0.0
     created_at: date | None = None
     updated_at: date | None = None
+
+
+@dataclass
+class SigmaResult:
+    """Sigma computed from ATM straddle prices (Yahoo Finance options chain)."""
+
+    id: int | None = None
+    ticker: str = ""
+    current_price: float = 0.0
+    expiry_date: date | None = None
+
+    # ATM straddle inputs
+    atm_strike: float = 0.0
+    atm_call: float = 0.0           # mid price (bid/ask avg), fallback lastPrice
+    atm_put: float = 0.0
+
+    # Computed expected move
+    expected_move: float = 0.0      # atm_call + atm_put
+    expected_move_pct: float = 0.0  # expected_move / current_price * 100
+
+    # Snapshot metadata
+    snapshot_date: date | None = None    # ET trading day
+    snapshot_at: datetime | None = None  # UTC timestamp
+    source: str = "yfinance_straddle"
+    created_at: datetime | None = None
+
+    # Volume flow / sentiment
+    total_call_volume: int = 0
+    total_put_volume: int = 0
+    put_call_volume_ratio: float | None = None
+    atm_call_volume: int = 0
+    atm_put_volume: int = 0
 
 
 class SigmaPosition(StrEnum):

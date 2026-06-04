@@ -19,6 +19,7 @@ if TYPE_CHECKING:
 from app.stock.schemas import (
     AnalyzeResponse,
     AnalyzeResult,
+    SigmaDataOut,
     StockReport,
     StockSummary,
     TechnicalOut,
@@ -280,6 +281,7 @@ async def stock_report(
                 "expected_move_pct": wem.expected_move_pct,
                 "expected_move_high": wem.expected_move_high,
                 "expected_move_low": wem.expected_move_low,
+                "source": "usstocksigma_html",
                 "weekly_moves": [
                     {
                         "week_start": str(w.week_start) if w.week_start else None,
@@ -348,6 +350,7 @@ async def stock_report_all(
                     "expected_move_pct": wem.expected_move_pct,
                     "expected_move_high": wem.expected_move_high,
                     "expected_move_low": wem.expected_move_low,
+                    "source": "usstocksigma_html",
                     "weekly_moves": [
                         {
                             "week_start": str(w.week_start) if w.week_start else None,
@@ -408,6 +411,57 @@ async def stock_report_all(
         ))
 
     return ApiResponse(success=True, data=summaries)
+
+
+# ── Sigma (Options IV) ────────────────────────────────────────────────────────
+
+
+@router.get(
+    "/stock/sigma",
+    tags=["Stock"],
+    summary="시그마 조회",
+    description=(
+        "ATM straddle 기반 시그마 데이터 조회.\n\n"
+        "- `ticker`: 단일 티커 (예: AAPL)\n"
+        "- 데이터 출처: `yfinance_straddle`"
+    ),
+)
+async def get_sigma(
+    ticker: str = Query(..., description="주식 티커 (예: AAPL)"),
+    db: Database = Depends(_get_db),
+):
+    from app.stock.repository import SigmaRepo
+
+    repo = SigmaRepo(db)
+    result = await repo.get_latest(ticker.upper())
+    if not result:
+        return ApiResponse(success=True, data=None)
+
+    created_at = None
+    if result.created_at:
+        created_at = result.created_at.isoformat() if isinstance(result.created_at, datetime) else str(result.created_at)
+    snapshot_at = None
+    if result.snapshot_at:
+        snapshot_at = result.snapshot_at.isoformat() if isinstance(result.snapshot_at, datetime) else str(result.snapshot_at)
+    return ApiResponse(success=True, data=SigmaDataOut(
+        ticker=result.ticker,
+        current_price=result.current_price,
+        expiry_date=str(result.expiry_date) if result.expiry_date else None,
+        atm_strike=result.atm_strike,
+        atm_call=result.atm_call,
+        atm_put=result.atm_put,
+        expected_move=result.expected_move,
+        expected_move_pct=result.expected_move_pct,
+        snapshot_date=str(result.snapshot_date) if result.snapshot_date else None,
+        snapshot_at=snapshot_at,
+        source=result.source,
+        total_call_volume=result.total_call_volume,
+        total_put_volume=result.total_put_volume,
+        put_call_volume_ratio=result.put_call_volume_ratio,
+        atm_call_volume=result.atm_call_volume,
+        atm_put_volume=result.atm_put_volume,
+        created_at=created_at,
+    ))
 
 
 # ── Market Status ────────────────────────────────────────────────────────────
@@ -624,6 +678,62 @@ async def crawling_sigma(db: Database = Depends(_get_db)):
         "items_fetched": result.items_fetched,
         "items_new": result.items_new,
         "errors": result.errors or None,
+    })
+
+
+@router.post(
+    "/crawling/stock/sigma/compute",
+    tags=["Stock Crawling"],
+    summary="Sigma 즉시 계산 (ATM straddle 기반)",
+    description=(
+        "yfinance 옵션 체인 ATM straddle 기반 sigma 즉시 계산 + 저장.\n\n"
+        "- `tickers` 생략 시 활성 watchlist 전체 대상\n"
+        "- 결과: 각 ticker별 ATM straddle expected move 저장\n"
+        "- 자동 스케줄: 화-토 22:30 UTC (미국장 종료 후)"
+    ),
+)
+async def compute_sigma(
+    tickers: list[str] | None = Query(None, description="계산할 티커 목록. 생략 시 전체 watchlist"),
+    db: Database = Depends(_get_db),
+):
+    from app.stock.repository import SigmaRepo, WatchlistRepo
+    from app.stock.sigma import compute_sigma_from_options
+
+    provider = get_provider_router()
+    wl_repo = WatchlistRepo(db)
+    sigma_repo = SigmaRepo(db)
+
+    if tickers:
+        target_tickers = [t.upper() for t in tickers]
+    else:
+        items = await wl_repo.find_all(active_only=True)
+        target_tickers = [it.ticker for it in items]
+
+    if not target_tickers:
+        return ApiResponse(success=True, data={"saved": 0, "tickers": []})
+
+    snapshot_at = datetime.now(timezone.utc)
+    saved = 0
+    errors = 0
+    for ticker in target_tickers:
+        try:
+            quote = await provider.quote(ticker)
+            price = float(quote.get("regularMarketPrice", 0))
+            if price <= 0:
+                errors += 1
+                continue
+            results = await compute_sigma_from_options(provider, ticker, price, snapshot_at=snapshot_at)
+            for result in results:
+                await sigma_repo.save(result)
+                saved += 1
+        except Exception:
+            logger.exception("Sigma compute failed for %s", ticker)
+            errors += 1
+
+    return ApiResponse(success=True, data={
+        "saved": saved,
+        "errors": errors,
+        "tickers": target_tickers,
     })
 
 

@@ -91,3 +91,40 @@ def register_jobs(
         replace_existing=True,
     )
     logger.info("Scheduled 'stock_analyze' with cron '%s'", analyze_schedule)
+
+    async def _compute_daily_sigma() -> None:
+        from datetime import datetime, timezone
+
+        from app.stock.repository import SigmaRepo, WatchlistRepo
+        from app.stock.sigma import compute_sigma_from_options
+
+        wl_repo = WatchlistRepo(db)
+        sigma_repo = SigmaRepo(db)
+        wl_items = await wl_repo.find_all(active_only=True)
+        tickers = [item.ticker for item in wl_items]
+        if not tickers:
+            return
+
+        snapshot_at = datetime.now(timezone.utc)
+        saved = 0
+        for ticker in tickers:
+            try:
+                quote = await provider_router.quote(ticker)
+                price = float(quote.get("regularMarketPrice", 0))
+                if price <= 0:
+                    continue
+                results = await compute_sigma_from_options(provider_router, ticker, price, snapshot_at=snapshot_at)
+                for result in results:
+                    await sigma_repo.save(result)
+                    saved += 1
+            except Exception:
+                logger.exception("Sigma computation failed for %s", ticker)
+        logger.info("Sigma (straddle): %d saved for %d tickers", saved, len(tickers))
+
+    scheduler.add_job(
+        _compute_daily_sigma,
+        trigger=CronTrigger(minute="30", hour="22", day="*", month="*", day_of_week="2-6"),
+        id="stock_daily_sigma",
+        replace_existing=True,
+    )
+    logger.info("Scheduled 'stock_daily_sigma' with cron '30 22 * * 2-6'")

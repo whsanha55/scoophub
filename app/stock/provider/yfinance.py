@@ -6,6 +6,8 @@ import logging
 import time
 from datetime import date
 
+import math
+
 import yfinance as yf
 
 from app.stock.models import Candle
@@ -27,6 +29,18 @@ _OUTPUTSIZE_TO_PERIOD: dict[int, str] = {
     1300: "5y",
     5000: "max",
 }
+
+
+def _safe_int(val) -> int:
+    """Convert to int, handling NaN from pandas DataFrames."""
+    if val is None:
+        return 0
+    try:
+        if isinstance(val, float) and math.isnan(val):
+            return 0
+    except TypeError:
+        pass
+    return int(val)
 
 
 def _get_period(outputsize: int) -> str:
@@ -128,6 +142,76 @@ class YFinanceProvider:
         except Exception as e:
             logging.warning("yfinance quote(%s) failed: %s", ticker, e)
             return {}
+
+    async def options_chain(
+        self,
+        ticker: str,
+        expiry: str | None = None,
+    ) -> dict | None:
+        """Fetch options chain for a ticker.
+
+        Returns dict with keys: expiries, expiry, calls, puts.
+        Each call/put entry: contractSymbol, strike, impliedVolatility, volume, openInterest.
+        Returns None on failure.
+        """
+        logger.info("YFinanceProvider.options_chain() 진입 — ticker=%s, expiry=%s", ticker, expiry)
+        await self._throttle()
+
+        def _fetch() -> dict | None:
+            t = yf.Ticker(ticker)
+            expiries = t.options
+            if not expiries:
+                return None
+
+            chosen = expiry or expiries[0]
+            chain = t.option_chain(chosen)
+
+            calls = []
+            for _, row in chain.calls.iterrows():
+                calls.append({
+                    "contractSymbol": str(row.get("contractSymbol", "")),
+                    "strike": float(row.get("strike", 0)),
+                    "impliedVolatility": float(row.get("impliedVolatility", 0)),
+                    "volume": _safe_int(row.get("volume", 0)),
+                    "openInterest": _safe_int(row.get("openInterest", 0)),
+                    "bid": float(row.get("bid", 0)),
+                    "ask": float(row.get("ask", 0)),
+                    "lastPrice": float(row.get("lastPrice", 0)),
+                })
+
+            puts = []
+            for _, row in chain.puts.iterrows():
+                puts.append({
+                    "contractSymbol": str(row.get("contractSymbol", "")),
+                    "strike": float(row.get("strike", 0)),
+                    "impliedVolatility": float(row.get("impliedVolatility", 0)),
+                    "volume": _safe_int(row.get("volume", 0)),
+                    "openInterest": _safe_int(row.get("openInterest", 0)),
+                    "bid": float(row.get("bid", 0)),
+                    "ask": float(row.get("ask", 0)),
+                    "lastPrice": float(row.get("lastPrice", 0)),
+                })
+
+            return {
+                "expiries": list(expiries),
+                "expiry": chosen,
+                "calls": calls,
+                "puts": puts,
+            }
+
+        try:
+            result = await asyncio.to_thread(_fetch)
+            if result is None:
+                logger.info("YFinanceProvider.options_chain() 완료 — ticker=%s, 만기 없음", ticker)
+            else:
+                logger.info(
+                    "YFinanceProvider.options_chain() 완료 — ticker=%s, expiry=%s, calls=%d, puts=%d",
+                    ticker, result["expiry"], len(result["calls"]), len(result["puts"]),
+                )
+            return result
+        except Exception as e:
+            logging.warning("yfinance options_chain(%s) failed: %s", ticker, e)
+            return None
 
     async def close(self) -> None:
         """No persistent connection to close."""
