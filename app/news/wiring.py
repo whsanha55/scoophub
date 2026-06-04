@@ -36,6 +36,5 @@ def register(ctx: AppContext) -> None:
             ctx.db,
             schedule_minutes=cfg["schedule_minutes"],
             max_lookback_hours=cfg.get("max_lookback_hours", 24),
-            title_similarity=cfg.get("title_similarity", 0.85),
             dedup_window_hours=cfg.get("dedup_window_hours", 24),
         )

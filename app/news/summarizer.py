@@ -59,7 +59,8 @@ class NewsSummarizer:
         The recency bound is a safety guard against retrying stale failures forever."""
         rows = await self.db.fetch(
             "SELECT id, title, summary, importance, category FROM news_articles "
-            f"WHERE summary_status <> 'success' AND created_at >= NOW() - interval '{RETRY_WINDOW_HOURS} hours' "
+            f"WHERE summary_status <> 'success' AND duplicated = false "
+            f"AND created_at >= NOW() - interval '{RETRY_WINDOW_HOURS} hours' "
             "ORDER BY id"
         )
         if not rows:
