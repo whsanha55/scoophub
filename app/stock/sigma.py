@@ -61,26 +61,30 @@ async def compute_sigma_from_options(
     provider: ProviderRouter,
     ticker: str,
     current_price: float,
-) -> SigmaResult | None:
+) -> list[SigmaResult]:
     """Compute daily & weekly sigma from options chain ATM IV.
+
+    Returns a list of SigmaResult (daily first, weekly second).
+    Empty list on failure.
 
     Formulas:
         daily_sigma = price × IV × √(1/252)
         weekly_sigma = price × IV × √(5/252)
-        expected_move = price × IV × √(DTE/365)
+        expected_move (daily) = price × IV × √(DTE/365)
+        expected_move (weekly) = price × IV × √(5/252)  (same as weekly_sigma)
     """
     if current_price <= 0:
-        return None
+        return []
 
     chain = await provider.options_chain(ticker)
     if not chain or not chain.get("calls") or not chain.get("puts"):
         logger.warning("No options chain data for %s", ticker)
-        return None
+        return []
 
     atm_iv = extract_atm_iv(chain["calls"], chain["puts"], current_price)
     if atm_iv <= 0:
         logger.warning("ATM IV is 0 for %s", ticker)
-        return None
+        return []
 
     dte = compute_dte(chain["expiry"])
     expiry_date = None
@@ -89,29 +93,50 @@ async def compute_sigma_from_options(
     except (ValueError, IndexError):
         pass
 
+    results: list[SigmaResult] = []
+
     # Daily sigma: price × IV × √(1/252)
     daily_sigma = current_price * atm_iv * math.sqrt(1 / 252)
     daily_sigma_pct = (daily_sigma / current_price) * 100
 
-    # Expected move from DTE: price × IV × √(DTE/365)
     if dte > 0:
-        expected_move = current_price * atm_iv * math.sqrt(dte / 365)
+        daily_expected = current_price * atm_iv * math.sqrt(dte / 365)
     else:
-        expected_move = daily_sigma  # fallback to 1-day
+        daily_expected = daily_sigma
+    daily_expected_pct = (daily_expected / current_price) * 100
 
-    expected_move_pct = (expected_move / current_price) * 100
-
-    return SigmaResult(
+    results.append(SigmaResult(
         ticker=ticker,
         current_price=current_price,
         atm_iv=atm_iv,
         dte=dte,
         daily_sigma=round(daily_sigma, 4),
         daily_sigma_pct=round(daily_sigma_pct, 4),
-        expected_move_high=round(current_price + expected_move, 4),
-        expected_move_low=round(current_price - expected_move, 4),
-        expected_move_pct=round(expected_move_pct, 4),
+        expected_move_high=round(current_price + daily_expected, 4),
+        expected_move_low=round(current_price - daily_expected, 4),
+        expected_move_pct=round(daily_expected_pct, 4),
         sigma_type="daily",
         expiry_date=expiry_date,
         source="yfinance_options",
-    )
+    ))
+
+    # Weekly sigma: price × IV × √(5/252)
+    weekly_sigma = current_price * atm_iv * math.sqrt(5 / 252)
+    weekly_sigma_pct = (weekly_sigma / current_price) * 100
+
+    results.append(SigmaResult(
+        ticker=ticker,
+        current_price=current_price,
+        atm_iv=atm_iv,
+        dte=dte,
+        daily_sigma=round(weekly_sigma, 4),
+        daily_sigma_pct=round(weekly_sigma_pct, 4),
+        expected_move_high=round(current_price + weekly_sigma, 4),
+        expected_move_low=round(current_price - weekly_sigma, 4),
+        expected_move_pct=round(weekly_sigma_pct, 4),
+        sigma_type="weekly",
+        expiry_date=expiry_date,
+        source="yfinance_options",
+    ))
+
+    return results

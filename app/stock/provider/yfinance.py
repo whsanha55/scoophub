@@ -6,6 +6,8 @@ import logging
 import time
 from datetime import date
 
+import math
+
 import yfinance as yf
 
 from app.stock.models import Candle
@@ -25,6 +27,18 @@ _OUTPUTSIZE_TO_PERIOD: dict[int, str] = {
     1300: "5y",
     5000: "max",
 }
+
+
+def _safe_int(val) -> int:
+    """Convert to int, handling NaN from pandas DataFrames."""
+    if val is None:
+        return 0
+    try:
+        if isinstance(val, float) and math.isnan(val):
+            return 0
+    except TypeError:
+        pass
+    return int(val)
 
 
 def _get_period(outputsize: int) -> str:
@@ -145,8 +159,8 @@ class YFinanceProvider:
                     "contractSymbol": str(row.get("contractSymbol", "")),
                     "strike": float(row.get("strike", 0)),
                     "impliedVolatility": float(row.get("impliedVolatility", 0)),
-                    "volume": int(row.get("volume", 0) or 0),
-                    "openInterest": int(row.get("openInterest", 0) or 0),
+                    "volume": _safe_int(row.get("volume", 0)),
+                    "openInterest": _safe_int(row.get("openInterest", 0)),
                 })
 
             puts = []
@@ -155,8 +169,8 @@ class YFinanceProvider:
                     "contractSymbol": str(row.get("contractSymbol", "")),
                     "strike": float(row.get("strike", 0)),
                     "impliedVolatility": float(row.get("impliedVolatility", 0)),
-                    "volume": int(row.get("volume", 0) or 0),
-                    "openInterest": int(row.get("openInterest", 0) or 0),
+                    "volume": _safe_int(row.get("volume", 0)),
+                    "openInterest": _safe_int(row.get("openInterest", 0)),
                 })
 
             return {

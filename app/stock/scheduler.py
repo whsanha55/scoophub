@@ -110,13 +110,13 @@ def register_jobs(
                 price = float(quote.get("regularMarketPrice", 0))
                 if price <= 0:
                     continue
-                result = await compute_sigma_from_options(provider_router, ticker, price)
-                if result:
+                results = await compute_sigma_from_options(provider_router, ticker, price)
+                for result in results:
                     await sigma_repo.save(result)
                     saved += 1
             except Exception:
                 logger.exception("Sigma computation failed for %s", ticker)
-        logger.info("Daily sigma: %d/%d tickers saved", saved, len(tickers))
+        logger.info("Sigma (daily+weekly): %d saved for %d tickers", saved, len(tickers))
 
     scheduler.add_job(
         _compute_daily_sigma,

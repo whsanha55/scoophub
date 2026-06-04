@@ -44,7 +44,7 @@ class SigmaRepo:
             "(ticker, sigma_type, current_price, atm_iv, expiry_date, dte, "
             " daily_sigma, daily_sigma_pct, expected_move_high, expected_move_low, expected_move_pct) "
             "VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) "
-            "ON CONFLICT (ticker, sigma_type, COALESCE(expiry_date, CURRENT_DATE)) DO UPDATE SET "
+            "ON CONFLICT (ticker, sigma_type, COALESCE(expiry_date, '1970-01-01'::date)) DO UPDATE SET "
             " current_price = EXCLUDED.current_price, "
             " atm_iv = EXCLUDED.atm_iv, "
             " dte = EXCLUDED.dte, "

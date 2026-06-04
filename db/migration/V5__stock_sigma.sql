@@ -18,7 +18,7 @@ CREATE TABLE IF NOT EXISTS stock_sigma (
 
 -- 동일 ticker/type/expiry 조합은 upsert
 CREATE UNIQUE INDEX IF NOT EXISTS uq_stock_sigma_ticker_type_expiry
-    ON stock_sigma (ticker, sigma_type, COALESCE(expiry_date, CURRENT_DATE));
+    ON stock_sigma (ticker, sigma_type, COALESCE(expiry_date, '1970-01-01'::date));
 
 -- 조회용: 최근 데이터 우선
 CREATE INDEX IF NOT EXISTS ix_stock_sigma_ticker_type_created

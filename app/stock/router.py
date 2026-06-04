@@ -666,6 +666,61 @@ async def crawling_sigma(db: Database = Depends(_get_db)):
 
 
 @router.post(
+    "/crawling/stock/sigma/compute",
+    tags=["Stock Crawling"],
+    summary="Sigma 즉시 계산 (옵션 IV 기반)",
+    description=(
+        "yfinance 옵션 체인 ATM IV 기반 daily/weekly sigma 즉시 계산 + 저장.\n\n"
+        "- `tickers` 생략 시 활성 watchlist 전체 대상\n"
+        "- 결과: 각 ticker별 daily + weekly sigma 저장\n"
+        "- 자동 스케줄: 화-토 22:30 UTC (미국장 종료 후)"
+    ),
+)
+async def compute_sigma(
+    tickers: list[str] | None = Query(None, description="계산할 티커 목록. 생략 시 전체 watchlist"),
+    db: Database = Depends(_get_db),
+):
+    from app.stock.repository import SigmaRepo, WatchlistRepo
+    from app.stock.sigma import compute_sigma_from_options
+
+    provider = get_provider_router()
+    wl_repo = WatchlistRepo(db)
+    sigma_repo = SigmaRepo(db)
+
+    if tickers:
+        target_tickers = [t.upper() for t in tickers]
+    else:
+        items = await wl_repo.find_all(active_only=True)
+        target_tickers = [it.ticker for it in items]
+
+    if not target_tickers:
+        return ApiResponse(success=True, data={"saved": 0, "tickers": []})
+
+    saved = 0
+    errors = 0
+    for ticker in target_tickers:
+        try:
+            quote = await provider.quote(ticker)
+            price = float(quote.get("regularMarketPrice", 0))
+            if price <= 0:
+                errors += 1
+                continue
+            results = await compute_sigma_from_options(provider, ticker, price)
+            for result in results:
+                await sigma_repo.save(result)
+                saved += 1
+        except Exception:
+            logger.exception("Sigma compute failed for %s", ticker)
+            errors += 1
+
+    return ApiResponse(success=True, data={
+        "saved": saved,
+        "errors": errors,
+        "tickers": target_tickers,
+    })
+
+
+@router.post(
     "/crawling/stock/sync",
     tags=["Stock Crawling"],
     summary="캔들 동기화 수동 실행",
