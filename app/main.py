@@ -22,8 +22,9 @@ from app.system import wiring as system_wiring
 from app.news import wiring as news_wiring
 from app.weather import wiring as weather_wiring
 from app.stock import wiring as stock_wiring
+from app.jira import wiring as jira_wiring
 
-DOMAINS = [news_wiring, weather_wiring, stock_wiring, system_wiring]
+DOMAINS = [news_wiring, weather_wiring, stock_wiring, jira_wiring, system_wiring]
 
 
 def create_app(db: Database | None = None) -> FastAPI:

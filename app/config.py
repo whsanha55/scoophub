@@ -16,6 +16,12 @@ class Settings(BaseSettings):
     LLM_API_KEY: str = ""
     LLM_MODEL: str = "google/gemini-2.0-flash-001"
 
+    # Jira Configuration
+    JIRA_BASE_URL: str = ""
+    JIRA_EMAIL: str = ""
+    JIRA_API_TOKEN: str = ""
+    JIRA_ACCOUNT_ID: str = ""
+
     @property
     def database_url(self) -> str:
         return (
