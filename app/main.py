@@ -27,8 +27,9 @@ from app.hacker_news import wiring as hacker_news_wiring
 from app.arxiv import wiring as arxiv_wiring
 from app.exchange_crypto import wiring as exchange_crypto_wiring
 from app.product_hunt import wiring as product_hunt_wiring
+from app.reddit import wiring as reddit_wiring
 
-DOMAINS = [news_wiring, weather_wiring, stock_wiring, github_trending_wiring, hacker_news_wiring, arxiv_wiring, exchange_crypto_wiring, product_hunt_wiring, system_wiring]
+DOMAINS = [news_wiring, weather_wiring, stock_wiring, github_trending_wiring, hacker_news_wiring, arxiv_wiring, exchange_crypto_wiring, product_hunt_wiring, reddit_wiring, system_wiring]
 
 
 def create_app(db: Database | None = None) -> FastAPI:
