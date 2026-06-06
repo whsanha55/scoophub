@@ -29,8 +29,10 @@ from app.exchange_crypto import wiring as exchange_crypto_wiring
 from app.product_hunt import wiring as product_hunt_wiring
 from app.reddit import wiring as reddit_wiring
 from app.youtube_trending import wiring as youtube_trending_wiring
+from app.devto_hashnode import wiring as devto_hashnode_wiring
 
-DOMAINS = [news_wiring, weather_wiring, stock_wiring, github_trending_wiring, hacker_news_wiring, arxiv_wiring, exchange_crypto_wiring, product_hunt_wiring, reddit_wiring, youtube_trending_wiring, system_wiring]
+DOMAINS = [news_wiring, weather_wiring, stock_wiring, github_trending_wiring, hacker_news_wiring, arxiv_wiring, exchange_crypto_wiring, product_hunt_wiring, reddit_wiring, youtube_trending_wiring, devto_hashnode_wiring, system_wiring]
+>>>>>>> 0382f69 (feat(devto-hashnode): Dev.to 개발자 블로그 인기 글 도메인 추가)
 
 
 def create_app(db: Database | None = None) -> FastAPI:
