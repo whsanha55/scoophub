@@ -13,6 +13,11 @@ crawlers:
     sync_interval_minutes: 60
     sigma_schedule: "0 3 * * 1"       # 월요일 03:00 (KST)
     analyze_schedule: "0 6 * * 2-6"   # 화-토 06:00 (KST, 미국장 종료)
+  github_trending:
+    schedule: "0 9 * * *"              # 매일 09:00 (KST)
+    since: "daily"
+    language: null
+    max_repos: 25
 
 api:
   default_minutes: 30
