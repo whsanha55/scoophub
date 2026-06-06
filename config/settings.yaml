@@ -18,6 +18,17 @@ crawlers:
     since: "daily"
     language: null
     max_repos: 25
+  hacker_news:
+    schedule: "0 */4 * * *"              # 4시간마다 (Asia/Seoul)
+    max_items: 100
+    min_score: 50
+    story_types:
+      - top
+      - best
+    source_timeout_seconds: 30
+    retry_count: 3
+    retry_delay_seconds: 10
+    dedup_window_hours: 24
 
 api:
   default_minutes: 30
