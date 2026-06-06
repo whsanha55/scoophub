@@ -24,8 +24,9 @@ from app.weather import wiring as weather_wiring
 from app.stock import wiring as stock_wiring
 from app.github_trending import wiring as github_trending_wiring
 from app.hacker_news import wiring as hacker_news_wiring
+from app.arxiv import wiring as arxiv_wiring
 
-DOMAINS = [news_wiring, weather_wiring, stock_wiring, github_trending_wiring, hacker_news_wiring, system_wiring]
+DOMAINS = [news_wiring, weather_wiring, stock_wiring, github_trending_wiring, hacker_news_wiring, arxiv_wiring, system_wiring]
 
 
 def create_app(db: Database | None = None) -> FastAPI:
