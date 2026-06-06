@@ -41,6 +41,11 @@ crawlers:
     retry_count: 3
     retry_delay_seconds: 5
     dedup_window_hours: 48
+  exchange_crypto:
+    schedule: "0 */4 * * *"            # 4시간마다 (KST)
+    vs_currency: "krw"
+    max_coins: 100
+    include_trending: true
 
 api:
   default_minutes: 30
