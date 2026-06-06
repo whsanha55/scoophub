@@ -60,7 +60,7 @@ def _get_db() -> Database:
 # ── Helpers ──────────────────────────────────────────────────────────────────
 
 
-async def _fetch_sigma_enrichment(ticker: str, db: Database) -> dict | None:
+async def _fetch_sigma_enrichment(ticker: str, db: Database, price: float) -> dict | None:
     """Fetch sigma + WEM snapshot for persistence at analysis time.
 
     Returns dict matching issue #49 JSON schema, or None if no data.
@@ -94,7 +94,7 @@ async def _fetch_sigma_enrichment(ticker: str, db: Database) -> dict | None:
         wem = wem_list[0]
         from app.stock.models import compute_sigma_range, generate_sigma_signal
 
-        sigma_range = compute_sigma_range(wem, sigma_result.current_price if sigma_result else 0)
+        sigma_range = compute_sigma_range(wem, price)
         sigma_signal = generate_sigma_signal(sigma_range)
         sigma_data["weekly_expected_move"] = {
             "week_start": str(wem.week_start) if wem.week_start else None,
@@ -155,7 +155,7 @@ async def _run_analysis_for_tickers(
 
             # Save to DB
             details_dict = asdict(report.technical_details)
-            sigma_data = await _fetch_sigma_enrichment(ticker.upper(), db)
+            sigma_data = await _fetch_sigma_enrichment(ticker.upper(), db, price)
             if sigma_data:
                 details_dict["sigma_data"] = sigma_data
             await repo.save(
@@ -239,6 +239,39 @@ def _analysis_row_to_report(row: dict) -> StockReport:
         data_date=data_date,
         is_stale=is_stale,
     )
+
+
+async def _enrich_sigma_fallback(
+    report: StockReport, ticker: str, wem_repo, limit: int = 4
+) -> None:
+    """Enrich report.sigma with live WEM data when no persisted snapshot."""
+    from app.stock.models import compute_sigma_range, generate_sigma_signal
+
+    wem_list = await wem_repo.find_by_ticker(ticker, limit=limit)
+    if not wem_list:
+        return
+    wem = wem_list[0]
+    sigma_range = compute_sigma_range(wem, report.price)
+    sigma_signal = generate_sigma_signal(sigma_range)
+    report.sigma = {
+        "sigma_position": sigma_signal.sigma_position.value,
+        "sigma_signal": sigma_signal.signal.value,
+        "sigma_confidence": sigma_signal.confidence,
+        "expected_move_pct": wem.expected_move_pct,
+        "expected_move_high": wem.expected_move_high,
+        "expected_move_low": wem.expected_move_low,
+        "source": "usstocksigma_html",
+        "weekly_moves": [
+            {
+                "week_start": str(w.week_start) if w.week_start else None,
+                "week_end": str(w.week_end) if w.week_end else None,
+                "expected_move_pct": w.expected_move_pct,
+                "expected_move_high": w.expected_move_high,
+                "expected_move_low": w.expected_move_low,
+            }
+            for w in wem_list
+        ],
+    }
 
 
 def _watchlist_item_to_out(item) -> WatchlistItemOut:
@@ -330,7 +363,6 @@ async def stock_report(
         return ApiResponse(success=True, data=[])
 
     from app.stock.repository import AnalysisResultRepo, WeeklyExpectedMoveRepo
-    from app.stock.models import compute_sigma_range, generate_sigma_signal
 
     repo = AnalysisResultRepo(db)
     wem_repo = WeeklyExpectedMoveRepo(db)
@@ -339,33 +371,8 @@ async def stock_report(
     reports: list[StockReport] = []
     for row in rows:
         report = _analysis_row_to_report(row)
-
-        # Fallback: only enrich if no persisted sigma_data
         if report.sigma is None:
-            wem_list = await wem_repo.find_by_ticker(row["ticker"], limit=4)
-            if wem_list:
-                wem = wem_list[0]
-                sigma_range = compute_sigma_range(wem, report.price)
-                sigma_signal = generate_sigma_signal(sigma_range)
-                report.sigma = {
-                    "sigma_position": sigma_signal.sigma_position.value,
-                    "sigma_signal": sigma_signal.signal.value,
-                    "sigma_confidence": sigma_signal.confidence,
-                    "expected_move_pct": wem.expected_move_pct,
-                    "expected_move_high": wem.expected_move_high,
-                    "expected_move_low": wem.expected_move_low,
-                    "source": "usstocksigma_html",
-                    "weekly_moves": [
-                        {
-                            "week_start": str(w.week_start) if w.week_start else None,
-                            "week_end": str(w.week_end) if w.week_end else None,
-                            "expected_move_pct": w.expected_move_pct,
-                            "expected_move_high": w.expected_move_high,
-                            "expected_move_low": w.expected_move_low,
-                        }
-                        for w in wem_list
-                    ],
-                }
+            await _enrich_sigma_fallback(report, row["ticker"], wem_repo)
 
         reports.append(report)
 
@@ -400,7 +407,6 @@ async def stock_report_all(
         )
 
     from app.stock.repository import AnalysisResultRepo, WeeklyExpectedMoveRepo
-    from app.stock.models import compute_sigma_range, generate_sigma_signal
 
     repo = AnalysisResultRepo(db)
     wem_repo = WeeklyExpectedMoveRepo(db)
@@ -410,105 +416,35 @@ async def stock_report_all(
         reports: list[StockReport] = []
         for row in rows:
             report = _analysis_row_to_report(row)
-
-            # Fallback: only enrich if no persisted sigma_data
             if report.sigma is None:
-                wem_list = await wem_repo.find_by_ticker(row["ticker"], limit=4)
-                if wem_list:
-                    wem = wem_list[0]
-                    sigma_range = compute_sigma_range(wem, report.price)
-                    sigma_signal = generate_sigma_signal(sigma_range)
-                    report.sigma = {
-                        "sigma_position": sigma_signal.sigma_position.value,
-                        "sigma_signal": sigma_signal.signal.value,
-                        "sigma_confidence": sigma_signal.confidence,
-                        "expected_move_pct": wem.expected_move_pct,
-                        "expected_move_high": wem.expected_move_high,
-                        "expected_move_low": wem.expected_move_low,
-                        "source": "usstocksigma_html",
-                        "weekly_moves": [
-                            {
-                                "week_start": str(w.week_start) if w.week_start else None,
-                                "week_end": str(w.week_end) if w.week_end else None,
-                                "expected_move_pct": w.expected_move_pct,
-                                "expected_move_high": w.expected_move_high,
-                                "expected_move_low": w.expected_move_low,
-                            }
-                            for w in wem_list
-                        ],
-                    }
+                await _enrich_sigma_fallback(report, row["ticker"], wem_repo)
             reports.append(report)
         return ApiResponse(success=True, data=reports)
 
     # Summarized version
     summaries: list[StockSummary] = []
     for row in rows:
-        analyzed_at = row.get("analyzed_at")
-        data_date = analyzed_at.isoformat() if isinstance(analyzed_at, datetime) else str(analyzed_at) if analyzed_at else None
-        is_stale = None
-        if analyzed_at and isinstance(analyzed_at, datetime):
-            aware_at = analyzed_at if analyzed_at.tzinfo else analyzed_at.replace(tzinfo=timezone.utc)
-            hours_diff = (datetime.now(timezone.utc) - aware_at).total_seconds() / 3600
-            is_stale = hours_diff > 24
+        report = _analysis_row_to_report(row)
+        if report.sigma is None:
+            await _enrich_sigma_fallback(report, row["ticker"], wem_repo, limit=1)
 
-        # Sigma: prefer persisted sigma_data in technical_details, fallback to live WEM
-        sigma_position = "NEAR_CENTER"
-        sigma_signal_val = "NEUTRAL"
-        sigma_confidence = 0.0
-        expected_move_pct = 0.0
-
-        # Parse technical_details to extract sigma_data
-        _td = row.get("technical_details", {})
-        if isinstance(_td, str):
-            _td = json.loads(_td)
-        _sigma_snapshot = _td.get("sigma_data")
-
-        if _sigma_snapshot:
-            wem_data = _sigma_snapshot.get("weekly_expected_move")
-            if wem_data:
-                sigma_position = wem_data.get("sigma_position", "NEAR_CENTER")
-                sigma_signal_val = wem_data.get("sigma_signal", "NEUTRAL")
-                sigma_confidence = wem_data.get("sigma_confidence", 0.0)
-                expected_move_pct = wem_data.get("expected_move_pct", 0.0)
-            else:
-                # persisted but no WEM section — fallback
-                wem_list = await wem_repo.find_by_ticker(row["ticker"], limit=1)
-                if wem_list:
-                    wem = wem_list[0]
-                    sigma_range = compute_sigma_range(wem, float(row.get("price", 0)))
-                    sigma_signal_obj = generate_sigma_signal(sigma_range)
-                    sigma_position = sigma_signal_obj.sigma_position.value
-                    sigma_signal_val = sigma_signal_obj.signal.value
-                    sigma_confidence = sigma_signal_obj.confidence
-                    expected_move_pct = wem.expected_move_pct
-        else:
-            # No persisted data — fallback to live WEM
-            wem_list = await wem_repo.find_by_ticker(row["ticker"], limit=1)
-            if wem_list:
-                wem = wem_list[0]
-                sigma_range = compute_sigma_range(wem, float(row.get("price", 0)))
-                sigma_signal_obj = generate_sigma_signal(sigma_range)
-                sigma_position = sigma_signal_obj.sigma_position.value
-                sigma_signal_val = sigma_signal_obj.signal.value
-                sigma_confidence = sigma_signal_obj.confidence
-                expected_move_pct = wem.expected_move_pct
-
+        sigma = report.sigma or {}
         summaries.append(StockSummary(
-            ticker=row["ticker"],
-            exchange=row.get("exchange", "NAS"),
-            price=float(row.get("price", 0)),
-            change=float(row.get("change", 0)),
-            change_rate=float(row.get("change_rate", 0)),
+            ticker=report.ticker,
+            exchange=report.exchange,
+            price=report.price,
+            change=report.change,
+            change_rate=report.change_rate,
             signal=row["signal"],
             total_score=float(row["total_score"]),
             confidence=float(row["confidence"]),
             market_regime=row["market_regime"],
-            sigma_position=sigma_position,
-            sigma_signal=sigma_signal_val,
-            sigma_confidence=sigma_confidence,
-            expected_move_pct=expected_move_pct,
-            data_date=data_date,
-            is_stale=is_stale,
+            sigma_position=sigma.get("sigma_position", "NEAR_CENTER"),
+            sigma_signal=sigma.get("sigma_signal", "NEUTRAL"),
+            sigma_confidence=sigma.get("sigma_confidence", 0.0),
+            expected_move_pct=sigma.get("expected_move_pct", 0.0),
+            data_date=report.data_date,
+            is_stale=report.is_stale,
         ))
 
     return ApiResponse(success=True, data=summaries)
