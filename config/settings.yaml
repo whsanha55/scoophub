@@ -29,6 +29,18 @@ crawlers:
     retry_count: 3
     retry_delay_seconds: 10
     dedup_window_hours: 24
+  arxiv:
+    schedule: "0 10 * * *"               # 매일 10:00 (KST)
+    categories:
+      - cs.AI
+      - cs.LG
+      - cs.CL
+      - stat.ML
+    max_results_per_category: 25
+    source_timeout_seconds: 30
+    retry_count: 3
+    retry_delay_seconds: 5
+    dedup_window_hours: 48
 
 api:
   default_minutes: 30
