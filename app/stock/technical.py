@@ -274,6 +274,7 @@ def atr(candles: list[Candle], period: int = 14) -> float:
     logger.info("atr: calculating ATR(%d) from %d candles", period, len(candles))
 
     # True Range 시계열 계산 (ADX와 동일한 방식)
+    tr_list: list[float] = []
     for i in range(1, len(candles)):
         c = candles[i]
         p = candles[i - 1]

@@ -25,7 +25,7 @@ class TechnicalOut(BaseModel):
     confidence: float = Field(..., description="분석 신뢰도 (0~1)")
     market_regime: str = Field(..., description="시장 국면 (bull | bear | neutral | volatile)")
     technical_scores: dict[str, int] = Field(..., description="개별 지표별 점수 (예: rsi: 65, macd: -10)")
-    technical_details: dict[str, float] = Field(..., description="개별 지표별 상세 값 (예: rsi_value: 65.2)")
+    technical_details: dict[str, Any] = Field(..., description="개별 지표별 상세 값 (예: rsi_value: 65.2)")
 
 
 class SigmaOut(BaseModel):
@@ -35,7 +35,7 @@ class SigmaOut(BaseModel):
     expected_move_pct: float = Field(..., description="이번 주 예상 변동폭 (%)")
     expected_move_high: float = Field(..., description="예상 상방 가격 (+1σ)")
     expected_move_low: float = Field(..., description="예상 하방 가격 (-1σ)")
-    weekly_moves: list[dict[str, Any]] = Field(..., description="최근 주간 예상 변동폭 이력")
+    weekly_moves: list[dict[str, Any]] = Field(default_factory=list, description="최근 주간 예상 변동폭 이력")
 
 
 class StockReport(BaseModel):
