@@ -24,10 +24,15 @@ def _get_db() -> Database:
     summary="arXiv 논문 조회",
     description=(
         "최신 arXiv 논문 목록을 반환합니다.\n\n"
+        "## 필터\n"
         "- `category`: primary_category 필터 (예: cs.AI)\n"
-        "- `since`: ISO 8601 날짜 (예: 2025-01-01)\n"
+        "- `since`: ISO 8601 날짜 (예: 2026-01-01)\n"
         "- `query`: 제목 검색 (ILIKE)\n"
-        "- `limit`: 최대 반환 개수"
+        "- `limit`: 최대 반환 개수 (기본 25, 최대 100)\n\n"
+        "## 사용 예시\n"
+        "- AI 논문: `?category=cs.AI`\n"
+        "- transformer 관련: `?query=transformer`\n"
+        "- 2026년 이후 ML 논문: `?category=cs.LG&since=2026-01-01`"
     ),
 )
 async def get_arxiv(
@@ -95,7 +100,23 @@ def _row_to_dict(row) -> dict:
 @router.post(
     "/crawling/arxiv",
     summary="arXiv 크롤 수동 실행",
-    description="arXiv 논문을 수집합니다.",
+    description=(
+        "arXiv API에서 최신 논문을 수집합니다.\n\n"
+        "## 자동 스케줄\n"
+        "- Cron: `0 10 * * *` (KST, 매일 10:00)\n"
+        "- 설정: `config/settings.yaml` → `crawlers.arxiv`\n\n"
+        "## 수집 범위\n"
+        "- categories: cs.AI, cs.LG, cs.CL, stat.ML\n"
+        "- max_results_per_category: 25\n"
+        "- dedup_window_hours: 48\n"
+        "- source_timeout_seconds: 30\n\n"
+        "## 수동 실행\n"
+        "스케줄과 무관하게 즉시 크롤을 트리거합니다.\n\n"
+        "## 응답\n"
+        "- `items_fetched`: 수집된 전체 아이템 수\n"
+        "- `items_new`: 신규 저장 아이템 수\n"
+        "- `errors`: 오류 목록 (없으면 null)"
+    ),
     tags=["arXiv Crawling"],
 )
 async def crawling_arxiv(db: Database = Depends(_get_db)):

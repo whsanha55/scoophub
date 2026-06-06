@@ -24,9 +24,13 @@ def _get_db() -> Database:
     summary="암호화폐 시세 조회",
     description=(
         "최신 암호화폐 시세 목록을 반환합니다.\n\n"
-        "- `limit`: 최대 반환 개수\n"
-        "- `vs_currency`: 통화 필터 (예: krw, usd)\n"
-        "- `since`: fetched_at 기준 시작 시각 (ISO 8601)"
+        "## 필터\n"
+        "- `limit`: 최대 반환 개수 (기본 25, 최대 100)\n"
+        "- `vs_currency`: 통화 필터 (기본: krw)\n"
+        "- `since`: fetched_at 기준 시작 시각 (ISO 8601)\n\n"
+        "## 사용 예시\n"
+        "- 최근 1시간 KRW 시세: `?vs_currency=krw&since=2026-06-06T11:00:00Z`\n"
+        "- 상위 50개: `?limit=50`"
     ),
 )
 async def get_exchange_crypto(
@@ -83,7 +87,22 @@ def _row_to_dict(row) -> dict:
 @router.post(
     "/crawling/exchange-crypto",
     summary="암호화폐 시세 크롤 수동 실행",
-    description="CoinGecko API로 암호화폐 시세를 수집합니다.",
+    description=(
+        "CoinGecko API에서 암호화폐 시세를 수집합니다.\n\n"
+        "## 자동 스케줄\n"
+        "- Cron: `0 */4 * * *` (KST, 4시간마다)\n"
+        "- 설정: `config/settings.yaml` → `crawlers.exchange_crypto`\n\n"
+        "## 수집 범위\n"
+        "- vs_currency: KRW\n"
+        "- max_coins: 100\n"
+        "- include_trending: true\n\n"
+        "## 수동 실행\n"
+        "스케줄과 무관하게 즉시 크롤을 트리거합니다.\n\n"
+        "## 응답\n"
+        "- `items_fetched`: 수집된 전체 아이템 수\n"
+        "- `items_new`: 신규 저장 아이템 수\n"
+        "- `errors`: 오류 목록 (없으면 null)"
+    ),
     tags=["Exchange Crypto Crawling"],
 )
 async def crawling_exchange_crypto(db: Database = Depends(_get_db)):

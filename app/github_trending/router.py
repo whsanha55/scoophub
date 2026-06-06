@@ -24,9 +24,13 @@ def _get_db() -> Database:
     summary="GitHub 트렌딩 리포지토리 조회",
     description=(
         "최신 GitHub 트렌딩 리포지토리 목록을 반환합니다.\n\n"
-        "- `period`: daily / weekly / monthly\n"
+        "## 필터\n"
+        "- `period`: daily / weekly / monthly (기본: daily)\n"
         "- `language`: 언어 필터 (예: python, typescript)\n"
-        "- `limit`: 최대 반환 개수"
+        "- `limit`: 최대 반환 개수 (기본 25, 최대 100)\n\n"
+        "## 사용 예시\n"
+        "- 주간 Python 트렌딩: `?period=weekly&language=python`\n"
+        "- 월간 전체: `?period=monthly&limit=50`"
     ),
 )
 async def get_github_trending(
@@ -86,7 +90,22 @@ def _row_to_dict(row) -> dict:
 @router.post(
     "/crawling/github-trending",
     summary="GitHub 트렌딩 크롤 수동 실행",
-    description="gtrending 라이브러리로 GitHub 트렌딩 리포지토리를 수집합니다.",
+    description=(
+        "gtrending 라이브러리로 GitHub 트렌딩 리포지토리를 수집합니다.\n\n"
+        "## 자동 스케줄\n"
+        "- Cron: `0 9 * * *` (KST, 매일 09:00)\n"
+        "- 설정: `config/settings.yaml` → `crawlers.github_trending`\n\n"
+        "## 수집 범위\n"
+        "- since: daily\n"
+        "- language: null (전체 언어)\n"
+        "- max_repos: 25\n\n"
+        "## 수동 실행\n"
+        "스케줄과 무관하게 즉시 크롤을 트리거합니다.\n\n"
+        "## 응답\n"
+        "- `items_fetched`: 수집된 전체 아이템 수\n"
+        "- `items_new`: 신규 저장 아이템 수\n"
+        "- `errors`: 오류 목록 (없으면 null)"
+    ),
     tags=["GitHub Trending Crawling"],
 )
 async def crawling_github_trending(db: Database = Depends(_get_db)):

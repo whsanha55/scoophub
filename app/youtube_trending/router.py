@@ -24,9 +24,13 @@ def _get_db() -> Database:
     summary="YouTube 트렌딩 영상 조회",
     description=(
         "최신 YouTube 트렌딩 영상 목록을 반환합니다.\n\n"
-        "- `limit`: 최대 반환 개수\n"
-        "- `region_code`: 국가 코드 필터 (예: KR, US)\n"
-        "- `category_id`: 카테고리 ID 필터"
+        "## 필터\n"
+        "- `region_code`: 국가 코드 (기본: KR, 예: KR, US)\n"
+        "- `category_id`: 카테고리 ID 필터\n"
+        "- `limit`: 최대 반환 개수 (기본 25, 최대 100)\n\n"
+        "## 사용 예시\n"
+        "- 한국 트렌딩: `?region_code=KR`\n"
+        "- 미국 트렌딩 상위 50: `?region_code=US&limit=50`"
     ),
 )
 async def get_youtube_trending(
@@ -83,7 +87,23 @@ def _row_to_dict(row) -> dict:
 @router.post(
     "/crawling/youtube-trending",
     summary="YouTube 트렌딩 크롤 수동 실행",
-    description="YouTube Data API로 트렌딩 영상을 수집합니다.",
+    description=(
+        "YouTube Data API에서 트렌딩 영상을 수집합니다.\n\n"
+        "## 자동 스케줄\n"
+        "- Cron: `0 */6 * * *` (KST, 6시간마다)\n"
+        "- 설정: `config/settings.yaml` → `crawlers.youtube_trending`\n\n"
+        "## 수집 범위\n"
+        "- region_codes: KR, US\n"
+        "- max_results_per_region: 50\n"
+        "- source_timeout_seconds: 15\n"
+        "- retry_count: 3\n\n"
+        "## 수동 실행\n"
+        "스케줄과 무관하게 즉시 크롤을 트리거합니다.\n\n"
+        "## 응답\n"
+        "- `items_fetched`: 수집된 전체 아이템 수\n"
+        "- `items_new`: 신규 저장 아이템 수\n"
+        "- `errors`: 오류 목록 (없으면 null)"
+    ),
     tags=["YouTube Trending Crawling"],
 )
 async def crawling_youtube_trending(db: Database = Depends(_get_db)):

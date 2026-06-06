@@ -24,9 +24,14 @@ def _get_db() -> Database:
     summary="Tech Newsletter 아티클 조회",
     description=(
         "최신 Tech Newsletter 아티클 목록을 반환합니다.\n\n"
-        "- `limit`: 최대 반환 개수\n"
-        "- `source`: 소스 필터 (예: TLDR Tech, TechCrunch)\n"
-        "- `since`: ISO 8601 형식 이후 게시글 필터"
+        "## 필터\n"
+        "- `source`: 소스 필터 (예: TLDR Tech, TLDR AI, TechCrunch, The Verge)\n"
+        "- `since`: published_at 기준 ISO 8601 필터\n"
+        "- `limit`: 최대 반환 개수 (기본 25, 최대 100)\n\n"
+        "## 사용 예시\n"
+        "- TLDR Tech만: `?source=TLDR Tech`\n"
+        "- 최근 1일 전체: `?since=2026-06-05T00:00:00Z`\n"
+        "- TechCrunch 최근 10개: `?source=TechCrunch&limit=10`"
     ),
 )
 async def get_tech_newsletter(
@@ -91,7 +96,26 @@ def _row_to_dict(row) -> dict:
 @router.post(
     "/crawling/tech-newsletter",
     summary="Tech Newsletter 크롤 수동 실행",
-    description="RSS 피드로 Tech Newsletter 아티클을 수집합니다.",
+    description=(
+        "RSS 피드에서 Tech Newsletter 아티클을 수집합니다.\n\n"
+        "## 자동 스케줄\n"
+        "- Cron: `0 */4 * * *` (KST, 4시간마다)\n"
+        "- 설정: `config/settings.yaml` → `crawlers.tech_newsletter`\n\n"
+        "## 수집 소스\n"
+        "- TLDR Tech (https://tldr.tech/api/rss/tech)\n"
+        "- TLDR AI (https://tldr.tech/api/rss/ai)\n"
+        "- TechCrunch (https://techcrunch.com/feed/)\n"
+        "- The Verge (https://www.theverge.com/rss/tech/index.xml)\n\n"
+        "## 수집 범위\n"
+        "- source_timeout_seconds: 10\n"
+        "- retry_count: 3\n\n"
+        "## 수동 실행\n"
+        "스케줄과 무관하게 즉시 크롤을 트리거합니다.\n\n"
+        "## 응답\n"
+        "- `items_fetched`: 수집된 전체 아이템 수\n"
+        "- `items_new`: 신규 저장 아이템 수\n"
+        "- `errors`: 오류 목록 (없으면 null)"
+    ),
     tags=["Tech Newsletter Crawling"],
 )
 async def crawling_tech_newsletter(db: Database = Depends(_get_db)):

@@ -24,10 +24,14 @@ def _get_db() -> Database:
     summary="Reddit 포스트 조회",
     description=(
         "최신 Reddit 포스트 목록을 반환합니다.\n\n"
-        "- `subreddit`: 서브레딧 필터\n"
+        "## 필터\n"
+        "- `subreddit`: 서브레딧 필터 (예: programming)\n"
         "- `min_score`: 최소 점수 필터\n"
-        "- `since`: ISO 8601 기준 posted_at 필터\n"
-        "- `limit`: 최대 반환 개수"
+        "- `since`: posted_at 기준 ISO 8601 필터\n"
+        "- `limit`: 최대 반환 개수 (기본 25, 최대 100)\n\n"
+        "## 사용 예시\n"
+        "- 프로그래밍 서브레딧 점수 100+: `?subreddit=programming&min_score=100`\n"
+        "- 최근 1일 ML 포스트: `?subreddit=MachineLearning&since=2026-06-05T00:00:00Z`"
     ),
 )
 async def get_reddit(
@@ -97,7 +101,24 @@ def _row_to_dict(row) -> dict:
 @router.post(
     "/crawling/reddit",
     summary="Reddit 크롤 수동 실행",
-    description="Reddit API로 포스트를 수집합니다.",
+    description=(
+        "Reddit API에서 인기 포스트를 수집합니다.\n\n"
+        "## 자동 스케줄\n"
+        "- Cron: `0 */4 * * *` (KST, 4시간마다)\n"
+        "- 설정: `config/settings.yaml` → `crawlers.reddit`\n\n"
+        "## 수집 범위\n"
+        "- subreddits: programming, python, javascript, MachineLearning, webdev, datascience\n"
+        "- listing_type: hot\n"
+        "- max_posts_per_subreddit: 25\n"
+        "- min_score: 50\n"
+        "- source_timeout_seconds: 15\n\n"
+        "## 수동 실행\n"
+        "스케줄과 무관하게 즉시 크롤을 트리거합니다.\n\n"
+        "## 응답\n"
+        "- `items_fetched`: 수집된 전체 아이템 수\n"
+        "- `items_new`: 신규 저장 아이템 수\n"
+        "- `errors`: 오류 목록 (없으면 null)"
+    ),
     tags=["Reddit Crawling"],
 )
 async def crawling_reddit(db: Database = Depends(_get_db)):

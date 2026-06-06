@@ -28,7 +28,13 @@ def get_db() -> Database:
 @router.get(
     "/health",
     summary="헬스 체크",
-    description="서비스 상태와 주요 테이블 레코드 수를 반환합니다.",
+    description=(
+        "서비스 상태와 주요 테이블 레코드 수를 반환합니다.\n\n"
+        "## 확인 항목\n"
+        "- API 서버 상태\n"
+        "- 데이터베이스 연결 상태\n"
+        "- 각 도메인별 테이블 레코드 수"
+    ),
 )
 async def health(db: Database = Depends(get_db)):
     logger.info("health check requested")
@@ -46,7 +52,15 @@ async def health(db: Database = Depends(get_db)):
 @router.post(
     "/llm/test",
     summary="LLM 호출 테스트",
-    description="요청 body의 message를 LLM에 전송해 응답을 반환합니다. LLM 키·모델·연결 상태 점검용.",
+    description=(
+        "요청 body의 message를 LLM에 전송해 응답을 반환합니다.\n\n"
+        "## 용도\n"
+        "- LLM API 키 유효성 검증\n"
+        "- 모델 응답 상태 확인\n"
+        "- 연결 상태 점검\n\n"
+        "## 요청\n"
+        "- `message`: LLM에 전송할 텍스트 (필수)"
+    ),
 )
 async def llm_test(body: LLMTestRequest):
     logger.info("llm test requested: message=%r", body.message)
@@ -69,7 +83,16 @@ async def llm_test(body: LLMTestRequest):
 @router.get(
     "/crawl-logs",
     summary="크롤 실행 로그 조회",
-    description="크롤러 실행 이력을 최신순으로 반환합니다. 크롤러 이름으로 필터링 가능.",
+    description=(
+        "크롤러 실행 이력을 최신순으로 반환합니다.\n\n"
+        "## 필터\n"
+        "- `crawler`: 크롤러 이름 (예: news, stock, weather)\n"
+        "- `crawler_detail`: 크롤러 목적 (예: rss, sigma-scan, forecast)\n"
+        "- `limit`: 최대 로그 수 (기본 20, 최대 200)\n\n"
+        "## 사용 예시\n"
+        "- 뉴스 크롤 로그: `?crawler=news`\n"
+        "- 최근 50개: `?limit=50`"
+    ),
 )
 async def crawl_logs(
     crawler: str | None = Query(None, description="크롤러 이름 필터 (예: news, stock, weather)"),

@@ -297,9 +297,19 @@ def _watchlist_item_to_out(item) -> WatchlistItemOut:
     tags=["Stock Crawling"],
     summary="분석 수동 실행",
     description=(
-        "watchlist 종목의 기술 분석 수동 실행 + 결과 저장.\n\n"
+        "watchlist 종목의 기술 분석 수동 실행 + 결과 저장합니다.\n\n"
+        "## 자동 스케줄\n"
+        "- Cron: `0 6 * * 2-6` (KST, 화-토 06:00 = 미국 시간 화-토 22:30 UTC)\n"
+        "- 설정: `config/settings.yaml` → `crawlers.stock.analyze_schedule`\n\n"
+        "## 수집 범위\n"
         "- `tickers` 생략 시 활성 watchlist 전체 대상\n"
-        "- 자동 스케줄: 화-토 06:00 (KST, 미국장 종료 직후)"
+        "- 분석: 기술적 지표 + Sigma 위치 판단\n\n"
+        "## 수동 실행\n"
+        "스케줄과 무관하게 즉시 분석을 트리거합니다.\n\n"
+        "## 응답\n"
+        "- `items_fetched`: 수집된 전체 아이템 수\n"
+        "- `items_new`: 신규 저장 아이템 수\n"
+        "- `errors`: 오류 목록 (없으면 null)"
     ),
 )
 async def analyze(
@@ -675,16 +685,22 @@ async def _do_sync_candles(db: Database) -> int:
     summary="Sigma(1σ) 주간 예상 변동폭 크롤 (월 03:00 자동 / 수동 트리거)",
     description=(
         "usstocksigma.com에서 이번 주 **예상 주간 변동폭(1σ)** 데이터를 크롤링합니다.\n\n"
-        "### 크롤링 데이터\n"
+        "## 크롤링 데이터\n"
         "| 항목 | 설명 |\n"
         "|------|------|\n"
         "| Ticker | 미국 주식 티커 (예: AAPL, TSLA) |\n"
         "| 예상 변동률 | 주간 예상 변동률 (% Weekly Expected Move) |\n"
         "| -1σ 가격 | 현재가 기준 하방 1표준편차 가격 |\n"
         "| +1σ 가격 | 현재가 기준 상방 1표준편차 가격 |\n\n"
-        "### 자동 스케줄\n"
-        "- 매주 월요일 03:00(KST) 스케줄러가 자동 실행합니다.\n"
-        "- 본 엔드포인트는 스케줄과 별개로 즉시 재크롤이 필요할 때 쓰는 수동 트리거입니다."
+        "## 자동 스케줄\n"
+        "- Cron: `0 3 * * 1` (KST, 매주 월요일 03:00)\n"
+        "- 설정: `config/settings.yaml` → `crawlers.stock.sigma_schedule`\n\n"
+        "## 수동 실행\n"
+        "스케줄과 무관하게 즉시 크롤을 트리거합니다.\n\n"
+        "## 응답\n"
+        "- `items_fetched`: 수집된 전체 아이템 수\n"
+        "- `items_new`: 신규 저장 아이템 수\n"
+        "- `errors`: 오류 목록 (없으면 null)"
     ),
     responses={
         200: {
@@ -726,10 +742,20 @@ async def crawling_sigma(db: Database = Depends(_get_db)):
     tags=["Stock Crawling"],
     summary="Sigma 즉시 계산 (ATM straddle 기반)",
     description=(
-        "yfinance 옵션 체인 ATM straddle 기반 sigma 즉시 계산 + 저장.\n\n"
+        "yfinance 옵션 체인 ATM straddle 기반 sigma 즉시 계산 + 저장합니다.\n\n"
+        "## 자동 스케줄\n"
+        "- Cron: `0 6 * * 2-6` (KST, 화-토 06:00 = 미국 시간 화-토 22:30 UTC)\n"
+        "- 설정: `config/settings.yaml` → `crawlers.stock.analyze_schedule`\n\n"
+        "## 수집 범위\n"
         "- `tickers` 생략 시 활성 watchlist 전체 대상\n"
-        "- 결과: 각 ticker별 ATM straddle expected move 저장\n"
-        "- 자동 스케줄: 화-토 22:30 UTC (미국장 종료 후)"
+        "- 데이터 출처: `yfinance_straddle`\n"
+        "- 결과: 각 ticker별 ATM straddle expected move 저장\n\n"
+        "## 수동 실행\n"
+        "스케줄과 무관하게 즉시 계산을 트리거합니다.\n\n"
+        "## 응답\n"
+        "- `items_fetched`: 수집된 전체 아이템 수\n"
+        "- `items_new`: 신규 저장 아이템 수\n"
+        "- `errors`: 오류 목록 (없으면 null)"
     ),
 )
 async def compute_sigma(
@@ -782,9 +808,19 @@ async def compute_sigma(
     tags=["Stock Crawling"],
     summary="캔들 동기화 수동 실행",
     description=(
-        "watchlist 종목의 일봉(OHLCV) 캔들 데이터를 yfinance에서 동기화.\n\n"
-        "- 자동 스케줄: 60분 간격\n"
-        "- 대상: 활성 watchlist 전체 종목"
+        "watchlist 종목의 일봉(OHLCV) 캔들 데이터를 yfinance에서 동기화합니다.\n\n"
+        "## 자동 스케줄\n"
+        "- 60분 간격\n"
+        "- 설정: `config/settings.yaml` → `crawlers.stock.sync_interval_minutes`\n\n"
+        "## 수집 범위\n"
+        "- 대상: 활성 watchlist 전체 종목\n"
+        "- 데이터: 일봉 OHLCV (시가/고가/저가/종가/거래량)\n\n"
+        "## 수동 실행\n"
+        "스케줄과 무관하게 즉시 동기화를 트리거합니다.\n\n"
+        "## 응답\n"
+        "- `items_fetched`: 수집된 전체 아이템 수\n"
+        "- `items_new`: 신규 저장 아이템 수\n"
+        "- `errors`: 오류 목록 (없으면 null)"
     ),
 )
 async def crawling_sync(db: Database = Depends(_get_db)):

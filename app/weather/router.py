@@ -25,8 +25,16 @@ def _get_db() -> Database:
     summary="현재 날씨 조회",
     description=(
         "지정한 지역의 최신 날씨 스냅샷을 반환합니다.\n\n"
-        "- 시간 필터: `minutes` 또는 `from`/`to` 범위 (둘 다 없으면 최근 30분)\n"
-        "- 해당 기간에 데이터가 없으면 `data=null`"
+        "## 시간 필터\n"
+        "- `minutes`: 최근 N분 (예: `?minutes=60` → 최근 1시간)\n"
+        "- `from`/`to`: ISO 8601 범위 지정\n"
+        "- 둘 다 없으면 최근 30분\n"
+        "- 해당 기간에 데이터가 없으면 `data=null`\n\n"
+        "## 지역\n"
+        "- `location`: 지역 이름 (예: seoul, busan)\n\n"
+        "## 사용 예시\n"
+        "- 서울 최근 1시간: `?location=seoul&minutes=60`\n"
+        "- 부산 오늘: `?location=busan&from=2026-06-06T00:00:00Z`"
     ),
 )
 async def get_weather(
@@ -66,7 +74,14 @@ async def get_weather(
     "/weather/forecast",
     tags=["Weather"],
     summary="주간 날씨 예보 조회",
-    description="지정한 지역의 주간 예보 데이터를 반환합니다. 최대 limit일치까지.",
+    description=(
+        "지정한 지역의 주간 예보 데이터를 반환합니다.\n\n"
+        "## 파라미터\n"
+        "- `location`: 지역 이름 (예: seoul, busan)\n"
+        "- `limit`: 조회할 최대 일수 (1~7, 기본 3)\n\n"
+        "## 사용 예시\n"
+        "- 서울 7일 예보: `?location=seoul&limit=7`"
+    ),
 )
 async def get_weather_forecast(
     location: str = Query("seoul", description="지역 이름 (예: seoul, busan)"),
@@ -103,7 +118,20 @@ def _row_to_dict(row) -> dict:
 @router.post(
     "/crawling/weather",
     summary="날씨 크롤 수동 실행",
-    description="wttr.in + Open-Meteo에서 서울 날씨/대기질을 수집합니다.",
+    description=(
+        "wttr.in + Open-Meteo에서 날씨/대기질 데이터를 수집합니다.\n\n"
+        "## 자동 스케줄\n"
+        "- 30분 간격\n"
+        "- 설정: `config/settings.yaml` → `crawlers.weather`\n\n"
+        "## 수집 범위\n"
+        "- source_timeout_seconds: 15\n\n"
+        "## 수동 실행\n"
+        "스케줄과 무관하게 즉시 크롤을 트리거합니다.\n\n"
+        "## 응답\n"
+        "- `items_fetched`: 수집된 전체 아이템 수\n"
+        "- `items_new`: 신규 저장 아이템 수\n"
+        "- `errors`: 오류 목록 (없으면 null)"
+    ),
     tags=["Weather Crawling"],
 )
 async def crawling_weather(db: Database = Depends(_get_db)):

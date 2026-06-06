@@ -24,10 +24,14 @@ def _get_db() -> Database:
     summary="Hacker News 아이템 조회",
     description=(
         "최신 Hacker News 아이템 목록을 반환합니다.\n\n"
-        "- `item_type`: story / ask_hn / show_hn / job\n"
+        "## 필터\n"
+        "- `item_type`: story / ask_hn / show_hn / job (기본: story)\n"
         "- `min_score`: 최소 점수 필터\n"
         "- `since`: ISO 8601 시간 필터 (예: 2026-06-06T00:00:00Z)\n"
-        "- `limit`: 최대 반환 개수"
+        "- `limit`: 최대 반환 개수 (기본 25, 최대 100)\n\n"
+        "## 사용 예시\n"
+        "- 점수 100+ 스토리: `?min_score=100`\n"
+        "- Show HN 최근 1일: `?item_type=show_hn&since=2026-06-05T00:00:00Z`"
     ),
 )
 async def get_hacker_news(
@@ -97,7 +101,24 @@ def _row_to_dict(row) -> dict:
 @router.post(
     "/crawling/hacker-news",
     summary="Hacker News 크롤 수동 실행",
-    description="Hacker News API로 아이템을 수집합니다.",
+    description=(
+        "Hacker News API(Algolia)에서 인기 스토리를 수집합니다.\n\n"
+        "## 자동 스케줄\n"
+        "- Cron: `0 */4 * * *` (KST, 4시간마다)\n"
+        "- 설정: `config/settings.yaml` → `crawlers.hacker_news`\n\n"
+        "## 수집 범위\n"
+        "- story_types: top, best\n"
+        "- max_items: 100\n"
+        "- min_score: 50\n"
+        "- dedup_window_hours: 24\n"
+        "- source_timeout_seconds: 30\n\n"
+        "## 수동 실행\n"
+        "스케줄과 무관하게 즉시 크롤을 트리거합니다.\n\n"
+        "## 응답\n"
+        "- `items_fetched`: 수집된 전체 아이템 수\n"
+        "- `items_new`: 신규 저장 아이템 수\n"
+        "- `errors`: 오류 목록 (없으면 null)"
+    ),
     tags=["Hacker News Crawling"],
 )
 async def crawling_hacker_news(db: Database = Depends(_get_db)):
