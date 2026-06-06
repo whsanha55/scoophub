@@ -107,6 +107,14 @@ crawlers:
     source_timeout_seconds: 10
     retry_count: 3
     retry_delay_seconds: 10
+  rss_universal:
+    schedule: "0 */2 * * *"
+    default_poll_interval_minutes: 60
+    max_entries_per_feed: 50
+    source_timeout_seconds: 10
+    retry_count: 3
+    retry_delay_seconds: 10
+    respect_conditional_get: true
 
 api:
   default_minutes: 30
