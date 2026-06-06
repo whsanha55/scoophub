@@ -428,7 +428,8 @@ async def stock_report_all(
         if report.sigma is None:
             await _enrich_sigma_fallback(report, row["ticker"], wem_repo, limit=1)
 
-        sigma = report.sigma or {}
+        sigma = report.sigma
+        _sget = (lambda k, d: sigma.get(k, d)) if isinstance(sigma, dict) else (lambda k, d: getattr(sigma, k, d))
         summaries.append(StockSummary(
             ticker=report.ticker,
             exchange=report.exchange,
@@ -439,10 +440,10 @@ async def stock_report_all(
             total_score=float(row["total_score"]),
             confidence=float(row["confidence"]),
             market_regime=row["market_regime"],
-            sigma_position=sigma.get("sigma_position", "NEAR_CENTER"),
-            sigma_signal=sigma.get("sigma_signal", "NEUTRAL"),
-            sigma_confidence=sigma.get("sigma_confidence", 0.0),
-            expected_move_pct=sigma.get("expected_move_pct", 0.0),
+            sigma_position=_sget("sigma_position", "NEAR_CENTER") if sigma else "NEAR_CENTER",
+            sigma_signal=_sget("sigma_signal", "NEUTRAL") if sigma else "NEUTRAL",
+            sigma_confidence=_sget("sigma_confidence", 0.0) if sigma else 0.0,
+            expected_move_pct=_sget("expected_move_pct", 0.0) if sigma else 0.0,
             data_date=report.data_date,
             is_stale=report.is_stale,
         ))
