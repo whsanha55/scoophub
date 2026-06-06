@@ -25,8 +25,18 @@ def _get_db() -> Database:
     summary="뉴스 기사 목록 조회",
     description=(
         "수집된 뉴스 기사를 최신순으로 반환합니다.\n\n"
-        "- 시간 필터: `minutes` 또는 `from`/`to` 범위 지정 (둘 다 없으면 최근 30분)\n"
-        "- `minutes`와 `from`/`to` 중 `minutes`가 우선"
+        "## 시간 필터\n"
+        "- `minutes`: 최근 N분 (예: `?minutes=60` → 최근 1시간)\n"
+        "- `from`/`to`: ISO 8601 범위 지정 (예: `?from=2026-06-01T00:00:00Z&to=2026-06-06T00:00:00Z`)\n"
+        "- 둘 다 없으면 최근 30분\n"
+        "- `minutes`와 `from`/`to` 중 `minutes`가 우선\n\n"
+        "## 필터\n"
+        "- `category`: 카테고리 필터\n"
+        "- `min_importance`: 최소 중요도 1~5\n"
+        "- `limit`: 최대 기사 수 (기본 20, 최대 200)\n\n"
+        "## 사용 예시\n"
+        "- 최근 1시간 AI 뉴스: `?minutes=60&category=ai`\n"
+        "- 중요도 3 이상 최근 30분: `?min_importance=3`"
     ),
 )
 async def get_news(
@@ -126,7 +136,23 @@ def _row_to_dict(row) -> dict:
 @router.post(
     "/crawling/news",
     summary="뉴스 크롤 수동 실행",
-    description="RSS 피드를 수집해 뉴스 기사를 저장하고, 신규 기사를 LLM으로 요약합니다.",
+    description=(
+        "RSS 피드를 수집해 뉴스 기사를 저장하고, 신규 기사를 LLM으로 요약합니다.\n\n"
+        "## 자동 스케줄\n"
+        "- 15분 간격\n"
+        "- 설정: `config/settings.yaml` → `crawlers.news`\n\n"
+        "## 수집 범위\n"
+        "- max_lookback_hours: 24\n"
+        "- dedup_window_hours: 24\n"
+        "- retry_count: 3\n"
+        "- source_timeout_seconds: 10\n\n"
+        "## 수동 실행\n"
+        "스케줄과 무관하게 즉시 크롤을 트리거합니다.\n\n"
+        "## 응답\n"
+        "- `items_fetched`: 수집된 전체 아이템 수\n"
+        "- `items_new`: 신규 저장 아이템 수\n"
+        "- `errors`: 오류 목록 (없으면 null)"
+    ),
     tags=["News Crawling"],
 )
 async def crawling_news(db: Database = Depends(_get_db)):
@@ -177,7 +203,17 @@ async def crawling_news(db: Database = Depends(_get_db)):
 @router.post(
     "/crawling/news/summarize/retry",
     summary="뉴스 요약 재시도",
-    description="최근 1일 이내이면서 아직 성공하지 않은(summary_status != 'success': pending/failed/error) 기사를 20개 단위로 다시 LLM 요약합니다.",
+    description=(
+        "최근 1일 이내이면서 아직 성공하지 않은(summary_status != 'success': pending/failed/error) 기사를 20개 단위로 다시 LLM 요약합니다.\n\n"
+        "## 재시도 조건\n"
+        "- `summary_status`: pending, failed, error인 기사만 대상\n"
+        "- 시간 범위: 최근 24시간\n"
+        "- 배치 크기: 20개\n\n"
+        "## 응답\n"
+        "- `data.retried`: 재시도된 기사 수\n"
+        "- `data.succeeded`: 성공한 기사 수\n"
+        "- `data.failed`: 실패한 기사 수"
+    ),
     tags=["News Crawling"],
 )
 async def summarize_news_retry(db: Database = Depends(_get_db)):

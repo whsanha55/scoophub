@@ -32,9 +32,13 @@ def _row_to_dict(row) -> dict:
     summary="Product Hunt 게시물 조회",
     description=(
         "최신 Product Hunt 게시물 목록을 반환합니다.\n\n"
+        "## 필터\n"
         "- `topic`: 토픽 필터 (예: AI, SaaS)\n"
         "- `since`: ISO 8601 날짜 이후 게시물만\n"
-        "- `limit`: 최대 반환 개수"
+        "- `limit`: 최대 반환 개수 (기본 25, 최대 100)\n\n"
+        "## 사용 예시\n"
+        "- AI 관련: `?topic=AI`\n"
+        "- 최근 1주일: `?since=2026-05-30T00:00:00Z`"
     ),
 )
 async def get_product_hunt(
@@ -87,7 +91,22 @@ async def get_product_hunt(
 @router.post(
     "/crawling/product-hunt",
     summary="Product Hunt 크롤 수동 실행",
-    description="Product Hunt 게시물을 수집합니다.",
+    description=(
+        "Product Hunt API에서 오늘의 게시물을 수집합니다.\n\n"
+        "## 자동 스케줄\n"
+        "- Cron: `0 11 * * *` (KST, 매일 11:00)\n"
+        "- 설정: `config/settings.yaml` → `crawlers.product_hunt`\n\n"
+        "## 수집 범위\n"
+        "- max_posts: 30\n"
+        "- source_timeout_seconds: 15\n"
+        "- retry_count: 3\n\n"
+        "## 수동 실행\n"
+        "스케줄과 무관하게 즉시 크롤을 트리거합니다.\n\n"
+        "## 응답\n"
+        "- `items_fetched`: 수집된 전체 아이템 수\n"
+        "- `items_new`: 신규 저장 아이템 수\n"
+        "- `errors`: 오류 목록 (없으면 null)"
+    ),
     tags=["Product Hunt Crawling"],
 )
 async def crawling_product_hunt(db: Database = Depends(_get_db)):

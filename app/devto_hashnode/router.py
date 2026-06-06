@@ -24,9 +24,13 @@ def _get_db() -> Database:
     summary="Dev.to 트렌딩 아티클 조회",
     description=(
         "최신 Dev.to 트렌딩 아티클 목록을 반환합니다.\n\n"
-        "- `tag`: 태그 필터 (예: python, javascript)\n"
+        "## 필터\n"
+        "- `tag`: 태그 필터 (예: python, javascript, webdev)\n"
         "- `since`: published_at 기준 ISO 8601 필터\n"
-        "- `limit`: 최대 반환 개수"
+        "- `limit`: 최대 반환 개수 (기본 25, 최대 100)\n\n"
+        "## 사용 예시\n"
+        "- Python 아티클: `?tag=python`\n"
+        "- 최근 1일 WebDev: `?tag=webdev&since=2026-06-05T00:00:00Z`"
     ),
 )
 async def get_devto_hashnode(
@@ -87,7 +91,23 @@ def _row_to_dict(row) -> dict:
 @router.post(
     "/crawling/devto-hashnode",
     summary="Dev.to 크롤 수동 실행",
-    description="Dev.to 트렌딩 아티클을 수집합니다.",
+    description=(
+        "Dev.to API에서 태그별 트렌딩 아티클을 수집합니다.\n\n"
+        "## 자동 스케줄\n"
+        "- Cron: `0 */4 * * *` (KST, 4시간마다)\n"
+        "- 설정: `config/settings.yaml` → `crawlers.devto_hashnode`\n\n"
+        "## 수집 범위\n"
+        "- tags: python, javascript, webdev, tutorial, beginners\n"
+        "- max_articles_per_tag: 30\n"
+        "- source_timeout_seconds: 10\n"
+        "- retry_count: 3\n\n"
+        "## 수동 실행\n"
+        "스케줄과 무관하게 즉시 크롤을 트리거합니다.\n\n"
+        "## 응답\n"
+        "- `items_fetched`: 수집된 전체 아이템 수\n"
+        "- `items_new`: 신규 저장 아이템 수\n"
+        "- `errors`: 오류 목록 (없으면 null)"
+    ),
     tags=["Dev.to Crawling"],
 )
 async def crawling_devto_hashnode(

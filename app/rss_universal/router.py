@@ -38,9 +38,14 @@ def _row_to_dict(row) -> dict:
     summary="RSS 엔트리 조회",
     description=(
         "수집된 RSS 엔트리 목록을 반환합니다.\n\n"
-        "- `limit`: 최대 반환 개수\n"
-        "- `feed_id`: 특정 피드 필터\n"
-        "- `since`: ISO 8601 시각 이후 엔트리만 (published_at >= since)"
+        "## 필터\n"
+        "- `feed_id`: 특정 피드 ID 필터\n"
+        "- `since`: published_at 기준 ISO 8601 필터\n"
+        "- `limit`: 최대 반환 개수 (기본 25, 최대 100)\n\n"
+        "## 사용 예시\n"
+        "- 특정 피드: `?feed_id=1`\n"
+        "- 최근 1일: `?since=2026-06-05T00:00:00Z`\n"
+        "- 피드별 최근 50개: `?feed_id=1&limit=50`"
     ),
 )
 async def get_entries(
@@ -162,7 +167,23 @@ async def delete_feed(
 @router.post(
     "/crawling/rss-universal",
     summary="RSS Universal 크롤 수동 실행",
-    description="등록된 모든 RSS 피드에서 엔트리를 수집합니다.",
+    description=(
+        "등록된 모든 RSS 피드에서 엔트리를 수집합니다.\n\n"
+        "## 자동 스케줄\n"
+        "- Cron: `0 */2 * * *` (KST, 2시간마다)\n"
+        "- 설정: `config/settings.yaml` → `crawlers.rss_universal`\n\n"
+        "## 수집 범위\n"
+        "- default_poll_interval_minutes: 60\n"
+        "- max_entries_per_feed: 50\n"
+        "- source_timeout_seconds: 10\n"
+        "- respect_conditional_get: true\n\n"
+        "## 수동 실행\n"
+        "스케줄과 무관하게 즉시 크롤을 트리거합니다.\n\n"
+        "## 응답\n"
+        "- `items_fetched`: 수집된 전체 아이템 수\n"
+        "- `items_new`: 신규 저장 아이템 수\n"
+        "- `errors`: 오류 목록 (없으면 null)"
+    ),
     tags=["RSS Universal Crawling"],
 )
 async def crawling_rss_universal(db: Database = Depends(_get_db)):
