@@ -1,18 +1,16 @@
 from __future__ import annotations
 
-import asyncio
 import logging
 from datetime import datetime, timezone
 
-import feedparser
 import httpx
 
-from app.core.base_crawler import BaseCrawler, CrawlResult
+from app.core.base_rss_crawler import BaseRssCrawler, CrawlResult
 
 logger = logging.getLogger(__name__)
 
 
-class RssUniversalCrawler(BaseCrawler):
+class RssUniversalCrawler(BaseRssCrawler):
     name = "rss_universal"
     detail = "all_feeds"
 
@@ -64,50 +62,34 @@ class RssUniversalCrawler(BaseCrawler):
                     new_etag = resp.headers.get("ETag")
                     new_modified = resp.headers.get("Last-Modified")
 
-                # feedparser 파싱
-                parsed = await asyncio.to_thread(feedparser.parse, content)
-
                 # 피드 메타 업데이트
                 await self.db.execute(
                     "UPDATE rss_feed SET last_fetched_at = $1, last_etag = $2, last_modified = $3 WHERE id = $4",
                     fetched_at, new_etag, new_modified, feed_id,
                 )
 
-                entries = parsed.entries[:self.max_entries_per_feed]
+                # BaseRssCrawler 헬퍼로 파싱
+                parsed_entries, parse_errors = await self.parse_feed(content)
+                errors.extend(parse_errors)
 
-                # 기존 URL 집합
-                urls = [e.get("link", "") for e in entries if e.get("link")]
-                existing = await self.db.fetch(
-                    "SELECT url FROM rss_entry WHERE url = ANY($1)", urls
-                ) if urls else []
-                existing_urls = {r["url"] for r in existing}
+                entries = parsed_entries[:self.max_entries_per_feed]
+
+                # 기존 URL 집합 조회
+                urls = [e["url"] for e in entries if e["url"]]
+                existing_urls = await self.get_existing_urls("rss_entry", "url", urls)
 
                 for entry in entries:
-                    link = entry.get("link", "")
+                    link = entry["url"]
                     if not link:
                         continue
 
-                    published = entry.get("published_parsed")
-                    published_at = (
-                        datetime(*published[:6], tzinfo=timezone.utc)
-                        if published
-                        else fetched_at
-                    )
-
                     try:
-                        await self.db.execute(
-                            "INSERT INTO rss_entry "
-                            "(feed_id, title, url, summary, author, published_at, fetched_at) "
-                            "VALUES ($1, $2, $3, $4, $5, $6, $7) "
-                            "ON CONFLICT (url) DO UPDATE SET "
-                            "fetched_at = EXCLUDED.fetched_at",
-                            feed_id,
-                            entry.get("title", ""),
-                            link,
-                            entry.get("summary"),
-                            entry.get("author"),
-                            published_at,
-                            fetched_at,
+                        await self.upsert_entry(
+                            table="rss_entry",
+                            columns=["feed_id", "title", "url", "summary", "author", "published_at", "fetched_at"],
+                            values=[feed_id, entry["title"], link, entry["summary"], entry["author"], entry["published_at"], fetched_at],
+                            conflict_column="url",
+                            fetched_at=fetched_at,
                         )
                         if link not in existing_urls:
                             total_new += 1

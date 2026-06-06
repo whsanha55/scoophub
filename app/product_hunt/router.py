@@ -2,28 +2,33 @@
 from __future__ import annotations
 
 import logging
-from datetime import datetime
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import Depends, Query
 
+from app.core.base_router import BaseRouter
 from app.core.database import Database
-from app.core.models import ApiResponse, ErrorDetail
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/api")
+
+class ProductHuntRouter(BaseRouter):
+    table_name = "product_hunt"
+    route_path = "/product-hunt"
+    crawler_import = "app.product_hunt.crawler"
+    crawler_class_name = "ProductHuntCrawler"
+    api_tag = "Product Hunt"
+    order_by = "votes_count DESC NULLS LAST"
+
+    def _make_get_db(self):
+        """wiring에서 dependency_overrides 가능한 plain 함수 반환."""
+        def _get_db() -> Database:
+            raise NotImplementedError
+        return _get_db
 
 
-def _get_db() -> Database:
-    raise NotImplementedError
-
-
-def _row_to_dict(row) -> dict:
-    d = dict(row)
-    for key, val in d.items():
-        if isinstance(val, datetime):
-            d[key] = val.isoformat()
-    return d
+_base = ProductHuntRouter()
+router = _base.router
+_get_db = _base.get_db_fn
 
 
 @router.get(
@@ -49,15 +54,12 @@ async def get_product_hunt(
 ):
     logger.info("get_product_hunt requested: limit=%d topic=%s since=%s", limit, topic, since)
 
-    # 최신 fetched_at 기준
-    latest = await db.fetchrow(
-        "SELECT MAX(fetched_at) AS latest FROM product_hunt"
-    )
-    if not latest or not latest["latest"]:
-        return ApiResponse(success=True, data=[], meta={"total": 0, "returned": 0})
+    latest = await _base.get_latest(db)
+    if not latest:
+        return _base.empty_response()
 
-    conditions = ["fetched_at = $1"]
-    params: list = [latest["latest"]]
+    conditions: list[str] = ["fetched_at = $1"]
+    params: list = [latest]
     idx = 2
 
     if topic is not None:
@@ -70,63 +72,5 @@ async def get_product_hunt(
         params.append(since)
         idx += 1
 
-    where = " AND ".join(conditions)
-
-    rows = await db.fetch(
-        f"SELECT * FROM product_hunt WHERE {where} "
-        f"ORDER BY votes_count DESC NULLS LAST LIMIT ${idx}",
-        *params,
-        limit,
-    )
-
-    items = [_row_to_dict(r) for r in rows]
-    return ApiResponse(success=True, data=items, meta={"total": len(items), "returned": len(items)})
-
-
-# ────────────────────────────────────────────────────────────
-#  수동 크롤 트리거
-# ────────────────────────────────────────────────────────────
-
-
-@router.post(
-    "/crawling/product-hunt",
-    summary="Product Hunt 크롤 수동 실행",
-    description=(
-        "Product Hunt API에서 오늘의 게시물을 수집합니다.\n\n"
-        "## 자동 스케줄\n"
-        "- Cron: `0 11 * * *` (KST, 매일 11:00)\n"
-        "- 설정: `config/settings.yaml` → `crawlers.product_hunt`\n\n"
-        "## 수집 범위\n"
-        "- max_posts: 30\n"
-        "- source_timeout_seconds: 15\n"
-        "- retry_count: 3\n\n"
-        "## 수동 실행\n"
-        "스케줄과 무관하게 즉시 크롤을 트리거합니다.\n\n"
-        "## 응답\n"
-        "- `items_fetched`: 수집된 전체 아이템 수\n"
-        "- `items_new`: 신규 저장 아이템 수\n"
-        "- `errors`: 오류 목록 (없으면 null)"
-    ),
-    tags=["Product Hunt Crawling"],
-)
-async def crawling_product_hunt(db: Database = Depends(_get_db)):
-    logger.info("manual product_hunt crawl triggered")
-    from app.product_hunt.crawler import ProductHuntCrawler
-    import yaml
-
-    with open("config/settings.yaml") as f:
-        cfg = yaml.safe_load(f)
-
-    ph_cfg = cfg.get("crawlers", {}).get("product_hunt", {})
-    cfg_token = ph_cfg.get("developer_token", "")
-
-    result = await ProductHuntCrawler(db, developer_token=cfg_token).run()
-    if result is None:
-        return ApiResponse(success=False, error=ErrorDetail(code="crawl_failed", message="Product Hunt 크롤 실패"))
-    return ApiResponse(success=True, data={
-        "crawler": "product_hunt",
-        "crawler_detail": "daily_launches",
-        "items_fetched": result.items_fetched,
-        "items_new": result.items_new,
-        "errors": result.errors or None,
-    })
+    items = await _base.query_items(db, conditions, params, limit)
+    return _base.items_response(items)

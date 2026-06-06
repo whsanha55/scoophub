@@ -2,30 +2,32 @@
 from __future__ import annotations
 
 import logging
+from typing import Any, ClassVar
 
-from app.core.context import AppContext
+from app.core.base_module import BaseModule
 
 logger = logging.getLogger(__name__)
 
-TAGS = [
-    {"name": "Tech Newsletter", "description": "Tech Newsletter 아티클 조회 API"},
-    {"name": "Tech Newsletter Crawling", "description": "Tech Newsletter 크롤 수동 실행 API"},
-]
 
+class TechNewsletterModule(BaseModule):
+    domain_name = "tech_newsletter"
+    router_module = "app.tech_newsletter.router"
+    scheduler_module = "app.tech_newsletter.scheduler"
+    schedule_type = "cron"
+    tags: ClassVar[list[dict[str, str]]] = [
+        {"name": "Tech Newsletter", "description": "Tech Newsletter 아티클 조회 API"},
+        {"name": "Tech Newsletter Crawling", "description": "Tech Newsletter 크롤 수동 실행 API"},
+    ]
 
-def register(ctx: AppContext) -> None:
-    logger.info("registering tech_newsletter module")
-    from app.tech_newsletter.router import router, _get_db as tn_get_db
-    from app.tech_newsletter.scheduler import register_jobs
-
-    ctx.app.dependency_overrides[tn_get_db] = lambda: ctx.db
-    ctx.app.include_router(router)
-
-    if ctx.enable_scheduler:
-        cfg = ctx.cfg["crawlers"]["tech_newsletter"]
-        register_jobs(
-            ctx.scheduler,
-            ctx.db,
-            schedule=cfg["schedule"],
+    @classmethod
+    def get_scheduler_params(cls, cfg: dict[str, Any]) -> dict[str, Any]:
+        params = super().get_scheduler_params(cfg)
+        params.update(
             feeds=cfg.get("feeds"),
         )
+        return params
+
+
+# main.py 호환성
+register = TechNewsletterModule.register
+TAGS = TechNewsletterModule.tags

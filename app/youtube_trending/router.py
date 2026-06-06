@@ -2,20 +2,33 @@
 from __future__ import annotations
 
 import logging
-from datetime import datetime
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import Depends, Query
 
+from app.core.base_router import BaseRouter
 from app.core.database import Database
-from app.core.models import ApiResponse, ErrorDetail
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/api")
+
+class YoutubeTrendingRouter(BaseRouter):
+    table_name = "youtube_trending"
+    route_path = "/youtube-trending"
+    crawler_import = "app.youtube_trending.crawler"
+    crawler_class_name = "YoutubeTrendingCrawler"
+    api_tag = "YouTube Trending"
+    order_by = "view_count DESC NULLS LAST"
+
+    def _make_get_db(self):
+        """wiring에서 dependency_overrides 가능한 plain 함수 반환."""
+        def _get_db() -> Database:
+            raise NotImplementedError
+        return _get_db
 
 
-def _get_db() -> Database:
-    raise NotImplementedError
+_base = YoutubeTrendingRouter()
+router = _base.router
+_get_db = _base.get_db_fn
 
 
 @router.get(
@@ -41,13 +54,13 @@ async def get_youtube_trending(
 ):
     logger.info("get_youtube_trending requested: region=%s category=%s limit=%d", region_code, category_id, limit)
 
-    # 최신 fetched_at 기준으로 필터링
+    # 최신 fetched_at 기준으로 필터링 (region_code 조건 포함)
     latest = await db.fetchrow(
         "SELECT MAX(fetched_at) AS latest FROM youtube_trending WHERE region_code = $1",
         region_code,
     )
     if not latest or not latest["latest"]:
-        return ApiResponse(success=True, data=[], meta={"total": 0, "returned": 0})
+        return _base.empty_response()
 
     conditions = ["fetched_at = $1", "region_code = $2"]
     params: list = [latest["latest"], region_code]
@@ -58,77 +71,5 @@ async def get_youtube_trending(
         params.append(category_id)
         idx += 1
 
-    where = " AND ".join(conditions)
-
-    rows = await db.fetch(
-        f"SELECT * FROM youtube_trending WHERE {where} "
-        f"ORDER BY view_count DESC NULLS LAST LIMIT ${idx}",
-        *params,
-        limit,
-    )
-
-    items = [_row_to_dict(r) for r in rows]
-    return ApiResponse(success=True, data=items, meta={"total": len(items), "returned": len(items)})
-
-
-def _row_to_dict(row) -> dict:
-    d = dict(row)
-    for key, val in d.items():
-        if isinstance(val, datetime):
-            d[key] = val.isoformat()
-    return d
-
-
-# ────────────────────────────────────────────────────────────
-#  수동 크롤 트리거
-# ────────────────────────────────────────────────────────────
-
-
-@router.post(
-    "/crawling/youtube-trending",
-    summary="YouTube 트렌딩 크롤 수동 실행",
-    description=(
-        "YouTube Data API에서 트렌딩 영상을 수집합니다.\n\n"
-        "## 자동 스케줄\n"
-        "- Cron: `0 */6 * * *` (KST, 6시간마다)\n"
-        "- 설정: `config/settings.yaml` → `crawlers.youtube_trending`\n\n"
-        "## 수집 범위\n"
-        "- region_codes: KR, US\n"
-        "- max_results_per_region: 50\n"
-        "- source_timeout_seconds: 15\n"
-        "- retry_count: 3\n\n"
-        "## 수동 실행\n"
-        "스케줄과 무관하게 즉시 크롤을 트리거합니다.\n\n"
-        "## 응답\n"
-        "- `items_fetched`: 수집된 전체 아이템 수\n"
-        "- `items_new`: 신규 저장 아이템 수\n"
-        "- `errors`: 오류 목록 (없으면 null)"
-    ),
-    tags=["YouTube Trending Crawling"],
-)
-async def crawling_youtube_trending(db: Database = Depends(_get_db)):
-    logger.info("manual youtube_trending crawl triggered")
-    import yaml
-
-    from app.youtube_trending.crawler import YoutubeTrendingCrawler
-
-    with open("config/settings.yaml") as f:
-        cfg = yaml.safe_load(f)
-    yt_cfg = cfg["crawlers"]["youtube_trending"]
-
-    result = await YoutubeTrendingCrawler(
-        db,
-        api_key=yt_cfg.get("api_key", ""),
-        region_codes=yt_cfg.get("region_codes"),
-        max_results_per_region=yt_cfg.get("max_results_per_region", 50),
-    ).run()
-
-    if result is None:
-        return ApiResponse(success=False, error=ErrorDetail(code="crawl_failed", message="YouTube 트렌딩 크롤 실패"))
-    return ApiResponse(success=True, data={
-        "crawler": "youtube_trending",
-        "crawler_detail": "most_popular",
-        "items_fetched": result.items_fetched,
-        "items_new": result.items_new,
-        "errors": result.errors or None,
-    })
+    items = await _base.query_items(db, conditions, params, limit)
+    return _base.items_response(items)

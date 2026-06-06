@@ -2,25 +2,24 @@
 from __future__ import annotations
 
 import logging
+from typing import ClassVar
 
-from app.core.context import AppContext
+from app.core.base_module import BaseModule
 
 logger = logging.getLogger(__name__)
 
-TAGS = [
-    {"name": "Weather", "description": "날씨 데이터 조회 API"},
-    {"name": "Weather Crawling", "description": "날씨 크롤 수동 실행 API"},
-]
+
+class WeatherModule(BaseModule):
+    domain_name = "weather"
+    router_module = "app.weather.router"
+    scheduler_module = "app.weather.scheduler"
+    schedule_type = "interval"
+    tags: ClassVar[list[dict[str, str]]] = [
+        {"name": "Weather", "description": "날씨 데이터 조회 API"},
+        {"name": "Weather Crawling", "description": "날씨 크롤 수동 실행 API"},
+    ]
 
 
-def register(ctx: AppContext) -> None:
-    logger.info("registering weather module")
-    from app.weather.router import router, _get_db as weather_get_db
-    from app.weather.scheduler import register_jobs
-
-    ctx.app.dependency_overrides[weather_get_db] = lambda: ctx.db
-    ctx.app.include_router(router)
-
-    if ctx.enable_scheduler:
-        cfg = ctx.cfg["crawlers"]["weather"]
-        register_jobs(ctx.scheduler, ctx.db, schedule_minutes=cfg["schedule_minutes"])
+# main.py 호환성
+register = WeatherModule.register
+TAGS = WeatherModule.tags

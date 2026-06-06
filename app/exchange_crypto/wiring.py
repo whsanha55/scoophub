@@ -2,32 +2,34 @@
 from __future__ import annotations
 
 import logging
+from typing import Any, ClassVar
 
-from app.core.context import AppContext
+from app.core.base_module import BaseModule
 
 logger = logging.getLogger(__name__)
 
-TAGS = [
-    {"name": "Exchange Crypto", "description": "암호화폐 시세 조회 API"},
-    {"name": "Exchange Crypto Crawling", "description": "암호화폐 시세 크롤 수동 실행 API"},
-]
 
+class ExchangeCryptoModule(BaseModule):
+    domain_name = "exchange_crypto"
+    router_module = "app.exchange_crypto.router"
+    scheduler_module = "app.exchange_crypto.scheduler"
+    schedule_type = "cron"
+    tags: ClassVar[list[dict[str, str]]] = [
+        {"name": "Exchange Crypto", "description": "암호화폐 시세 조회 API"},
+        {"name": "Exchange Crypto Crawling", "description": "암호화폐 시세 크롤 수동 실행 API"},
+    ]
 
-def register(ctx: AppContext) -> None:
-    logger.info("registering exchange_crypto module")
-    from app.exchange_crypto.router import router, _get_db as ec_get_db
-    from app.exchange_crypto.scheduler import register_jobs
-
-    ctx.app.dependency_overrides[ec_get_db] = lambda: ctx.db
-    ctx.app.include_router(router)
-
-    if ctx.enable_scheduler:
-        cfg = ctx.cfg["crawlers"]["exchange_crypto"]
-        register_jobs(
-            ctx.scheduler,
-            ctx.db,
-            schedule=cfg["schedule"],
+    @classmethod
+    def get_scheduler_params(cls, cfg: dict[str, Any]) -> dict[str, Any]:
+        params = super().get_scheduler_params(cfg)
+        params.update(
             vs_currency=cfg.get("vs_currency", "krw"),
             max_coins=cfg.get("max_coins", 100),
             include_trending=cfg.get("include_trending", True),
         )
+        return params
+
+
+# main.py 호환성
+register = ExchangeCryptoModule.register
+TAGS = ExchangeCryptoModule.tags
