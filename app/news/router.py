@@ -34,7 +34,7 @@ async def get_news(
     fr: datetime | None = Query(None, alias="from", description="조회 시작 시각 (ISO 8601)"),
     to: datetime | None = Query(None, alias="to", description="조회 종료 시각 (ISO 8601)"),
     category: str | None = Query(None, description="카테고리 필터"),
-    min_importance: int | None = Query(None, ge=1, le=10, description="최소 중요도 (1~10)"),
+    min_importance: int | None = Query(None, ge=1, le=5, description="최소 중요도 (1~5)"),
     limit: int = Query(20, ge=1, le=200, description="조회할 최대 기사 수"),
     db: Database = Depends(_get_db),
 ):
