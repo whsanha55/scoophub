@@ -328,6 +328,19 @@ wheels = [
 ]
 
 [[package]]
+name = "gtrending"
+version = "0.5.1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "beautifulsoup4" },
+    { name = "requests" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/3a/fe/81e8906e8f159b2828c3d0b807f62d3c54a0f7737c6b7b1d70b3287364d9/gtrending-0.5.1.tar.gz", hash = "sha256:f82505a6e2425a18c772afce12bc92c2165180b5caa98de5feb7cea3b4b117c8", size = 19886, upload-time = "2023-06-13T11:17:07.96Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/97/11/b9dc4abf1534cc33407ac1d8c3c36b22e0ced1a12a3dc019e2cb569b1c93/gtrending-0.5.1-py3-none-any.whl", hash = "sha256:544bcd7feab2448b9522675918263292d0874f6fabc6f17aa82377fba71084a2", size = 19759, upload-time = "2023-06-13T11:17:05.986Z" },
+]
+
+[[package]]
 name = "h11"
 version = "0.16.0"
 source = { registry = "https://pypi.org/simple" }
@@ -877,6 +890,7 @@ dependencies = [
     { name = "beautifulsoup4" },
     { name = "fastapi" },
     { name = "feedparser" },
+    { name = "gtrending" },
     { name = "httpx" },
     { name = "pydantic" },
     { name = "pydantic-settings" },
@@ -899,6 +913,7 @@ requires-dist = [
     { name = "beautifulsoup4", specifier = ">=4.12.0" },
     { name = "fastapi", specifier = ">=0.110.0" },
     { name = "feedparser", specifier = ">=6.0.0" },
+    { name = "gtrending", specifier = ">=0.5.0" },
     { name = "httpx", specifier = ">=0.27.0" },
     { name = "pydantic", specifier = ">=2.6.0" },
     { name = "pydantic-settings", specifier = ">=2.2.0" },
