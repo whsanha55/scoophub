@@ -46,6 +46,13 @@ crawlers:
     vs_currency: "krw"
     max_coins: 100
     include_trending: true
+  product_hunt:
+    schedule: "0 11 * * *"               # 매일 11:00 (KST)
+    developer_token: ""
+    max_posts: 30
+    source_timeout_seconds: 15
+    retry_count: 3
+    retry_delay_seconds: 10
 
 api:
   default_minutes: 30
