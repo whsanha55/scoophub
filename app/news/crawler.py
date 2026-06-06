@@ -42,6 +42,7 @@ def _parse_published(entry) -> datetime | None:
 
 class NewsCrawler(BaseCrawler):
     name = "news"
+    detail = "rss"
 
     def __init__(
         self,
@@ -60,8 +61,9 @@ class NewsCrawler(BaseCrawler):
         floor = datetime.now(timezone.utc) - timedelta(hours=self.max_lookback_hours)
         last = await self.db.fetchval(
             "SELECT max(finished_at) FROM crawl_logs "
-            "WHERE crawler = $1 AND status IN ('success', 'partial')",
+            "WHERE crawler = $1 AND crawler_detail = $2 AND status IN ('success', 'partial')",
             self.name,
+            self.detail,
         )
         return max(last, floor) if last else floor
 

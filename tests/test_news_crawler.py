@@ -52,3 +52,10 @@ async def test_crawler_stores_articles(db):
     assert rows[0]["category"] is None
     assert rows[0]["summary_status"] == "pending"
     assert rows[0]["normalized_url"] is not None
+
+    # crawl_logs에 crawler_detail='rss' 기록 확인
+    logs = await db.fetch(
+        "SELECT * FROM crawl_logs WHERE crawler='news' ORDER BY started_at DESC LIMIT 1"
+    )
+    assert len(logs) == 1
+    assert logs[0]["crawler_detail"] == "rss"

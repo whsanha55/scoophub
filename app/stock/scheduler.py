@@ -65,10 +65,10 @@ def register_jobs(
     scheduler.add_job(
         _crawl_sigma,
         trigger=CronTrigger(minute=parts[0], hour=parts[1], day=parts[2], month=parts[3], day_of_week=parts[4]),
-        id="stock_sigma",
+        id="stock-sigma-scan",
         replace_existing=True,
     )
-    logger.info("Scheduled 'stock_sigma' with cron '%s'", sigma_schedule)
+    logger.info("Scheduled 'stock-sigma-scan' with cron '%s'", sigma_schedule)
 
     async def _run_analysis() -> None:
         from app.stock.repository import WatchlistRepo

@@ -23,6 +23,7 @@ class CrawlResult:
 
 class BaseCrawler(ABC):
     name: str = "base"
+    detail: str = ""
 
     def __init__(self, db: Database):
         self.db = db
@@ -33,7 +34,7 @@ class BaseCrawler(ABC):
         ...
 
     async def run(self) -> CrawlResult | None:
-        logger.info("BaseCrawler.run 시작 - crawler=%s", self.name)
+        logger.info("BaseCrawler.run 시작 - crawler=%s detail=%s", self.name, self.detail)
         started_at = datetime.now(timezone.utc)
         try:
             result = await self.fetch()
@@ -41,8 +42,8 @@ class BaseCrawler(ABC):
             status = "partial" if result.errors else "success"
             await self._log_crawl(status, result, started_at)
             logger.info(
-                "BaseCrawler.run 완료 - crawler=%s, status=%s, fetched=%d, new=%d",
-                self.name, status, result.items_fetched, result.items_new,
+                "BaseCrawler.run 완료 - crawler=%s detail=%s, status=%s, fetched=%d, new=%d",
+                self.name, self.detail, status, result.items_fetched, result.items_new,
             )
             return result
         except Exception as e:
@@ -55,9 +56,10 @@ class BaseCrawler(ABC):
     ) -> None:
         finished_at = datetime.now(timezone.utc)
         await self.db.execute(
-            "INSERT INTO crawl_logs (crawler, status, items_fetched, items_new, error_message, started_at, finished_at) "
-            "VALUES ($1, $2, $3, $4, $5, $6, $7)",
+            "INSERT INTO crawl_logs (crawler, crawler_detail, status, items_fetched, items_new, error_message, started_at, finished_at) "
+            "VALUES ($1, $2, $3, $4, $5, $6, $7, $8)",
             self.name,
+            self.detail,
             status,
             result.items_fetched,
             result.items_new,

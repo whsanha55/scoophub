@@ -85,7 +85,8 @@ def _parse_table(table: object, expiry_date: date | None) -> list[WeeklyExpected
 
 
 class SigmaCrawler(BaseCrawler):
-    name = "stock_sigma"
+    name = "stock"
+    detail = "sigma-scan"
 
     def __init__(self, db: Database):
         super().__init__(db)

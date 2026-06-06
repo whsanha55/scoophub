@@ -49,6 +49,7 @@ def _translate_condition(english: str) -> str:
 
 class WeatherCrawler(BaseCrawler):
     name = "weather"
+    detail = "forecast"
 
     def __init__(self, db, timeout: int = 15):
         super().__init__(db)

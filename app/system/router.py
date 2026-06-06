@@ -72,16 +72,26 @@ async def llm_test(body: LLMTestRequest):
     description="크롤러 실행 이력을 최신순으로 반환합니다. 크롤러 이름으로 필터링 가능.",
 )
 async def crawl_logs(
-    crawler: str | None = Query(None, description="크롤러 이름 필터 (예: news, weather, stock_sigma)"),
+    crawler: str | None = Query(None, description="크롤러 이름 필터 (예: news, stock, weather)"),
+    crawler_detail: str | None = Query(None, description="크롤러 목적 필터 (예: rss, sigma-scan, forecast)"),
     limit: int = Query(20, ge=1, le=200, description="조회할 최대 로그 수"),
     db: Database = Depends(get_db),
 ):
-    logger.info("crawl logs requested: crawler=%s limit=%d", crawler, limit)
-    if crawler:
+    logger.info("crawl logs requested: crawler=%s detail=%s limit=%d", crawler, crawler_detail, limit)
+    if crawler and crawler_detail:
+        rows = await db.fetch(
+            "SELECT * FROM crawl_logs WHERE crawler=$1 AND crawler_detail=$2 ORDER BY started_at DESC LIMIT $3",
+            crawler, crawler_detail, limit,
+        )
+    elif crawler:
         rows = await db.fetch(
             "SELECT * FROM crawl_logs WHERE crawler=$1 ORDER BY started_at DESC LIMIT $2",
-            crawler,
-            limit,
+            crawler, limit,
+        )
+    elif crawler_detail:
+        rows = await db.fetch(
+            "SELECT * FROM crawl_logs WHERE crawler_detail=$1 ORDER BY started_at DESC LIMIT $2",
+            crawler_detail, limit,
         )
     else:
         rows = await db.fetch(
