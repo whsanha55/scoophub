@@ -71,6 +71,16 @@ crawlers:
     source_timeout_seconds: 15
     retry_count: 3
     retry_delay_seconds: 10
+  youtube_trending:
+    schedule: "0 */6 * * *"
+    api_key: ""
+    region_codes:
+      - KR
+      - US
+    max_results_per_region: 50
+    source_timeout_seconds: 15
+    retry_count: 3
+    retry_delay_seconds: 10
 
 api:
   default_minutes: 30

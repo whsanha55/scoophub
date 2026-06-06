@@ -19,6 +19,7 @@ dependencies = [
     "arxiv>=4.0.0",
     "pycoingecko>=3.2.0",
     "asyncpraw>=7.8.0",
+    "google-api-python-client>=2.0.0",
 ]
 
 [dependency-groups]
