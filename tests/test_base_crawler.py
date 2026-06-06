@@ -40,3 +40,4 @@ async def test_failing_crawler_isolated(db):
     assert len(rows) == 1
     assert rows[0]["status"] == "error"
     assert "boom" in rows[0]["error_message"]
+    assert rows[0]["crawler_detail"] == ""

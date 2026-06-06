@@ -656,7 +656,8 @@ async def _do_sync_candles(db: Database) -> int:
                     "example": {
                         "success": True,
                         "data": {
-                            "crawler": "stock_sigma",
+                            "crawler": "stock",
+                            "crawler_detail": "sigma-scan",
                             "items_fetched": 150,
                             "items_new": 12,
                             "errors": None,
@@ -674,7 +675,8 @@ async def crawling_sigma(db: Database = Depends(_get_db)):
     if result is None:
         return ApiResponse(success=False, error=ErrorDetail(code="crawl_failed", message="Sigma 크롤 실패"))
     return ApiResponse(success=True, data={
-        "crawler": "stock_sigma",
+        "crawler": "stock",
+        "crawler_detail": "sigma-scan",
         "items_fetched": result.items_fetched,
         "items_new": result.items_new,
         "errors": result.errors or None,
