@@ -93,6 +93,20 @@ crawlers:
     source_timeout_seconds: 10
     retry_count: 3
     retry_delay_seconds: 10
+  tech_newsletter:
+    schedule: "0 */4 * * *"
+    feeds:
+      - url: "https://tldr.tech/api/rss/tech"
+        source: "TLDR Tech"
+      - url: "https://tldr.tech/api/rss/ai"
+        source: "TLDR AI"
+      - url: "https://techcrunch.com/feed/"
+        source: "TechCrunch"
+      - url: "https://www.theverge.com/rss/tech/index.xml"
+        source: "The Verge"
+    source_timeout_seconds: 10
+    retry_count: 3
+    retry_delay_seconds: 10
 
 api:
   default_minutes: 30
