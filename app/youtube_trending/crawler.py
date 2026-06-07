@@ -20,6 +20,14 @@ class YoutubeTrendingCrawler(BaseCrawler):
         self.region_codes = region_codes or ["KR", "US"]
         self.max_results_per_region = max_results_per_region
 
+    @classmethod
+    def from_config(cls, db):
+        import yaml
+        with open("config/settings.yaml") as f:
+            cfg = yaml.safe_load(f)
+        yt = cfg.get("crawlers", {}).get("youtube_trending", {})
+        return cls(db, api_key=yt.get("api_key", ""), region_codes=yt.get("region_codes"), max_results_per_region=yt.get("max_results_per_region", 50))
+
     async def fetch(self) -> CrawlResult:
         if not self.api_key:
             return CrawlResult(errors=["YOUTUBE_API_KEY not configured"])

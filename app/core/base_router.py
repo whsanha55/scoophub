@@ -98,7 +98,7 @@ class BaseRouter(ABC):
             logger.info("manual %s crawl triggered", name)
             module = importlib.import_module(crawler_import)
             crawler_cls = getattr(module, crawler_class_name)
-            instance = crawler_cls(db)
+            instance = crawler_cls.from_config(db)
             result = await instance.run()
             if result is None:
                 return ApiResponse(

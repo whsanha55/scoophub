@@ -109,7 +109,7 @@ class BaseRssCrawler(BaseCrawler):
         conflict_column: str,
         fetched_at: datetime,
     ) -> bool:
-        """단일 엔트리를 UPSERT 합니다. 신규 삽입이면 ``True`` 를 반환합니다.
+        """단일 엔트리를 UPSERT 합니다.
 
         ``ON CONFLICT (conflict_column) DO UPDATE SET fetched_at = EXCLUDED.fetched_at``
         패턴을 사용합니다.
@@ -136,4 +136,3 @@ class BaseRssCrawler(BaseCrawler):
             f"fetched_at = EXCLUDED.fetched_at"
         )
         await self.db.execute(query, *values)
-        return True
