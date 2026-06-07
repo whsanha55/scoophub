@@ -25,6 +25,14 @@ class TechNewsletterCrawler(BaseCrawler):
             {"url": "https://www.theverge.com/rss/tech/index.xml", "source": "The Verge"},
         ]
 
+    @classmethod
+    def from_config(cls, db):
+        import yaml
+        with open("config/settings.yaml") as f:
+            cfg = yaml.safe_load(f)
+        cfg_feeds = cfg.get("crawlers", {}).get("tech_newsletter", {}).get("feeds")
+        return cls(db, feeds=cfg_feeds)
+
     async def fetch(self) -> CrawlResult:
         logger.info("tech_newsletter fetch started — %d feeds", len(self.feeds))
         errors: list[str] = []

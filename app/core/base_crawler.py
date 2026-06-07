@@ -29,6 +29,14 @@ class BaseCrawler(ABC):
         self.db = db
         logger.info("BaseCrawler.__init__ 시작 - crawler=%s", self.name)
 
+    @classmethod
+    def from_config(cls, db: Database) -> BaseCrawler:
+        """config 설정을 로드하여 crawler 인스턴스를 생성합니다.
+
+        도메인 특화 파라미터가 필요한 서브클래스는 이 메서드를 override 합니다.
+        """
+        return cls(db)
+
     @abstractmethod
     async def fetch(self) -> CrawlResult:
         ...

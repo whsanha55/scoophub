@@ -5,18 +5,33 @@ import json
 import logging
 from datetime import datetime
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import Depends, Query
 
+from app.core.base_router import BaseRouter
 from app.core.database import Database
-from app.core.models import ApiResponse, ErrorDetail
+from app.core.models import ApiResponse
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/api")
+
+class WeatherRouter(BaseRouter):
+    table_name = "weather_snapshots"
+    route_path = "/weather"
+    api_tag = "Weather"
+    crawler_import = "app.weather.crawler"
+    crawler_class_name = "WeatherCrawler"
+    order_by = "fetched_at DESC"
+
+    def _make_get_db(self):
+        """wiring에서 dependency_overrides 가능한 plain 함수 반환."""
+        def _get_db() -> Database:
+            raise NotImplementedError
+        return _get_db
 
 
-def _get_db() -> Database:
-    raise NotImplementedError
+_base = WeatherRouter()
+router = _base.router
+_get_db = _base.get_db_fn
 
 
 @router.get(
@@ -57,7 +72,6 @@ async def get_weather(
         idx += 2
     else:
         conditions.append("fetched_at >= NOW() - interval '30 minutes'")
-        idx += 1  # placeholder, not used
 
     where = " AND ".join(conditions)
     row = await db.fetchrow(
@@ -67,7 +81,7 @@ async def get_weather(
     if not row:
         return ApiResponse(success=True, data=None, meta={"total": 0, "returned": 0})
 
-    return ApiResponse(success=True, data=_row_to_dict(row), meta={"total": 1, "returned": 1})
+    return ApiResponse(success=True, data=_base._row_to_dict(row), meta={"total": 1, "returned": 1})
 
 
 @router.get(
@@ -100,61 +114,3 @@ async def get_weather_forecast(
 
     forecast = json.loads(row["weekly_forecast"])[:limit]
     return ApiResponse(success=True, data=forecast, meta={"total": len(forecast), "returned": len(forecast)})
-
-
-def _row_to_dict(row) -> dict:
-    d = dict(row)
-    for key, val in d.items():
-        if isinstance(val, datetime):
-            d[key] = val.isoformat()
-    return d
-
-
-# ────────────────────────────────────────────────────────────
-#  수동 크롤 트리거
-# ────────────────────────────────────────────────────────────
-
-
-@router.post(
-    "/crawling/weather",
-    summary="날씨 크롤 수동 실행",
-    description=(
-        "wttr.in + Open-Meteo에서 날씨/대기질 데이터를 수집합니다.\n\n"
-        "## 자동 스케줄\n"
-        "- 30분 간격\n"
-        "- 설정: `config/settings.yaml` → `crawlers.weather`\n\n"
-        "## 수집 범위\n"
-        "- source_timeout_seconds: 15\n\n"
-        "## 수동 실행\n"
-        "스케줄과 무관하게 즉시 크롤을 트리거합니다.\n\n"
-        "## 응답\n"
-        "- `items_fetched`: 수집된 전체 아이템 수\n"
-        "- `items_new`: 신규 저장 아이템 수\n"
-        "- `errors`: 오류 목록 (없으면 null)"
-    ),
-    tags=["Weather Crawling"],
-)
-async def crawling_weather(db: Database = Depends(_get_db)):
-    logger.info("manual weather crawl triggered")
-    """
-    ## 🌤️ 날씨 크롤러
-
-    | 항목      | 값                            |
-    |-----------|-------------------------------|
-    | 스케줄    | 매 30분                       |
-    | 소스      | wttr.in, Open-Meteo AQI       |
-    | 저장 테이블 | `weather_snapshots`           |
-
-    `config/settings.yaml` → `crawlers.weather` 참조.
-    """
-    from app.weather.crawler import WeatherCrawler
-
-    result = await WeatherCrawler(db).run()
-    if result is None:
-        return ApiResponse(success=False, error=ErrorDetail(code="crawl_failed", message="날씨 크롤 실패"))
-    return ApiResponse(success=True, data={
-        "crawler": "weather",
-        "items_fetched": result.items_fetched,
-        "items_new": result.items_new,
-        "errors": result.errors or None,
-    })

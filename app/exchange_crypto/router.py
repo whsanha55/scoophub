@@ -4,18 +4,32 @@ from __future__ import annotations
 import logging
 from datetime import datetime
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import Depends, Query
 
+from app.core.base_router import BaseRouter
 from app.core.database import Database
-from app.core.models import ApiResponse, ErrorDetail
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/api")
+
+class ExchangeCryptoRouter(BaseRouter):
+    table_name = "exchange_crypto"
+    route_path = "/exchange-crypto"
+    crawler_import = "app.exchange_crypto.crawler"
+    crawler_class_name = "ExchangeCryptoCrawler"
+    api_tag = "Exchange Crypto"
+    order_by = "market_cap_rank ASC NULLS LAST"
+
+    def _make_get_db(self):
+        """wiring에서 dependency_overrides 가능한 plain 함수 반환."""
+        def _get_db() -> Database:
+            raise NotImplementedError
+        return _get_db
 
 
-def _get_db() -> Database:
-    raise NotImplementedError
+_base = ExchangeCryptoRouter()
+router = _base.router
+_get_db = _base.get_db_fn
 
 
 @router.get(
@@ -41,13 +55,13 @@ async def get_exchange_crypto(
 ):
     logger.info("get_exchange_crypto requested: limit=%d vs_currency=%s since=%s", limit, vs_currency, since)
 
-    # 최신 fetched_at 기준으로 필터링
+    # 최신 fetched_at 기준으로 필터링 (vs_currency 조건 포함)
     latest = await db.fetchrow(
         "SELECT MAX(fetched_at) AS latest FROM exchange_crypto WHERE vs_currency = $1",
         vs_currency,
     )
     if not latest or not latest["latest"]:
-        return ApiResponse(success=True, data=[], meta={"total": 0, "returned": 0})
+        return _base.empty_response()
 
     conditions = ["vs_currency = $1", "fetched_at = $2"]
     params: list = [vs_currency, latest["latest"]]
@@ -58,64 +72,5 @@ async def get_exchange_crypto(
         params.append(datetime.fromisoformat(since))
         idx += 1
 
-    where = " AND ".join(conditions)
-
-    rows = await db.fetch(
-        f"SELECT * FROM exchange_crypto WHERE {where} "
-        f"ORDER BY market_cap_rank ASC NULLS LAST LIMIT ${idx}",
-        *params,
-        limit,
-    )
-
-    items = [_row_to_dict(r) for r in rows]
-    return ApiResponse(success=True, data=items, meta={"total": len(items), "returned": len(items)})
-
-
-def _row_to_dict(row) -> dict:
-    d = dict(row)
-    for key, val in d.items():
-        if isinstance(val, datetime):
-            d[key] = val.isoformat()
-    return d
-
-
-# ────────────────────────────────────────────────────────────
-#  수동 크롤 트리거
-# ────────────────────────────────────────────────────────────
-
-
-@router.post(
-    "/crawling/exchange-crypto",
-    summary="암호화폐 시세 크롤 수동 실행",
-    description=(
-        "CoinGecko API에서 암호화폐 시세를 수집합니다.\n\n"
-        "## 자동 스케줄\n"
-        "- Cron: `0 */4 * * *` (KST, 4시간마다)\n"
-        "- 설정: `config/settings.yaml` → `crawlers.exchange_crypto`\n\n"
-        "## 수집 범위\n"
-        "- vs_currency: KRW\n"
-        "- max_coins: 100\n"
-        "- include_trending: true\n\n"
-        "## 수동 실행\n"
-        "스케줄과 무관하게 즉시 크롤을 트리거합니다.\n\n"
-        "## 응답\n"
-        "- `items_fetched`: 수집된 전체 아이템 수\n"
-        "- `items_new`: 신규 저장 아이템 수\n"
-        "- `errors`: 오류 목록 (없으면 null)"
-    ),
-    tags=["Exchange Crypto Crawling"],
-)
-async def crawling_exchange_crypto(db: Database = Depends(_get_db)):
-    logger.info("manual exchange_crypto crawl triggered")
-    from app.exchange_crypto.crawler import ExchangeCryptoCrawler
-
-    result = await ExchangeCryptoCrawler(db).run()
-    if result is None:
-        return ApiResponse(success=False, error=ErrorDetail(code="crawl_failed", message="암호화폐 시세 크롤 실패"))
-    return ApiResponse(success=True, data={
-        "crawler": "exchange_crypto",
-        "crawler_detail": "market_data",
-        "items_fetched": result.items_fetched,
-        "items_new": result.items_new,
-        "errors": result.errors or None,
-    })
+    items = await _base.query_items(db, conditions, params, limit)
+    return _base.items_response(items)

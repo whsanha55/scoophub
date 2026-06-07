@@ -51,6 +51,14 @@ class ProductHuntCrawler(BaseCrawler):
         self.developer_token = developer_token or os.environ.get("PRODUCTHUNT_TOKEN", "")
         self.max_posts = max_posts
 
+    @classmethod
+    def from_config(cls, db):
+        import yaml
+        with open("config/settings.yaml") as f:
+            cfg = yaml.safe_load(f)
+        ph = cfg.get("crawlers", {}).get("product_hunt", {})
+        return cls(db, developer_token=ph.get("developer_token", ""), max_posts=ph.get("max_posts", 30))
+
     async def fetch(self) -> CrawlResult:
         if not self.developer_token:
             return CrawlResult(errors=["PRODUCTHUNT_TOKEN not configured"])
