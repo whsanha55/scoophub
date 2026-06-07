@@ -108,7 +108,7 @@ class BaseRssCrawler(BaseCrawler):
         values: list,
         conflict_column: str,
         fetched_at: datetime,
-    ) -> bool:
+    ) -> None:
         """단일 엔트리를 UPSERT 합니다.
 
         ``ON CONFLICT (conflict_column) DO UPDATE SET fetched_at = EXCLUDED.fetched_at``
