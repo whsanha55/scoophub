@@ -3,7 +3,7 @@ import pytest
 from datetime import datetime, timezone
 from email.utils import format_datetime
 from unittest.mock import AsyncMock, patch, MagicMock
-from app.news.crawler import NewsCrawler
+from app.feed.news.crawler import NewsCrawler
 
 
 @pytest.mark.asyncio
@@ -24,7 +24,7 @@ async def test_crawler_stores_articles(db):
         )
     ]
 
-    with patch("app.news.crawler.httpx.AsyncClient") as mock_client_cls:
+    with patch("app.feed.news.crawler.httpx.AsyncClient") as mock_client_cls:
         mock_response = AsyncMock()
         mock_response.status_code = 200
         mock_response.text = "<rss><channel></channel></rss>"
@@ -34,7 +34,7 @@ async def test_crawler_stores_articles(db):
         mock_client.__aexit__ = AsyncMock(return_value=False)
         mock_client_cls.return_value = mock_client
 
-        with patch("app.news.crawler.feedparser.parse") as mock_parse:
+        with patch("app.feed.news.crawler.feedparser.parse") as mock_parse:
             mock_feed = MagicMock()
             mock_feed.entries = mock_entries
             mock_feed.bozo = 0

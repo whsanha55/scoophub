@@ -1,5 +1,5 @@
 # tests/test_dedup.py
-from app.news.dedup import is_duplicate_title, normalize_url
+from app.feed.news.dedup import is_duplicate_title, normalize_url
 
 
 def test_normalize_strips_tracking_params():

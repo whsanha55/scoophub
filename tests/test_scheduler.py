@@ -4,7 +4,7 @@ from unittest.mock import MagicMock
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
-from app.news.scheduler import register_jobs as news_register_jobs
+from app.feed.news.scheduler import register_jobs as news_register_jobs
 from app.weather.scheduler import register_jobs as weather_register_jobs
 
 
