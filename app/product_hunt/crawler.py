@@ -2,11 +2,11 @@ from __future__ import annotations
 
 import json
 import logging
-import os
 from datetime import datetime, timezone
 
 import httpx
 
+from app.config import settings
 from app.core.base_crawler import BaseCrawler, CrawlResult
 
 logger = logging.getLogger(__name__)
@@ -48,7 +48,7 @@ class ProductHuntCrawler(BaseCrawler):
 
     def __init__(self, db, developer_token: str = "", max_posts: int = 30):
         super().__init__(db)
-        self.developer_token = developer_token or os.environ.get("PRODUCTHUNT_TOKEN", "")
+        self.developer_token = developer_token or settings.PRODUCTHUNT_TOKEN
         self.max_posts = max_posts
 
     @classmethod

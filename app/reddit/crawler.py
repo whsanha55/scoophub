@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 import logging
-import os
 from datetime import datetime, timezone
 
+from app.config import settings
 from app.core.base_crawler import BaseCrawler, CrawlResult
 
 logger = logging.getLogger(__name__)
@@ -25,8 +25,8 @@ class RedditCrawler(BaseCrawler):
         min_score: int = 50,
     ):
         super().__init__(db)
-        self.client_id = client_id or os.environ.get("REDDIT_CLIENT_ID", "")
-        self.client_secret = client_secret or os.environ.get("REDDIT_CLIENT_SECRET", "")
+        self.client_id = client_id or settings.REDDIT_CLIENT_ID
+        self.client_secret = client_secret or settings.REDDIT_CLIENT_SECRET
         self.user_agent = user_agent
         self.subreddits = subreddits or [
             "programming", "python", "javascript", "MachineLearning", "webdev",
