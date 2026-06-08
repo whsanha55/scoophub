@@ -64,7 +64,7 @@ async def get_github_trending(
 
     # 최신 fetched_at 기준으로 필터링 (period 조건 포함)
     latest = await db.fetchrow(
-        "SELECT MAX(fetched_at) AS latest FROM github_trending_repos WHERE period = $1",
+        "SELECT MAX(fetched_at) AS latest FROM community_github WHERE period = $1",
         period,
     )
     if not latest or not latest["latest"]:

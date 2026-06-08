@@ -56,7 +56,7 @@ async def get_youtube_trending(
 
     # 최신 fetched_at 기준으로 필터링 (region_code 조건 포함)
     latest = await db.fetchrow(
-        "SELECT MAX(fetched_at) AS latest FROM youtube_trending WHERE region_code = $1",
+        "SELECT MAX(fetched_at) AS latest FROM feed_youtube WHERE region_code = $1",
         region_code,
     )
     if not latest or not latest["latest"]:
