@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 
 
 class RedditRouter(BaseRouter):
-    table_name = "reddit_posts"
+    table_name = "community_reddit"
     route_path = "/reddit"
     crawler_import = "app.reddit.crawler"
     crawler_class_name = "RedditCrawler"

@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 
 
 class ArxivRouter(BaseRouter):
-    table_name = "arxiv_papers"
+    table_name = "feed_arxiv"
     route_path = "/arxiv"
     crawler_import = "app.arxiv.crawler"
     crawler_class_name = "ArxivCrawler"

@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 
 
 class ProductHuntRouter(BaseRouter):
-    table_name = "product_hunt"
+    table_name = "community_producthunt"
     route_path = "/product-hunt"
     crawler_import = "app.product_hunt.crawler"
     crawler_class_name = "ProductHuntCrawler"

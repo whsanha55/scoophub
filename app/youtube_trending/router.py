@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 
 
 class YoutubeTrendingRouter(BaseRouter):
-    table_name = "youtube_trending"
+    table_name = "feed_youtube"
     route_path = "/youtube-trending"
     crawler_import = "app.youtube_trending.crawler"
     crawler_class_name = "YoutubeTrendingCrawler"

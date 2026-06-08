@@ -7,9 +7,9 @@ trigger 엔드포인트가 자동 등록됩니다.
 
 사용 예:
     class HNRouter(BaseRouter):
-        table_name = "hacker_news"
+        table_name = "community_hackernews"
         route_path = "/hacker-news"
-        crawler_import = "app.hacker_news.crawler"
+        crawler_import = "app.community.hacker_news.crawler"
         crawler_class_name = "HackerNewsCrawler"
         api_tag = "Hacker News"
         order_by = "score DESC NULLS LAST"
@@ -43,7 +43,7 @@ class BaseRouter(ABC):
         table_name: DB 테이블명 (예: "hacker_news")
         route_path: URL 경로 (예: "/hacker-news")
         api_tag: OpenAPI 태그명 (예: "Hacker News")
-        crawler_import: crawler 모듈 경로 (예: "app.hacker_news.crawler")
+        crawler_import: crawler 모듈 경로 (예: "app.community.hacker_news.crawler")
         crawler_class_name: crawler 클래스명 (예: "HackerNewsCrawler")
         order_by: 기본 정렬 (예: "score DESC NULLS LAST")
     """
