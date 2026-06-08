@@ -86,7 +86,7 @@ async def llm_dedup(
 
     # 신규 기사 조회
     new_rows = await db.fetch(
-        "SELECT id, title, source, url, summary FROM news_articles "
+        "SELECT id, title, source, url, summary FROM feed_news "
         "WHERE id = ANY($1::int[])",
         new_article_ids,
     )
@@ -95,7 +95,7 @@ async def llm_dedup(
 
     # 24h 내 기존 기사 조회
     existing_rows = await db.fetch(
-        "SELECT id, title, source, url, summary FROM news_articles "
+        "SELECT id, title, source, url, summary FROM feed_news "
         "WHERE duplicated = false "
         f"AND created_at >= NOW() - interval '{dedup_window_hours} hours' "
         "AND id != ALL($1::int[])",
@@ -153,7 +153,7 @@ async def llm_dedup(
         duplicate_ids = [aid for aid in ids_in_group if aid != representative_id]
         if duplicate_ids:
             await db.execute(
-                "UPDATE news_articles SET duplicated = true, duplicated_news_id = $1, "
+                "UPDATE feed_news SET duplicated = true, duplicated_news_id = $1, "
                 "updated_at = NOW() WHERE id = ANY($2::int[])",
                 representative_id,
                 duplicate_ids,

@@ -49,7 +49,7 @@ class ArxivCrawler(BaseCrawler):
         # 기존 arxiv_id 집합 조회
         arxiv_ids = [p.get_short_id() for p in all_papers]
         existing = await self.db.fetch(
-            "SELECT arxiv_id FROM arxiv_papers WHERE arxiv_id = ANY($1)",
+            "SELECT arxiv_id FROM feed_arxiv WHERE arxiv_id = ANY($1)",
             arxiv_ids,
         )
         existing_ids = {r["arxiv_id"] for r in existing}
@@ -66,7 +66,7 @@ class ArxivCrawler(BaseCrawler):
                 updated_at = paper.updated
 
                 await self.db.execute(
-                    "INSERT INTO arxiv_papers "
+                    "INSERT INTO feed_arxiv "
                     "(arxiv_id, title, authors, summary, primary_category, categories, "
                     "pdf_url, abstract_url, published_at, updated_at, author_comment, "
                     "journal_ref, fetched_at) "

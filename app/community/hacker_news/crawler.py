@@ -1,4 +1,4 @@
-# hacker_news/crawler.py
+# community_hackernews/crawler.py
 from __future__ import annotations
 
 import asyncio
@@ -90,7 +90,7 @@ class HackerNewsCrawler(BaseCrawler):
             # 5) 기존 hn_id 집합 조회 (new 판별용)
             hn_ids = [item["id"] for item in items]
             existing = await self.db.fetch(
-                "SELECT hn_id FROM hacker_news WHERE hn_id = ANY($1)",
+                "SELECT hn_id FROM community_hackernews WHERE hn_id = ANY($1)",
                 hn_ids,
             )
             existing_ids = {r["hn_id"] for r in existing}
@@ -101,7 +101,7 @@ class HackerNewsCrawler(BaseCrawler):
                 posted_at = datetime.fromtimestamp(item["time"], tz=timezone.utc) if item.get("time") else None
                 try:
                     await self.db.execute(
-                        "INSERT INTO hacker_news "
+                        "INSERT INTO community_hackernews "
                         "(hn_id, title, url, by_user, score, descendants, item_type, body_text, posted_at, fetched_at) "
                         "VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) "
                         "ON CONFLICT (hn_id) DO UPDATE SET "

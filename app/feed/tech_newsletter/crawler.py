@@ -1,4 +1,4 @@
-# tech_newsletter/crawler.py
+# feed_newsletter/crawler.py
 from __future__ import annotations
 
 import asyncio
@@ -30,7 +30,7 @@ class TechNewsletterCrawler(BaseCrawler):
         import yaml
         with open("config/settings.yaml") as f:
             cfg = yaml.safe_load(f)
-        cfg_feeds = cfg.get("crawlers", {}).get("tech_newsletter", {}).get("feeds")
+        cfg_feeds = cfg.get("crawlers", {}).get("feed_newsletter", {}).get("feeds")
         return cls(db, feeds=cfg_feeds)
 
     async def fetch(self) -> CrawlResult:
@@ -70,7 +70,7 @@ class TechNewsletterCrawler(BaseCrawler):
         # 기존 URL 집합
         urls = [e["url"] for e in all_entries if e["url"]]
         existing = await self.db.fetch(
-            "SELECT url FROM tech_newsletter WHERE url = ANY($1)",
+            "SELECT url FROM feed_newsletter WHERE url = ANY($1)",
             urls,
         )
         existing_urls = {r["url"] for r in existing}
@@ -81,7 +81,7 @@ class TechNewsletterCrawler(BaseCrawler):
                 continue
             try:
                 await self.db.execute(
-                    "INSERT INTO tech_newsletter "
+                    "INSERT INTO feed_newsletter "
                     "(title, url, source, summary, author, category, published_at, fetched_at) "
                     "VALUES ($1, $2, $3, $4, $5, $6, $7, $8) "
                     "ON CONFLICT (url) DO UPDATE SET "

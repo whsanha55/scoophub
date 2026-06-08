@@ -25,7 +25,7 @@ class YoutubeTrendingCrawler(BaseCrawler):
         import yaml
         with open("config/settings.yaml") as f:
             cfg = yaml.safe_load(f)
-        yt = cfg.get("crawlers", {}).get("youtube_trending", {})
+        yt = cfg.get("crawlers", {}).get("feed_youtube", {})
         return cls(db, api_key=yt.get("api_key", ""), region_codes=yt.get("region_codes"), max_results_per_region=yt.get("max_results_per_region", 50))
 
     async def fetch(self) -> CrawlResult:
@@ -85,7 +85,7 @@ class YoutubeTrendingCrawler(BaseCrawler):
 
         # 기존 (video_id, region_code) 집합 조회 (new 판별용)
         existing = await self.db.fetch(
-            "SELECT video_id, region_code FROM youtube_trending WHERE region_code = ANY($1)",
+            "SELECT video_id, region_code FROM feed_youtube WHERE region_code = ANY($1)",
             list({item["region_code"] for item in all_items}),
         )
         existing_keys = {(r["video_id"], r["region_code"]) for r in existing}
@@ -95,7 +95,7 @@ class YoutubeTrendingCrawler(BaseCrawler):
             try:
                 published_at = datetime.fromisoformat(item["published_at"].replace("Z", "+00:00")) if item.get("published_at") else fetched_at
                 await self.db.execute(
-                    "INSERT INTO youtube_trending "
+                    "INSERT INTO feed_youtube "
                     "(video_id, title, channel_title, channel_id, description, "
                     "category_id, published_at, view_count, like_count, comment_count, "
                     "duration, thumbnail_url, region_code, fetched_at) "

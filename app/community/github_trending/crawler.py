@@ -44,7 +44,7 @@ class GithubTrendingCrawler(BaseCrawler):
         # 기존 URL 집합 조회 (new 판별용)
         urls = [r.get("url", "") for r in repos if r.get("url")]
         existing = await self.db.fetch(
-            "SELECT url FROM github_trending_repos WHERE url = ANY($1)",
+            "SELECT url FROM community_github WHERE url = ANY($1)",
             urls,
         )
         existing_urls = {r["url"] for r in existing}
@@ -54,7 +54,7 @@ class GithubTrendingCrawler(BaseCrawler):
             url = repo.get("url", "")
             try:
                 await self.db.execute(
-                    "INSERT INTO github_trending_repos "
+                    "INSERT INTO community_github "
                     "(fullname, author, name, url, description, language, stars, forks, "
                     "current_period_stars, period, fetched_at) "
                     "VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) "

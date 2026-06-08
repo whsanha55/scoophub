@@ -1,4 +1,4 @@
-# devto_hashnode/crawler.py
+# feed_devblog/crawler.py
 from __future__ import annotations
 
 import json
@@ -58,7 +58,7 @@ class DevtoHashnodeCrawler(BaseCrawler):
         # 기존 article_id 집합
         article_ids = list(seen_ids)
         existing = await self.db.fetch(
-            "SELECT article_id FROM devto_hashnode WHERE article_id = ANY($1)",
+            "SELECT article_id FROM feed_devblog WHERE article_id = ANY($1)",
             article_ids,
         )
         existing_ids = {r["article_id"] for r in existing}
@@ -70,7 +70,7 @@ class DevtoHashnodeCrawler(BaseCrawler):
                 published_at = datetime.fromisoformat(item["published_at"].replace("Z", "+00:00")) if item.get("published_at") else fetched_at
 
                 await self.db.execute(
-                    "INSERT INTO devto_hashnode "
+                    "INSERT INTO feed_devblog "
                     "(article_id, title, url, author, description, reactions_count, "
                     "comments_count, reading_time, tags, source, published_at, fetched_at) "
                     "VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) "

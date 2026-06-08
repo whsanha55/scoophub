@@ -58,7 +58,7 @@ class NewsSummarizer:
 
         The recency bound is a safety guard against retrying stale failures forever."""
         rows = await self.db.fetch(
-            "SELECT id, title, summary, importance, category FROM news_articles "
+            "SELECT id, title, summary, importance, category FROM feed_news "
             f"WHERE summary_status <> 'success' AND duplicated = false "
             f"AND created_at >= NOW() - interval '{RETRY_WINDOW_HOURS} hours' "
             "ORDER BY id"
@@ -136,7 +136,7 @@ class NewsSummarizer:
                 failed += 1
 
         await self.db.execute(
-            "UPDATE news_articles AS n SET "
+            "UPDATE feed_news AS n SET "
             "  title = v.title, summary = v.summary, importance = v.importance, "
             "  category = v.category, summary_status = v.status, updated_at = NOW() "
             "FROM (SELECT * FROM unnest($1::int[], $2::text[], $3::text[], $4::smallint[], $5::text[], $6::text[]) "
@@ -148,7 +148,7 @@ class NewsSummarizer:
 
     async def _mark_error(self, ids: list[int]) -> None:
         await self.db.execute(
-            "UPDATE news_articles SET summary_status = 'error', updated_at = NOW() "
+            "UPDATE feed_news SET summary_status = 'error', updated_at = NOW() "
             "WHERE id = ANY($1::int[])",
             ids,
         )

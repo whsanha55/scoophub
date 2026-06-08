@@ -56,7 +56,7 @@ class ProductHuntCrawler(BaseCrawler):
         import yaml
         with open("config/settings.yaml") as f:
             cfg = yaml.safe_load(f)
-        ph = cfg.get("crawlers", {}).get("product_hunt", {})
+        ph = cfg.get("crawlers", {}).get("community_producthunt", {})
         return cls(db, developer_token=ph.get("developer_token", ""), max_posts=ph.get("max_posts", 30))
 
     async def fetch(self) -> CrawlResult:
@@ -96,7 +96,7 @@ class ProductHuntCrawler(BaseCrawler):
         # 기존 ph_id 집합
         ph_ids = [edge["node"]["id"] for edge in edges if edge.get("node")]
         existing = await self.db.fetch(
-            "SELECT ph_id FROM product_hunt WHERE ph_id = ANY($1)",
+            "SELECT ph_id FROM community_producthunt WHERE ph_id = ANY($1)",
             ph_ids,
         )
         existing_ids = {r["ph_id"] for r in existing}
@@ -114,7 +114,7 @@ class ProductHuntCrawler(BaseCrawler):
                 featured_at = datetime.fromisoformat(node["featuredAt"].replace("Z", "+00:00")) if node.get("featuredAt") else None
 
                 await self.db.execute(
-                    "INSERT INTO product_hunt "
+                    "INSERT INTO community_producthunt "
                     "(ph_id, name, tagline, slug, ph_url, website_url, "
                     "votes_count, comments_count, topics, featured_at, posted_at, fetched_at) "
                     "VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) "

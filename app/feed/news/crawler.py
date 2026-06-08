@@ -148,7 +148,7 @@ class NewsCrawler(BaseCrawler):
 
             try:
                 inserted_id = await self.db.fetchval(
-                    "INSERT INTO news_articles (source, title, summary, url, normalized_url, published_at) "
+                    "INSERT INTO feed_news (source, title, summary, url, normalized_url, published_at) "
                     "VALUES ($1, $2, $3, $4, $5, $6) "
                     "ON CONFLICT (normalized_url) DO NOTHING "
                     "RETURNING id",

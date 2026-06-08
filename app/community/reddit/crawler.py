@@ -101,7 +101,7 @@ class RedditCrawler(BaseCrawler):
 
         reddit_ids = [item["reddit_id"] for item in all_items]
         existing = await self.db.fetch(
-            "SELECT reddit_id FROM reddit_posts WHERE reddit_id = ANY($1)",
+            "SELECT reddit_id FROM community_reddit WHERE reddit_id = ANY($1)",
             reddit_ids,
         )
         existing_ids = {r["reddit_id"] for r in existing}
@@ -110,7 +110,7 @@ class RedditCrawler(BaseCrawler):
         for item in all_items:
             try:
                 await self.db.execute(
-                    "INSERT INTO reddit_posts "
+                    "INSERT INTO community_reddit "
                     "(reddit_id, title, author, subreddit, score, upvote_ratio, "
                     "num_comments, url, permalink, selftext, is_self, link_flair, "
                     "domain, posted_at, fetched_at) "
