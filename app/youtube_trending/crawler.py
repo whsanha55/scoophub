@@ -2,9 +2,9 @@ from __future__ import annotations
 
 import asyncio
 import logging
-import os
 from datetime import datetime, timezone
 
+from app.config import settings
 from app.core.base_crawler import BaseCrawler, CrawlResult
 
 logger = logging.getLogger(__name__)
@@ -16,7 +16,7 @@ class YoutubeTrendingCrawler(BaseCrawler):
 
     def __init__(self, db, api_key: str = "", region_codes: list[str] | None = None, max_results_per_region: int = 50):
         super().__init__(db)
-        self.api_key = api_key or os.environ.get("YOUTUBE_API_KEY", "")
+        self.api_key = api_key or settings.YOUTUBE_API_KEY
         self.region_codes = region_codes or ["KR", "US"]
         self.max_results_per_region = max_results_per_region
 

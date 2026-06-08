@@ -16,6 +16,12 @@ class Settings(BaseSettings):
     LLM_API_KEY: str = ""
     LLM_MODEL: str = "google/gemini-2.0-flash-001"
 
+    # External API Keys
+    PRODUCTHUNT_TOKEN: str = ""
+    REDDIT_CLIENT_ID: str = ""
+    REDDIT_CLIENT_SECRET: str = ""
+    YOUTUBE_API_KEY: str = ""
+
     @property
     def database_url(self) -> str:
         return (
