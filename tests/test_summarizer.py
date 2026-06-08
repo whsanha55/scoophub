@@ -5,8 +5,8 @@ from datetime import datetime, timedelta, timezone
 
 import pytest
 
-from app.news.filter_rules import passes_cutoff
-from app.news.summarizer import NewsSummarizer
+from app.feed.news.filter_rules import passes_cutoff
+from app.feed.news.summarizer import NewsSummarizer
 
 
 class FakeLLM:

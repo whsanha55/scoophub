@@ -19,17 +19,21 @@ logger = logging.getLogger(__name__)
 
 # 도메인 wiring 모듈 — 새 도메인 추가 시 여기에 한 줄
 from app.system import wiring as system_wiring
-from app.news import wiring as news_wiring
 from app.weather import wiring as weather_wiring
 from app.stock import wiring as stock_wiring
-from app.github_trending import wiring as github_trending_wiring
-from app.hacker_news import wiring as hacker_news_wiring
-from app.arxiv import wiring as arxiv_wiring
-from app.product_hunt import wiring as product_hunt_wiring
-from app.reddit import wiring as reddit_wiring
-from app.youtube_trending import wiring as youtube_trending_wiring
-from app.devto_hashnode import wiring as devto_hashnode_wiring
-from app.tech_newsletter import wiring as tech_newsletter_wiring
+
+# community 그룹
+from app.community.hacker_news import wiring as hacker_news_wiring
+from app.community.reddit import wiring as reddit_wiring
+from app.community.product_hunt import wiring as product_hunt_wiring
+from app.community.github_trending import wiring as github_trending_wiring
+
+# feed 그룹
+from app.feed.news import wiring as news_wiring
+from app.feed.tech_newsletter import wiring as tech_newsletter_wiring
+from app.feed.devto_hashnode import wiring as devto_hashnode_wiring
+from app.feed.arxiv import wiring as arxiv_wiring
+from app.feed.youtube_trending import wiring as youtube_trending_wiring
 
 DOMAINS = [news_wiring, weather_wiring, stock_wiring, github_trending_wiring, hacker_news_wiring, arxiv_wiring, product_hunt_wiring, reddit_wiring, youtube_trending_wiring, devto_hashnode_wiring, tech_newsletter_wiring, system_wiring]
 
