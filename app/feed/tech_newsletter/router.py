@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 
 
 class TechNewsletterRouter(BaseRouter):
-    table_name = "tech_newsletter"
+    table_name = "feed_newsletter"
     route_path = "/tech-newsletter"
     api_tag = "Tech Newsletter"
     crawler_import = "app.feed.tech_newsletter.crawler"

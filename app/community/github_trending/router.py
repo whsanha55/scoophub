@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 
 
 class GithubTrendingRouter(BaseRouter):
-    table_name = "github_trending_repos"
+    table_name = "community_github"
     route_path = "/github-trending"
     crawler_import = "app.community.github_trending.crawler"
     crawler_class_name = "GithubTrendingCrawler"

@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 
 
 class HNRouter(BaseRouter):
-    table_name = "hacker_news"
+    table_name = "community_hackernews"
     route_path = "/hacker-news"
     api_tag = "Hacker News"
     crawler_import = "app.community.hacker_news.crawler"

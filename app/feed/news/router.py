@@ -74,12 +74,12 @@ async def get_news(
         idx += 1
 
     where = " AND ".join(conditions)
-    count_row = await db.fetchrow(f"SELECT COUNT(*) as cnt FROM news_articles WHERE {where}", *params)
+    count_row = await db.fetchrow(f"SELECT COUNT(*) as cnt FROM feed_news WHERE {where}", *params)
     total = count_row["cnt"]
 
     params.append(limit)
     rows = await db.fetch(
-        f"SELECT * FROM news_articles WHERE {where} ORDER BY created_at DESC LIMIT ${idx}",
+        f"SELECT * FROM feed_news WHERE {where} ORDER BY created_at DESC LIMIT ${idx}",
         *params,
     )
 
@@ -103,7 +103,7 @@ async def get_news_by_id(
     db: Database = Depends(_get_db),
 ):
     logger.info("get_news_by_id 시작 - article_id=%d", article_id)
-    row = await db.fetchrow("SELECT * FROM news_articles WHERE id = $1", article_id)
+    row = await db.fetchrow("SELECT * FROM feed_news WHERE id = $1", article_id)
     if not row:
         return JSONResponse(
             status_code=404,
@@ -163,7 +163,7 @@ async def crawling_news(db: Database = Depends(_get_db)):
     |-----------|-----------|
     | 스케줄    | 매 15분   |
     | 소스      | RSS 피드  |
-    | 저장 테이블 | `news_articles` |
+    | 저장 테이블 | `feed_news` |
 
     크롤 후 `summary_status='pending'` 기사를 20개 단위로 LLM 요약합니다.
     `config/settings.yaml` → `crawlers.news` 참조.

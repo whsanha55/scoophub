@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 
 
 class DevtoHashnodeRouter(BaseRouter):
-    table_name = "devto_hashnode"
+    table_name = "feed_devblog"
     route_path = "/devto-hashnode"
     crawler_import = "app.feed.devto_hashnode.crawler"
     crawler_class_name = "DevtoHashnodeCrawler"
