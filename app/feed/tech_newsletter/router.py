@@ -83,7 +83,7 @@ async def get_tech_newsletter(
 
     where = " AND ".join(conditions)
     rows = await db.fetch(
-        f"SELECT key, date_at, response "
+        f"SELECT id, key, date_at, response "
         f"FROM crawl_data "
         f"WHERE category='feed' AND purpose='newsletter' AND {where} "
         f"ORDER BY date_at DESC NULLS LAST LIMIT ${idx}",
@@ -99,6 +99,7 @@ def _newsletter_item(row) -> dict:
     if isinstance(resp, str):
         resp = json.loads(resp)
     return {
+        "id": row["id"],
         "url": row["key"],
         "title": resp.get("title"),
         "source": resp.get("source"),
