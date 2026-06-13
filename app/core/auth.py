@@ -119,6 +119,8 @@ async def get_current_user(
     cred: HTTPAuthorizationCredentials | None = Depends(bearer_scheme),
 ) -> dict[str, Any]:
     """Bearer 토큰 → 사용자 정보({email, is_super})."""
+    if settings.AUTH_BYPASS:
+        return {"email": "dev@local", "is_super": True}
     if cred is None or not cred.credentials:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,

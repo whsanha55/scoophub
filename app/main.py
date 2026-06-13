@@ -68,6 +68,13 @@ def create_app(db: Database | None = None) -> FastAPI:
                 "set a strong random JWT_SECRET in production"
             )
 
+        # 보안: AUTH_BYPASS는 로컬 전용 — 운영에서 켜지면 인증 전체 무력화
+        if settings.AUTH_BYPASS:
+            logger.warning(
+                "AUTH_BYPASS is ON — all auth checks skipped (local dev only, "
+                "NEVER enable in production)"
+            )
+
         if settings.ENABLE_SCHEDULER:
             scheduler.start()
             logger.info("Scheduler started")

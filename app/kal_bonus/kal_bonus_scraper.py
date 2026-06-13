@@ -98,7 +98,7 @@ class KalBonusScraper:
         self,
         db: Database,
         *,
-        headless: bool = True,
+        headless: bool = False,
         departure: str = DEPARTURE,
         routes: list[tuple[str, str]] | None = None,
         months: list[str] | None = None,
@@ -148,7 +148,13 @@ class KalBonusScraper:
 
         results: list[dict | None] = [None] * len(targets)
         async with async_playwright() as p:
-            browser = await p.chromium.launch(channel="chrome", headless=self.headless)
+            # 번들 chromium 사용 — Google Chrome(channel)은 linux-arm64 빌드가 없음.
+            # --disable-http2: Akamai가 HTTP/2 스트림 리셋(ERR_HTTP2_PROTOCOL_ERROR) → HTTP/1.1 강제
+            # --disable-dev-shm-usage: docker 기본 /dev/shm(64MB) 부족 시 Chrome 크래시 방지
+            browser = await p.chromium.launch(
+                headless=self.headless,
+                args=["--disable-http2", "--disable-dev-shm-usage"],
+            )
             try:
                 page = await browser.new_page()
                 # KAL 페이지 로드 → Akamai _abck 센서 자동 풀이

@@ -20,7 +20,8 @@ class KalBonusCrawler(BaseCrawler):
     name = "kal_bonus"
     detail = "보너스 좌석 현황 (대상: crawl_sources kal_bonus config)"
 
-    def __init__(self, db: Database, headless: bool = True):
+    # Akamai가 headless Chrome을 차단 → 항상 headful (docker는 xvfb로 구동)
+    def __init__(self, db: Database, headless: bool = False):
         super().__init__(db)
         self._headless = headless
 
