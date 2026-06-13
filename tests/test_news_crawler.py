@@ -53,9 +53,16 @@ async def test_crawler_stores_articles(db):
     assert rows[0]["summary_status"] == "pending"
     assert rows[0]["normalized_url"] is not None
 
-    # crawl_logs에 crawler_detail='rss' 기록 확인
+    # crawl_data(system/crawl_run)에 crawler_detail='rss' 기록 확인
     logs = await db.fetch(
-        "SELECT * FROM crawl_logs WHERE crawler='news' ORDER BY started_at DESC LIMIT 1"
+        "SELECT response FROM crawl_data "
+        "WHERE category='system' AND purpose='crawl_run' "
+        "  AND response->>'crawler'='news' "
+        "ORDER BY date_at DESC LIMIT 1"
     )
     assert len(logs) == 1
-    assert logs[0]["crawler_detail"] == "rss"
+    resp = logs[0]["response"]
+    if isinstance(resp, str):
+        import json
+        resp = json.loads(resp)
+    assert resp["crawler_detail"] == "rss"

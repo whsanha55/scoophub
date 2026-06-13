@@ -7,6 +7,8 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import TYPE_CHECKING
 
+from app.crawl_data.repo import CrawlDataRepo
+
 if TYPE_CHECKING:
     from app.core.database import Database
 
@@ -62,16 +64,22 @@ class BaseCrawler(ABC):
     async def _log_crawl(
         self, status: str, result: CrawlResult, started_at: datetime
     ) -> None:
+        # crawl_logs → generic crawl_data(category=system, purpose=crawl_run).
+        # append-only 히스토리 보존: key를 run마다 고유(name|detail|started_at)하게 →
+        # upsert의 ON CONFLICT가 발생하지 않아 사실상 insert로 동작.
         finished_at = datetime.now(timezone.utc)
-        await self.db.execute(
-            "INSERT INTO crawl_logs (crawler, crawler_detail, status, items_fetched, items_new, error_message, started_at, finished_at) "
-            "VALUES ($1, $2, $3, $4, $5, $6, $7, $8)",
-            self.name,
-            self.detail,
-            status,
-            result.items_fetched,
-            result.items_new,
-            "; ".join(result.errors) if result.errors else None,
-            started_at,
-            finished_at,
+        await CrawlDataRepo(self.db).upsert(
+            category="system",
+            purpose="crawl_run",
+            key=f"{self.name}|{self.detail}|{started_at.isoformat()}",
+            response={
+                "crawler": self.name,
+                "crawler_detail": self.detail,
+                "status": status,
+                "items_fetched": result.items_fetched,
+                "items_new": result.items_new,
+                "error_message": "; ".join(result.errors) if result.errors else None,
+                "finished_at": finished_at.isoformat(),
+            },
+            date_at=started_at,
         )
