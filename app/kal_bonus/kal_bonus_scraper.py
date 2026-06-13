@@ -93,19 +93,30 @@ class KalBonusScraper:
     Playwright는 라이브 크롤 시점에 lazy import (테스트/CI 환경 의존 분리).
     """
 
-    def __init__(self, db: Database, *, headless: bool = True):
+    def __init__(
+        self,
+        db: Database,
+        *,
+        headless: bool = True,
+        departure: str = DEPARTURE,
+        routes: list[tuple[str, str]] | None = None,
+        months: list[str] | None = None,
+    ):
         self.db = db
         self.repo = CrawlDataRepo(db)
         self.headless = headless
+        self.departure = departure
+        self.routes = routes if routes is not None else list(ROUTES)
+        self.months = months if months is not None else list(TARGET_MONTHS)
 
     async def fetch_and_store(self) -> dict[str, int]:
-        """30개(10노선×3월) 조합 크롤 → crawl_data upsert. 결과 카운트 반환."""
+        """(노선 × 월) 조합 크롤 → crawl_data upsert. 결과 카운트 반환."""
         # in-page fetch 결과를 이 메서드로 끌어올인 뒤 저장.
         # Playwright 세션 수명은 이 안에서만.
         targets = [
-            (DEPARTURE, arr, ym)
-            for arr, _city in ROUTES
-            for ym in TARGET_MONTHS
+            (self.departure, arr, ym)
+            for arr, _city in self.routes
+            for ym in self.months
         ]
         raws = await self._crawl_all(targets)
         stored = 0
