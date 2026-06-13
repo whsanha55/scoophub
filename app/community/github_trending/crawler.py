@@ -8,6 +8,7 @@ from datetime import datetime, timezone
 from gtrending import fetch_repos
 
 from app.core.base_crawler import BaseCrawler, CrawlResult
+from app.crawl_data.repo import CrawlDataRepo
 
 logger = logging.getLogger(__name__)
 
@@ -41,39 +42,38 @@ class GithubTrendingCrawler(BaseCrawler):
         repos = repos[: self.max_repos]
         fetched_at = datetime.now(timezone.utc)
 
-        # 기존 URL 집합 조회 (new 판별용)
+        # community_github → crawl_data(category=community, purpose=github, key=url).
         urls = [r.get("url", "") for r in repos if r.get("url")]
         existing = await self.db.fetch(
-            "SELECT url FROM community_github WHERE url = ANY($1)",
+            "SELECT key FROM crawl_data "
+            "WHERE category='community' AND purpose='github' AND key = ANY($1)",
             urls,
         )
-        existing_urls = {r["url"] for r in existing}
+        existing_urls = {r["key"] for r in existing}
         items_new = 0
+        repo_store = CrawlDataRepo(self.db)
 
         for repo in repos:
             url = repo.get("url", "")
             try:
-                await self.db.execute(
-                    "INSERT INTO community_github "
-                    "(fullname, author, name, url, description, language, stars, forks, "
-                    "current_period_stars, period, fetched_at) "
-                    "VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) "
-                    "ON CONFLICT (url) DO UPDATE SET "
-                    "stars = EXCLUDED.stars, "
-                    "forks = EXCLUDED.forks, "
-                    "current_period_stars = EXCLUDED.current_period_stars, "
-                    "fetched_at = EXCLUDED.fetched_at",
-                    repo.get("fullname", f"{repo.get('author', '')}/{repo.get('name', '')}"),
-                    repo.get("author", ""),
-                    repo.get("name", ""),
-                    url,
-                    repo.get("description"),
-                    repo.get("language"),
-                    repo.get("stars", 0),
-                    repo.get("forks", 0),
-                    repo.get("currentPeriodStars", 0),
-                    self.since,
-                    fetched_at,
+                await repo_store.upsert(
+                    category="community",
+                    purpose="github",
+                    key=url,
+                    response={
+                        "fullname": repo.get("fullname", f"{repo.get('author', '')}/{repo.get('name', '')}"),
+                        "author": repo.get("author", ""),
+                        "name": repo.get("name", ""),
+                        "url": url,
+                        "description": repo.get("description"),
+                        "language": repo.get("language"),
+                        "stars": repo.get("stars", 0),
+                        "forks": repo.get("forks", 0),
+                        "current_period_stars": repo.get("currentPeriodStars", 0),
+                        "period": self.since,
+                        "fetched_at": fetched_at.isoformat(),
+                    },
+                    date_at=fetched_at,
                 )
                 if url not in existing_urls:
                     items_new += 1
