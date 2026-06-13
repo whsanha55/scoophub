@@ -6,7 +6,7 @@ import pytest
 async def test_full_news_flow(client, db):
     """Insert via DB, retrieve via API."""
     await db.execute(
-        "INSERT INTO news_articles (source, title, url, category, importance) "
+        "INSERT INTO feed_news (source, title, url, category, importance) "
         "VALUES ($1, $2, $3, $4, $5)",
         "test",
         "통합테스트 대통령 연설",
@@ -49,7 +49,7 @@ async def test_full_weather_flow(client, db):
 @pytest.mark.asyncio
 async def test_health_with_data(client, db):
     await db.execute(
-        "INSERT INTO news_articles (source, title, url, category, importance) "
+        "INSERT INTO feed_news (source, title, url, category, importance) "
         "VALUES ($1, $2, $3, $4, $5)",
         "test",
         "Health test",

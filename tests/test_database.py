@@ -13,7 +13,7 @@ async def test_create_tables(db):
             "WHERE table_schema='public' ORDER BY table_name"
         )
     table_names = [t["table_name"] for t in tables]
-    assert "news_articles" in table_names
+    assert "feed_news" in table_names
     assert "weather_snapshots" in table_names
     assert "crawler_metadata" in table_names
     assert "crawl_logs" in table_names
@@ -25,7 +25,7 @@ async def test_insert_news_article(db):
     pool = await db.pool
     async with pool.acquire() as conn:
         row = await conn.fetchrow(
-            "INSERT INTO news_articles (source, title, url) "
+            "INSERT INTO feed_news (source, title, url) "
             "VALUES ($1, $2, $3) RETURNING *",
             "test_source",
             "Test Title",
@@ -42,7 +42,7 @@ async def test_duplicate_url_rejected(db):
     pool = await db.pool
     async with pool.acquire() as conn:
         await conn.execute(
-            "INSERT INTO news_articles (source, title, url) "
+            "INSERT INTO feed_news (source, title, url) "
             "VALUES ($1, $2, $3)",
             "src",
             "t1",
@@ -50,7 +50,7 @@ async def test_duplicate_url_rejected(db):
         )
         with pytest.raises(Exception):
             await conn.execute(
-                "INSERT INTO news_articles (source, title, url) "
+                "INSERT INTO feed_news (source, title, url) "
                 "VALUES ($1, $2, $3)",
                 "src",
                 "t2",
