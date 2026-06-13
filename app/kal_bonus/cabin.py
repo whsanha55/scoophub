@@ -15,9 +15,6 @@ CABIN_LABELS: dict[str, str] = {
     "Ø": "운항편 없음",
 }
 
-# 보너스 좌석 "가용" 신호로 의미있는 등급(Ø 제외)
-BONUS_CABIN_CODES = tuple(c for c in CABIN_LABELS if c != "Ø")
-
 
 def map_cabin(front_booking_class: str | None) -> str:
     """frontBookingClass 코드 → cabin_label. 미정의 코드는 원문 그대로 반환."""

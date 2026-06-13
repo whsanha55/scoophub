@@ -1,4 +1,4 @@
-# app/kal_bonus/scraper.py
+# app/kal_bonus/kal_bonus_scraper.py
 """대한항공 보너스 좌석 크롤러.
 
 Playwright real Chrome(`channel='chrome'`)으로 Akamai 센서를 푼 뒤,
