@@ -71,6 +71,15 @@ async def db():
     await database.close()
 
 
+@pytest.fixture(autouse=True)
+def _disable_auth_bypass(monkeypatch):
+    """AUTH_BYPASS는 로컬 .env(true)에 영향받지 않도록 테스트에선 항상 False.
+
+    인증 강제 케이스(test_auth)가 .env AUTH_BYPASS=true로 우회되지 않게 격리.
+    """
+    monkeypatch.setattr(settings, "AUTH_BYPASS", False)
+
+
 @pytest_asyncio.fixture
 async def client(db):
     """FastAPI test client with clean DB state."""
