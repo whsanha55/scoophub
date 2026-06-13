@@ -9,4 +9,4 @@ CREATE TABLE users (
     created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX idx_users_email ON users (email);
+-- email UNIQUE 제약이 자동 unique index를 생성하므로 별도 인덱스 불필요

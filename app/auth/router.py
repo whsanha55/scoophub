@@ -67,7 +67,14 @@ async def callback(
             detail="invalid oauth state",
         )
 
-    userinfo = await auth.exchange_code(code)
+    try:
+        userinfo = await auth.exchange_code(code)
+    except Exception as e:
+        logger.warning("oauth code exchange failed: %s", e)
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="oauth provider error",
+        )
     email = userinfo.get("email")
     if not email:
         raise HTTPException(

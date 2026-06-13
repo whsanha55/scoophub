@@ -57,6 +57,14 @@ def create_app(db: Database | None = None) -> FastAPI:
     async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         await _db.initialize()
         logger.info("Database initialized")
+
+        # 보안: 기본/빈 JWT_SECRET 경고 — 운영에선 강력한 난수 필수
+        if not settings.JWT_SECRET or settings.JWT_SECRET == "dev-secret-change-me":
+            logger.warning(
+                "JWT_SECRET is insecure (default or empty) — "
+                "set a strong random JWT_SECRET in production"
+            )
+
         if settings.ENABLE_SCHEDULER:
             scheduler.start()
             logger.info("Scheduler started")
