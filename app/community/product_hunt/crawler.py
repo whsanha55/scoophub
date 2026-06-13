@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 import logging
 from datetime import datetime, timezone
 
@@ -8,6 +7,7 @@ import httpx
 
 from app.config import settings
 from app.core.base_crawler import BaseCrawler, CrawlResult
+from app.crawl_data.repo import CrawlDataRepo
 
 logger = logging.getLogger(__name__)
 
@@ -93,49 +93,49 @@ class ProductHuntCrawler(BaseCrawler):
         if not edges:
             return CrawlResult(items_fetched=0, items_new=0, errors=errors)
 
-        # 기존 ph_id 집합
-        ph_ids = [edge["node"]["id"] for edge in edges if edge.get("node")]
+        # community_producthunt → crawl_data(category=community, purpose=producthunt, key=ph_id).
+        ph_ids = [str(edge["node"]["id"]) for edge in edges if edge.get("node")]
         existing = await self.db.fetch(
-            "SELECT ph_id FROM community_producthunt WHERE ph_id = ANY($1)",
+            "SELECT key FROM crawl_data "
+            "WHERE category='community' AND purpose='producthunt' AND key = ANY($1)",
             ph_ids,
         )
-        existing_ids = {r["ph_id"] for r in existing}
+        existing_ids = {r["key"] for r in existing}
         items_new = 0
+        repo = CrawlDataRepo(self.db)
 
         for edge in edges:
             node = edge.get("node")
             if not node:
                 continue
             try:
-                topics = json.dumps([
+                topics = [
                     t["node"]["name"] for t in (node.get("topics", {}).get("edges") or [])
-                ])
+                ]
                 posted_at = datetime.fromisoformat(node["createdAt"].replace("Z", "+00:00")) if node.get("createdAt") else fetched_at
                 featured_at = datetime.fromisoformat(node["featuredAt"].replace("Z", "+00:00")) if node.get("featuredAt") else None
 
-                await self.db.execute(
-                    "INSERT INTO community_producthunt "
-                    "(ph_id, name, tagline, slug, ph_url, website_url, "
-                    "votes_count, comments_count, topics, featured_at, posted_at, fetched_at) "
-                    "VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) "
-                    "ON CONFLICT (ph_id) DO UPDATE SET "
-                    "votes_count = EXCLUDED.votes_count, "
-                    "comments_count = EXCLUDED.comments_count, "
-                    "fetched_at = EXCLUDED.fetched_at",
-                    node["id"],
-                    node.get("name", ""),
-                    node.get("tagline"),
-                    node.get("slug", ""),
-                    node.get("url", ""),
-                    node.get("website"),
-                    node.get("votesCount", 0),
-                    node.get("commentsCount", 0),
-                    topics,
-                    featured_at,
-                    posted_at,
-                    fetched_at,
+                await repo.upsert(
+                    category="community",
+                    purpose="producthunt",
+                    key=str(node["id"]),
+                    response={
+                        "ph_id": node["id"],
+                        "name": node.get("name", ""),
+                        "tagline": node.get("tagline"),
+                        "slug": node.get("slug", ""),
+                        "ph_url": node.get("url", ""),
+                        "website_url": node.get("website"),
+                        "votes_count": node.get("votesCount", 0),
+                        "comments_count": node.get("commentsCount", 0),
+                        "topics": topics,
+                        "featured_at": featured_at.isoformat() if featured_at else None,
+                        "posted_at": posted_at.isoformat(),
+                        "fetched_at": fetched_at.isoformat(),
+                    },
+                    date_at=posted_at,
                 )
-                if node["id"] not in existing_ids:
+                if str(node["id"]) not in existing_ids:
                     items_new += 1
             except Exception as e:
                 errors.append(f"{node.get('id', '?')}: {e}")

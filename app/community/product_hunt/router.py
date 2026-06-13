@@ -1,7 +1,9 @@
 # product_hunt/router.py
 from __future__ import annotations
 
+import json
 import logging
+from datetime import datetime
 
 from fastapi import Depends, Query
 
@@ -54,23 +56,58 @@ async def get_product_hunt(
 ):
     logger.info("get_product_hunt requested: limit=%d topic=%s since=%s", limit, topic, since)
 
-    latest = await _base.get_latest(db)
+    # community_producthunt → crawl_data(category=community, purpose=producthunt).
+    latest = await db.fetchval(
+        "SELECT MAX((response->>'fetched_at')::timestamptz) FROM crawl_data "
+        "WHERE category='community' AND purpose='producthunt'"
+    )
     if not latest:
         return _base.empty_response()
 
-    conditions: list[str] = ["fetched_at = $1"]
+    conditions: list[str] = ["(response->>'fetched_at')::timestamptz = $1"]
     params: list = [latest]
     idx = 2
 
     if topic is not None:
-        conditions.append(f"topics::text LIKE ${idx}")
-        params.append(f'%"{topic}"%')
+        conditions.append(f"response->'topics' @> ${idx}::jsonb")
+        params.append(f'["{topic}"]')
         idx += 1
 
     if since is not None:
-        conditions.append(f"posted_at >= ${idx}")
-        params.append(since)
+        since_dt = datetime.fromisoformat(since.replace("Z", "+00:00"))
+        conditions.append(f"(response->>'posted_at')::timestamptz >= ${idx}")
+        params.append(since_dt)
         idx += 1
 
-    items = await _base.query_items(db, conditions, params, limit)
+    where = " AND ".join(conditions)
+    rows = await db.fetch(
+        f"SELECT id, key, date_at, response "
+        f"FROM crawl_data "
+        f"WHERE category='community' AND purpose='producthunt' AND {where} "
+        f"ORDER BY (response->>'votes_count')::int DESC NULLS LAST LIMIT ${idx}",
+        *params, limit,
+    )
+    items = [_ph_item(r) for r in rows]
     return _base.items_response(items)
+
+
+def _ph_item(row) -> dict:
+    """crawl_data row → 기존 community_producthunt 응답 필드로 재구성."""
+    resp = row["response"]
+    if isinstance(resp, str):
+        resp = json.loads(resp)
+    return {
+        "id": row["id"],
+        "ph_id": resp.get("ph_id"),
+        "name": resp.get("name"),
+        "tagline": resp.get("tagline"),
+        "slug": resp.get("slug"),
+        "ph_url": resp.get("ph_url"),
+        "website_url": resp.get("website_url"),
+        "votes_count": resp.get("votes_count", 0),
+        "comments_count": resp.get("comments_count", 0),
+        "topics": resp.get("topics", []),
+        "featured_at": resp.get("featured_at"),
+        "posted_at": resp.get("posted_at"),
+        "fetched_at": resp.get("fetched_at"),
+    }
