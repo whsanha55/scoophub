@@ -7,12 +7,13 @@ from datetime import datetime
 from fastapi import APIRouter, Depends, Query
 from fastapi.responses import JSONResponse
 
+from app.core.auth import get_current_user
 from app.core.database import Database
 from app.core.models import ApiResponse, ErrorDetail
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/api")
+router = APIRouter(prefix="/api", dependencies=[Depends(get_current_user)])
 
 
 def _get_db() -> Database:

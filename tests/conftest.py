@@ -7,6 +7,7 @@ import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
 
 from app.config import settings
+from app.core.auth import get_current_user
 from app.core.database import Database
 
 # Tests run against a DEDICATED database so they never touch dev data.
@@ -17,8 +18,8 @@ TEST_DB_URL = (
 )
 
 TRUNCATE_SQL = (
-    "TRUNCATE news_articles, weather_snapshots, crawl_logs, "
-    "crawler_metadata, crawl_sources RESTART IDENTITY CASCADE"
+    "TRUNCATE feed_news, weather_snapshots, crawl_logs, "
+    "crawler_metadata, crawl_sources, users RESTART IDENTITY CASCADE"
 )
 
 _MIGRATION_DIR = pathlib.Path(__file__).resolve().parent.parent / "db" / "migration"
@@ -51,7 +52,7 @@ async def _ensure_schema(database: Database) -> None:
         return
     pool = await database.pool
     async with pool.acquire() as conn:
-        already = await conn.fetchval("SELECT to_regclass('public.news_articles')")
+        already = await conn.fetchval("SELECT to_regclass('public.feed_news')")
         if already is None:
             for sql_file in sorted(_MIGRATION_DIR.glob("V*.sql")):
                 await conn.execute(sql_file.read_text(encoding="utf-8"))
@@ -76,6 +77,11 @@ async def client(db):
     from app.main import create_app
 
     app = create_app(db=db)
+    # 인증 의존성 우회 — 기존 도메인 테스트는 토큰 없이 동작
+    app.dependency_overrides[get_current_user] = lambda: {
+        "email": "test@example.com",
+        "is_super": True,
+    }
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as ac:
         pool = await db.pool
