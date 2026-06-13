@@ -18,6 +18,7 @@ from app.core.database import Database
 logger = logging.getLogger(__name__)
 
 # 도메인 wiring 모듈 — 새 도메인 추가 시 여기에 한 줄
+from app.auth import wiring as auth_wiring
 from app.system import wiring as system_wiring
 from app.weather import wiring as weather_wiring
 from app.stock import wiring as stock_wiring
@@ -35,7 +36,7 @@ from app.feed.devto_hashnode import wiring as devto_hashnode_wiring
 from app.feed.arxiv import wiring as arxiv_wiring
 from app.feed.youtube_trending import wiring as youtube_trending_wiring
 
-DOMAINS = [news_wiring, weather_wiring, stock_wiring, github_trending_wiring, hacker_news_wiring, arxiv_wiring, product_hunt_wiring, reddit_wiring, youtube_trending_wiring, devto_hashnode_wiring, tech_newsletter_wiring, system_wiring]
+DOMAINS = [news_wiring, weather_wiring, stock_wiring, github_trending_wiring, hacker_news_wiring, arxiv_wiring, product_hunt_wiring, reddit_wiring, youtube_trending_wiring, devto_hashnode_wiring, tech_newsletter_wiring, system_wiring, auth_wiring]
 
 
 def create_app(db: Database | None = None) -> FastAPI:
@@ -56,6 +57,14 @@ def create_app(db: Database | None = None) -> FastAPI:
     async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         await _db.initialize()
         logger.info("Database initialized")
+
+        # 보안: 기본/빈 JWT_SECRET 경고 — 운영에선 강력한 난수 필수
+        if not settings.JWT_SECRET or settings.JWT_SECRET == "dev-secret-change-me":
+            logger.warning(
+                "JWT_SECRET is insecure (default or empty) — "
+                "set a strong random JWT_SECRET in production"
+            )
+
         if settings.ENABLE_SCHEDULER:
             scheduler.start()
             logger.info("Scheduler started")
@@ -80,7 +89,8 @@ def create_app(db: Database | None = None) -> FastAPI:
 
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["*"],
+        allow_origins=settings.cors_origins,
+        allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
     )

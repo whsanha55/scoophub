@@ -5,6 +5,7 @@ import json
 import logging
 import re
 from typing import TYPE_CHECKING
+from difflib import SequenceMatcher
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 if TYPE_CHECKING:
@@ -69,6 +70,24 @@ def normalize_url(url: str) -> str:
     normalized = urlunsplit((scheme, netloc, path, query, ""))
     logger.info("normalize_url 완료 - normalized=%s", normalized)
     return normalized
+
+
+def is_duplicate_title(
+    title: str, recent_titles: list[str], threshold: float = 0.85
+) -> bool:
+    """제목 유사도 기반 중복 판별.
+
+    recent_titles 중 하나라도 threshold 이상 유사하면 True.
+    유사도는 difflib.SequenceMatcher 비율(0~1) 사용.
+    """
+    if not recent_titles:
+        return False
+    title = (title or "").strip()
+    for recent in recent_titles:
+        ratio = SequenceMatcher(None, title, (recent or "").strip()).ratio()
+        if ratio >= threshold:
+            return True
+    return False
 
 
 async def llm_dedup(

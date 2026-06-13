@@ -15,7 +15,7 @@ async def test_get_news_empty(client):
 @pytest.mark.asyncio
 async def test_get_news_with_data(client, db):
     await db.execute(
-        "INSERT INTO news_articles (source, title, url, category, importance) "
+        "INSERT INTO feed_news (source, title, url, category, importance) "
         "VALUES ($1, $2, $3, $4, $5)",
         "test",
         "Test Article",
@@ -33,7 +33,7 @@ async def test_get_news_with_data(client, db):
 @pytest.mark.asyncio
 async def test_get_news_by_minutes(client, db):
     await db.execute(
-        "INSERT INTO news_articles (source, title, url, created_at, category, importance) "
+        "INSERT INTO feed_news (source, title, url, created_at, category, importance) "
         "VALUES ($1, $2, $3, NOW() - interval '60 minutes', $4, $5)",
         "test",
         "Old Article",
@@ -42,7 +42,7 @@ async def test_get_news_by_minutes(client, db):
         2,
     )
     await db.execute(
-        "INSERT INTO news_articles (source, title, url, created_at, category, importance) "
+        "INSERT INTO feed_news (source, title, url, created_at, category, importance) "
         "VALUES ($1, $2, $3, NOW(), $4, $5)",
         "test",
         "Recent Article",
@@ -61,7 +61,7 @@ async def test_get_news_by_minutes(client, db):
 @pytest.mark.asyncio
 async def test_get_news_by_id(client, db):
     row = await db.fetchrow(
-        "INSERT INTO news_articles (source, title, url, category, importance) "
+        "INSERT INTO feed_news (source, title, url, category, importance) "
         "VALUES ($1, $2, $3, $4, $5) RETURNING id",
         "test",
         "Single Article",
