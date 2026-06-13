@@ -1,7 +1,9 @@
 # devto_hashnode/router.py
 from __future__ import annotations
 
+import json
 import logging
+from datetime import datetime
 
 from fastapi import Depends, Query
 
@@ -54,23 +56,59 @@ async def get_devto_hashnode(
 ):
     logger.info("get_devto_hashnode requested: limit=%d tag=%s since=%s", limit, tag, since)
 
-    latest = await _base.get_latest(db)
+    # feed_devblog → crawl_data(category=feed, purpose=devblog).
+    # 최신 배치 = response.fetched_at(크롤 run 단일 타임스탬프)의 MAX.
+    latest = await db.fetchval(
+        "SELECT MAX((response->>'fetched_at')::timestamptz) FROM crawl_data "
+        "WHERE category='feed' AND purpose='devblog'"
+    )
     if not latest:
         return _base.empty_response()
 
-    conditions: list[str] = ["fetched_at = $1"]
+    conditions: list[str] = ["(response->>'fetched_at')::timestamptz = $1"]
     params: list = [latest]
     idx = 2
 
     if tag is not None:
-        conditions.append(f"tags @> ${idx}::jsonb")
+        conditions.append(f"response->'tags' @> ${idx}::jsonb")
         params.append(f'["{tag}"]')
         idx += 1
 
     if since is not None:
-        conditions.append(f"published_at >= ${idx}")
-        params.append(since)
+        since_dt = datetime.fromisoformat(since.replace("Z", "+00:00"))
+        conditions.append(f"(response->>'published_at')::timestamptz >= ${idx}")
+        params.append(since_dt)
         idx += 1
 
-    items = await _base.query_items(db, conditions, params, limit)
+    where = " AND ".join(conditions)
+    rows = await db.fetch(
+        f"SELECT id, key, date_at, response "
+        f"FROM crawl_data "
+        f"WHERE category='feed' AND purpose='devblog' AND {where} "
+        f"ORDER BY (response->>'reactions_count')::int DESC NULLS LAST LIMIT ${idx}",
+        *params, limit,
+    )
+    items = [_devblog_item(r) for r in rows]
     return _base.items_response(items)
+
+
+def _devblog_item(row) -> dict:
+    """crawl_data row → 기존 feed_devblog 응답 필드로 재구성."""
+    resp = row["response"]
+    if isinstance(resp, str):
+        resp = json.loads(resp)
+    return {
+        "id": row["id"],
+        "article_id": resp.get("article_id"),
+        "title": resp.get("title"),
+        "url": resp.get("url"),
+        "author": resp.get("author"),
+        "description": resp.get("description"),
+        "reactions_count": resp.get("reactions_count", 0),
+        "comments_count": resp.get("comments_count", 0),
+        "reading_time": resp.get("reading_time"),
+        "tags": resp.get("tags", []),
+        "source": resp.get("source"),
+        "published_at": resp.get("published_at"),
+        "fetched_at": resp.get("fetched_at"),
+    }
