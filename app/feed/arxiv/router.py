@@ -1,7 +1,9 @@
 # arxiv/router.py
 from __future__ import annotations
 
+import json
 import logging
+from datetime import datetime
 
 from fastapi import Depends, Query
 
@@ -57,28 +59,64 @@ async def get_arxiv(
 ):
     logger.info("get_arxiv requested: category=%s since=%s query=%s limit=%d", category, since, query, limit)
 
-    latest = await _base.get_latest(db)
+    # feed_arxiv → crawl_data(category=feed, purpose=arxiv).
+    latest = await db.fetchval(
+        "SELECT MAX((response->>'fetched_at')::timestamptz) FROM crawl_data "
+        "WHERE category='feed' AND purpose='arxiv'"
+    )
     if not latest:
         return _base.empty_response()
 
-    conditions: list[str] = ["fetched_at = $1"]
+    conditions: list[str] = ["(response->>'fetched_at')::timestamptz = $1"]
     params: list = [latest]
     idx = 2
 
     if category is not None:
-        conditions.append(f"primary_category = ${idx}")
+        conditions.append(f"response->>'primary_category' = ${idx}")
         params.append(category)
         idx += 1
 
     if since is not None:
-        conditions.append(f"published_at >= ${idx}")
-        params.append(since)
+        since_dt = datetime.fromisoformat(since.replace("Z", "+00:00"))
+        conditions.append(f"(response->>'published_at')::timestamptz >= ${idx}")
+        params.append(since_dt)
         idx += 1
 
     if query is not None:
-        conditions.append(f"title ILIKE ${idx}")
+        conditions.append(f"response->>'title' ILIKE ${idx}")
         params.append(f"%{query}%")
         idx += 1
 
-    items = await _base.query_items(db, conditions, params, limit)
+    where = " AND ".join(conditions)
+    rows = await db.fetch(
+        f"SELECT id, key, date_at, response "
+        f"FROM crawl_data "
+        f"WHERE category='feed' AND purpose='arxiv' AND {where} "
+        f"ORDER BY date_at DESC NULLS LAST LIMIT ${idx}",
+        *params, limit,
+    )
+    items = [_arxiv_item(r) for r in rows]
     return _base.items_response(items)
+
+
+def _arxiv_item(row) -> dict:
+    """crawl_data row → 기존 feed_arxiv 응답 필드로 재구성."""
+    resp = row["response"]
+    if isinstance(resp, str):
+        resp = json.loads(resp)
+    return {
+        "id": row["id"],
+        "arxiv_id": resp.get("arxiv_id"),
+        "title": resp.get("title"),
+        "authors": resp.get("authors", []),
+        "summary": resp.get("summary"),
+        "primary_category": resp.get("primary_category"),
+        "categories": resp.get("categories", []),
+        "pdf_url": resp.get("pdf_url"),
+        "abstract_url": resp.get("abstract_url"),
+        "published_at": resp.get("published_at"),
+        "updated_at": resp.get("updated_at"),
+        "author_comment": resp.get("author_comment"),
+        "journal_ref": resp.get("journal_ref"),
+        "fetched_at": resp.get("fetched_at"),
+    }

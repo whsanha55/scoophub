@@ -1,5 +1,4 @@
 # tests/test_weather_crawler.py
-import json
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 from app.weather.crawler import WeatherCrawler
@@ -61,7 +60,15 @@ async def test_weather_crawler_stores_snapshot(db):
     assert result is not None
     assert result.items_fetched >= 1
 
-    rows = await db.fetch("SELECT * FROM weather_snapshots ORDER BY id DESC LIMIT 1")
+    rows = await db.fetch(
+        "SELECT response FROM crawl_data "
+        "WHERE category='weather' AND purpose='snapshot' AND key='seoul' "
+        "ORDER BY date_at DESC LIMIT 1"
+    )
     assert len(rows) == 1
-    assert rows[0]["temperature"] == 22.0
-    assert rows[0]["condition"] == "가벼운 비"
+    import json as _json
+    resp = rows[0]["response"]
+    if isinstance(resp, str):
+        resp = _json.loads(resp)
+    assert resp["temperature"] == 22.0
+    assert resp["condition"] == "가벼운 비"

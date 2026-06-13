@@ -1,13 +1,13 @@
 # feed_devblog/crawler.py
 from __future__ import annotations
 
-import json
 import logging
 from datetime import datetime, timezone
 
 import httpx
 
 from app.core.base_crawler import BaseCrawler, CrawlResult
+from app.crawl_data.repo import CrawlDataRepo
 
 logger = logging.getLogger(__name__)
 
@@ -55,43 +55,42 @@ class DevtoHashnodeCrawler(BaseCrawler):
                 seen_ids.add(aid)
                 unique_items.append(item)
 
-        # 기존 article_id 집합
-        article_ids = list(seen_ids)
+        # feed_devblog → crawl_data(category=feed, purpose=devblog, key=article_id).
+        article_ids = [str(aid) for aid in seen_ids]
         existing = await self.db.fetch(
-            "SELECT article_id FROM feed_devblog WHERE article_id = ANY($1)",
+            "SELECT key FROM crawl_data "
+            "WHERE category='feed' AND purpose='devblog' AND key = ANY($1)",
             article_ids,
         )
-        existing_ids = {r["article_id"] for r in existing}
+        existing_ids = {r["key"] for r in existing}
         items_new = 0
+        repo = CrawlDataRepo(self.db)
 
         for item in unique_items:
             try:
-                tags = json.dumps(item.get("tag_list", []))
                 published_at = datetime.fromisoformat(item["published_at"].replace("Z", "+00:00")) if item.get("published_at") else fetched_at
 
-                await self.db.execute(
-                    "INSERT INTO feed_devblog "
-                    "(article_id, title, url, author, description, reactions_count, "
-                    "comments_count, reading_time, tags, source, published_at, fetched_at) "
-                    "VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) "
-                    "ON CONFLICT (article_id) DO UPDATE SET "
-                    "reactions_count = EXCLUDED.reactions_count, "
-                    "comments_count = EXCLUDED.comments_count, "
-                    "fetched_at = EXCLUDED.fetched_at",
-                    item["id"],
-                    item.get("title", ""),
-                    item.get("url", ""),
-                    item.get("user", {}).get("name") or item.get("user", {}).get("username"),
-                    item.get("description"),
-                    item.get("public_reactions_count", 0),
-                    item.get("comments_count", 0),
-                    item.get("reading_time"),
-                    tags,
-                    "devto",
-                    published_at,
-                    fetched_at,
+                await repo.upsert(
+                    category="feed",
+                    purpose="devblog",
+                    key=str(item["id"]),
+                    response={
+                        "article_id": item["id"],
+                        "title": item.get("title", ""),
+                        "url": item.get("url", ""),
+                        "author": item.get("user", {}).get("name") or item.get("user", {}).get("username"),
+                        "description": item.get("description"),
+                        "reactions_count": item.get("public_reactions_count", 0),
+                        "comments_count": item.get("comments_count", 0),
+                        "reading_time": item.get("reading_time"),
+                        "tags": item.get("tag_list", []),
+                        "source": "devto",
+                        "published_at": published_at.isoformat(),
+                        "fetched_at": fetched_at.isoformat(),
+                    },
+                    date_at=published_at,
                 )
-                if item["id"] not in existing_ids:
+                if str(item["id"]) not in existing_ids:
                     items_new += 1
             except Exception as e:
                 errors.append(f"{item.get('id', '?')}: {e}")

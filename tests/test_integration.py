@@ -29,13 +29,15 @@ async def test_full_news_flow(client, db):
 @pytest.mark.asyncio
 async def test_full_weather_flow(client, db):
     """Insert weather, retrieve via API."""
-    await db.execute(
-        "INSERT INTO weather_snapshots (location, fetched_at, temperature, humidity, condition) "
-        "VALUES ($1, NOW(), $2, $3, $4)",
-        "seoul",
-        25.0,
-        60,
-        "맑음",
+    from datetime import datetime, timezone
+    from app.crawl_data.repo import CrawlDataRepo
+
+    await CrawlDataRepo(db).upsert(
+        category="weather", purpose="snapshot", key="seoul",
+        response={"location": "seoul", "fetched_at": datetime.now(timezone.utc).isoformat(),
+                  "temperature": 25.0, "humidity": 60, "condition": "맑음",
+                  "weekly_forecast": []},
+        date_at=datetime.now(timezone.utc),
     )
     resp = await client.get("/api/weather")
     assert resp.json()["success"] is True

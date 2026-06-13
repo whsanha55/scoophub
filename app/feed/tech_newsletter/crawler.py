@@ -8,6 +8,7 @@ from datetime import datetime, timezone
 import feedparser
 
 from app.core.base_crawler import BaseCrawler, CrawlResult
+from app.crawl_data.repo import CrawlDataRepo
 
 logger = logging.getLogger(__name__)
 
@@ -67,33 +68,35 @@ class TechNewsletterCrawler(BaseCrawler):
         if not all_entries:
             return CrawlResult(items_fetched=0, items_new=0, errors=errors)
 
-        # 기존 URL 집합
+        # feed_newsletter → crawl_data(category=feed, purpose=newsletter, key=url).
         urls = [e["url"] for e in all_entries if e["url"]]
         existing = await self.db.fetch(
-            "SELECT url FROM feed_newsletter WHERE url = ANY($1)",
+            "SELECT key FROM crawl_data "
+            "WHERE category='feed' AND purpose='newsletter' AND key = ANY($1)",
             urls,
         )
-        existing_urls = {r["url"] for r in existing}
+        existing_urls = {r["key"] for r in existing}
         items_new = 0
+        repo = CrawlDataRepo(self.db)
 
         for entry in all_entries:
             if not entry["url"]:
                 continue
             try:
-                await self.db.execute(
-                    "INSERT INTO feed_newsletter "
-                    "(title, url, source, summary, author, category, published_at, fetched_at) "
-                    "VALUES ($1, $2, $3, $4, $5, $6, $7, $8) "
-                    "ON CONFLICT (url) DO UPDATE SET "
-                    "fetched_at = EXCLUDED.fetched_at",
-                    entry["title"],
-                    entry["url"],
-                    entry["source"],
-                    entry["summary"],
-                    entry["author"],
-                    entry["category"],
-                    entry["published_at"],
-                    fetched_at,
+                await repo.upsert(
+                    category="feed",
+                    purpose="newsletter",
+                    key=entry["url"],
+                    response={
+                        "title": entry["title"],
+                        "source": entry["source"],
+                        "summary": entry["summary"],
+                        "author": entry["author"],
+                        "category": entry["category"],
+                        "published_at": entry["published_at"].isoformat(),
+                        "fetched_at": fetched_at.isoformat(),
+                    },
+                    date_at=entry["published_at"],
                 )
                 if entry["url"] not in existing_urls:
                     items_new += 1

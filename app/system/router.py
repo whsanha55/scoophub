@@ -1,8 +1,8 @@
 # system/router.py
 from __future__ import annotations
 
+import json
 import logging
-from datetime import datetime
 
 from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel, Field
@@ -40,7 +40,9 @@ def get_db() -> Database:
 async def health(db: Database = Depends(get_db)):
     logger.info("health check requested")
     news_count = await db.fetchval("SELECT COUNT(*) FROM feed_news")
-    weather_count = await db.fetchval("SELECT COUNT(*) FROM weather_snapshots")
+    weather_count = await db.fetchval(
+        "SELECT COUNT(*) FROM crawl_data WHERE category='weather' AND purpose='snapshot'"
+    )
     return ApiResponse(
         success=True,
         data={
@@ -104,29 +106,32 @@ async def crawl_logs(
     db: Database = Depends(get_db),
 ):
     logger.info("crawl logs requested: crawler=%s detail=%s limit=%d", crawler, crawler_detail, limit)
-    if crawler and crawler_detail:
-        rows = await db.fetch(
-            "SELECT * FROM crawl_logs WHERE crawler=$1 AND crawler_detail=$2 ORDER BY started_at DESC LIMIT $3",
-            crawler, crawler_detail, limit,
-        )
-    elif crawler:
-        rows = await db.fetch(
-            "SELECT * FROM crawl_logs WHERE crawler=$1 ORDER BY started_at DESC LIMIT $2",
-            crawler, limit,
-        )
-    elif crawler_detail:
-        rows = await db.fetch(
-            "SELECT * FROM crawl_logs WHERE crawler_detail=$1 ORDER BY started_at DESC LIMIT $2",
-            crawler_detail, limit,
-        )
-    else:
-        rows = await db.fetch(
-            "SELECT * FROM crawl_logs ORDER BY started_at DESC LIMIT $1",
-            limit,
-        )
-    logs = [dict(r) for r in rows]
-    for log in logs:
-        for key, val in log.items():
-            if isinstance(val, datetime):
-                log[key] = val.isoformat()
+    # crawl_logs → crawl_data(category=system, purpose=crawl_run).
+    # crawler/crawler_detail 필터는 response JSONB의 ->> 비교로 대체.
+    rows = await db.fetch(
+        "SELECT id, date_at, response "
+        "FROM crawl_data "
+        "WHERE category='system' AND purpose='crawl_run' "
+        "  AND ($1::text IS NULL OR response->>'crawler' = $1) "
+        "  AND ($2::text IS NULL OR response->>'crawler_detail' = $2) "
+        "ORDER BY date_at DESC LIMIT $3",
+        crawler, crawler_detail, limit,
+    )
+    logs = []
+    for r in rows:
+        resp = r["response"]
+        if isinstance(resp, str):
+            resp = json.loads(resp)
+        started_at = r["date_at"]
+        logs.append({
+            "id": r["id"],
+            "crawler": resp.get("crawler"),
+            "crawler_detail": resp.get("crawler_detail", ""),
+            "status": resp.get("status"),
+            "items_fetched": resp.get("items_fetched", 0),
+            "items_new": resp.get("items_new", 0),
+            "error_message": resp.get("error_message"),
+            "started_at": started_at.isoformat() if started_at else None,
+            "finished_at": resp.get("finished_at"),
+        })
     return ApiResponse(success=True, data=logs, meta={"total": len(logs), "returned": len(logs)})

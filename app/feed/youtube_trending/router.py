@@ -1,6 +1,7 @@
 # youtube_trending/router.py
 from __future__ import annotations
 
+import json
 import logging
 
 from fastapi import Depends, Query
@@ -54,22 +55,56 @@ async def get_youtube_trending(
 ):
     logger.info("get_youtube_trending requested: region=%s category=%s limit=%d", region_code, category_id, limit)
 
-    # 최신 fetched_at 기준으로 필터링 (region_code 조건 포함)
-    latest = await db.fetchrow(
-        "SELECT MAX(fetched_at) AS latest FROM feed_youtube WHERE region_code = $1",
+    # feed_youtube → crawl_data(category=feed, purpose=youtube).
+    # region별 최신 배치 = response.fetched_at의 MAX (해당 region).
+    latest = await db.fetchval(
+        "SELECT MAX((response->>'fetched_at')::timestamptz) FROM crawl_data "
+        "WHERE category='feed' AND purpose='youtube' AND response->>'region_code'=$1",
         region_code,
     )
-    if not latest or not latest["latest"]:
+    if not latest:
         return _base.empty_response()
 
-    conditions = ["fetched_at = $1", "region_code = $2"]
-    params: list = [latest["latest"], region_code]
+    conditions = ["(response->>'fetched_at')::timestamptz = $1", "response->>'region_code' = $2"]
+    params: list = [latest, region_code]
     idx = 3
 
     if category_id is not None:
-        conditions.append(f"category_id = ${idx}")
+        conditions.append(f"response->>'category_id' = ${idx}")
         params.append(category_id)
         idx += 1
 
-    items = await _base.query_items(db, conditions, params, limit)
+    where = " AND ".join(conditions)
+    rows = await db.fetch(
+        f"SELECT id, key, date_at, response "
+        f"FROM crawl_data "
+        f"WHERE category='feed' AND purpose='youtube' AND {where} "
+        f"ORDER BY (response->>'view_count')::bigint DESC NULLS LAST LIMIT ${idx}",
+        *params, limit,
+    )
+    items = [_youtube_item(r) for r in rows]
     return _base.items_response(items)
+
+
+def _youtube_item(row) -> dict:
+    """crawl_data row → 기존 feed_youtube 응답 필드로 재구성."""
+    resp = row["response"]
+    if isinstance(resp, str):
+        resp = json.loads(resp)
+    return {
+        "id": row["id"],
+        "video_id": resp.get("video_id"),
+        "title": resp.get("title"),
+        "channel_title": resp.get("channel_title"),
+        "channel_id": resp.get("channel_id"),
+        "description": resp.get("description"),
+        "category_id": resp.get("category_id"),
+        "published_at": resp.get("published_at"),
+        "view_count": resp.get("view_count", 0),
+        "like_count": resp.get("like_count", 0),
+        "comment_count": resp.get("comment_count", 0),
+        "duration": resp.get("duration"),
+        "thumbnail_url": resp.get("thumbnail_url"),
+        "region_code": resp.get("region_code"),
+        "fetched_at": resp.get("fetched_at"),
+    }

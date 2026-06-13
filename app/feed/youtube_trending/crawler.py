@@ -6,6 +6,7 @@ from datetime import datetime, timezone
 
 from app.config import settings
 from app.core.base_crawler import BaseCrawler, CrawlResult
+from app.crawl_data.repo import CrawlDataRepo
 
 logger = logging.getLogger(__name__)
 
@@ -83,44 +84,45 @@ class YoutubeTrendingCrawler(BaseCrawler):
         if not all_items:
             return CrawlResult(items_fetched=0, items_new=0, errors=errors)
 
-        # 기존 (video_id, region_code) 집합 조회 (new 판별용)
+        # feed_youtube → crawl_data(category=feed, purpose=youtube,
+        # key={region_code}:{video_id}).
+        keys = [f"{it['region_code']}:{it['video_id']}" for it in all_items]
         existing = await self.db.fetch(
-            "SELECT video_id, region_code FROM feed_youtube WHERE region_code = ANY($1)",
-            list({item["region_code"] for item in all_items}),
+            "SELECT key FROM crawl_data "
+            "WHERE category='feed' AND purpose='youtube' AND key = ANY($1)",
+            keys,
         )
-        existing_keys = {(r["video_id"], r["region_code"]) for r in existing}
+        existing_keys = {r["key"] for r in existing}
         items_new = 0
+        repo = CrawlDataRepo(self.db)
 
         for item in all_items:
             try:
                 published_at = datetime.fromisoformat(item["published_at"].replace("Z", "+00:00")) if item.get("published_at") else fetched_at
-                await self.db.execute(
-                    "INSERT INTO feed_youtube "
-                    "(video_id, title, channel_title, channel_id, description, "
-                    "category_id, published_at, view_count, like_count, comment_count, "
-                    "duration, thumbnail_url, region_code, fetched_at) "
-                    "VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14) "
-                    "ON CONFLICT (video_id, region_code) DO UPDATE SET "
-                    "view_count = EXCLUDED.view_count, "
-                    "like_count = EXCLUDED.like_count, "
-                    "comment_count = EXCLUDED.comment_count, "
-                    "fetched_at = EXCLUDED.fetched_at",
-                    item["video_id"],
-                    item["title"],
-                    item["channel_title"],
-                    item["channel_id"],
-                    item["description"],
-                    item["category_id"],
-                    published_at,
-                    item["view_count"],
-                    item["like_count"],
-                    item["comment_count"],
-                    item["duration"],
-                    item["thumbnail_url"],
-                    item["region_code"],
-                    fetched_at,
+                key = f"{item['region_code']}:{item['video_id']}"
+                await repo.upsert(
+                    category="feed",
+                    purpose="youtube",
+                    key=key,
+                    response={
+                        "video_id": item["video_id"],
+                        "title": item["title"],
+                        "channel_title": item["channel_title"],
+                        "channel_id": item["channel_id"],
+                        "description": item["description"],
+                        "category_id": item["category_id"],
+                        "published_at": published_at.isoformat(),
+                        "view_count": item["view_count"],
+                        "like_count": item["like_count"],
+                        "comment_count": item["comment_count"],
+                        "duration": item["duration"],
+                        "thumbnail_url": item["thumbnail_url"],
+                        "region_code": item["region_code"],
+                        "fetched_at": fetched_at.isoformat(),
+                    },
+                    date_at=published_at,
                 )
-                if (item["video_id"], item["region_code"]) not in existing_keys:
+                if key not in existing_keys:
                     items_new += 1
             except Exception as e:
                 errors.append(f"{item['video_id']}: {e}")

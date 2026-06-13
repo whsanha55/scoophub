@@ -1,11 +1,11 @@
 from __future__ import annotations
 
 import asyncio
-import json
 import logging
 from datetime import datetime, timezone
 
 from app.core.base_crawler import BaseCrawler, CrawlResult
+from app.crawl_data.repo import CrawlDataRepo
 
 logger = logging.getLogger(__name__)
 
@@ -46,47 +46,41 @@ class ArxivCrawler(BaseCrawler):
         if not all_papers:
             return CrawlResult(items_fetched=0, items_new=0, errors=errors)
 
-        # 기존 arxiv_id 집합 조회
+        # feed_arxiv → crawl_data(category=feed, purpose=arxiv, key=arxiv_id).
         arxiv_ids = [p.get_short_id() for p in all_papers]
         existing = await self.db.fetch(
-            "SELECT arxiv_id FROM feed_arxiv WHERE arxiv_id = ANY($1)",
+            "SELECT key FROM crawl_data "
+            "WHERE category='feed' AND purpose='arxiv' AND key = ANY($1)",
             arxiv_ids,
         )
-        existing_ids = {r["arxiv_id"] for r in existing}
+        existing_ids = {r["key"] for r in existing}
         items_new = 0
+        repo = CrawlDataRepo(self.db)
 
         for paper in all_papers:
             arxiv_id = paper.get_short_id()
             try:
-                authors = json.dumps([a.name for a in paper.authors])
-                categories = json.dumps([c for c in paper.categories])
-                pdf_url = paper.pdf_url
-                abstract_url = paper.entry_id
                 published_at = paper.published
-                updated_at = paper.updated
-
-                await self.db.execute(
-                    "INSERT INTO feed_arxiv "
-                    "(arxiv_id, title, authors, summary, primary_category, categories, "
-                    "pdf_url, abstract_url, published_at, updated_at, author_comment, "
-                    "journal_ref, fetched_at) "
-                    "VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13) "
-                    "ON CONFLICT (arxiv_id) DO UPDATE SET "
-                    "updated_at = EXCLUDED.updated_at, "
-                    "fetched_at = EXCLUDED.fetched_at",
-                    arxiv_id,
-                    paper.title,
-                    authors,
-                    paper.summary,
-                    paper.primary_category,
-                    categories,
-                    pdf_url,
-                    abstract_url,
-                    published_at,
-                    updated_at,
-                    paper.comment,
-                    paper.journal_ref,
-                    fetched_at,
+                await repo.upsert(
+                    category="feed",
+                    purpose="arxiv",
+                    key=arxiv_id,
+                    response={
+                        "arxiv_id": arxiv_id,
+                        "title": paper.title,
+                        "authors": [a.name for a in paper.authors],
+                        "summary": paper.summary,
+                        "primary_category": paper.primary_category,
+                        "categories": list(paper.categories),
+                        "pdf_url": paper.pdf_url,
+                        "abstract_url": paper.entry_id,
+                        "published_at": published_at.isoformat() if published_at else None,
+                        "updated_at": paper.updated.isoformat() if paper.updated else None,
+                        "author_comment": paper.comment,
+                        "journal_ref": paper.journal_ref,
+                        "fetched_at": fetched_at.isoformat(),
+                    },
+                    date_at=published_at or fetched_at,
                 )
                 if arxiv_id not in existing_ids:
                     items_new += 1
