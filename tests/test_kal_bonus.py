@@ -61,7 +61,7 @@ def test_config_scope():
     assert len(ROUTES) == 10
     assert len(TARGET_MONTHS) == 3
     assert len(ROUTES) * len(TARGET_MONTHS) == 30
-    assert make_key("ICN", "LHR", "202701") == "ICN-LHR-202701"
+    assert make_key("ICN", "LHR", "202701") == "202701-ICN-LHR"
 
 
 @pytest.fixture(autouse=True)
@@ -91,7 +91,7 @@ async def test_store_via_crawl_data(db, monkeypatch):
     assert counts["stored"] == 1
 
     row = await CrawlDataRepo(db).get(
-        category="kal", purpose="bonus_seat", key="ICN-LHR-202701"
+        category="kal", purpose="bonus_seat", key="202701-ICN-LHR"
     )
     assert row is not None
     assert row["response"]["arrivalAirport"] == "LHR"

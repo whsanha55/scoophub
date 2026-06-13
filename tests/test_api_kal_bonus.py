@@ -29,7 +29,7 @@ async def _seed(db, key, response, when):
 
 
 async def test_get_kal_bonus_returns_seeded(client, db):
-    await _seed(db, "ICN-LHR-202701", SAMPLE,
+    await _seed(db, "202701-ICN-LHR", SAMPLE,
                 datetime(2027, 1, 1, 7, 0, tzinfo=timezone.utc))
     res = await client.get("/api/kal-bonus?arrival=LHR")
     assert res.status_code == 200
@@ -37,7 +37,7 @@ async def test_get_kal_bonus_returns_seeded(client, db):
     assert body["success"] is True
     assert body["meta"]["returned"] == 1
     item = body["data"][0]
-    assert item["key"] == "ICN-LHR-202701"
+    assert item["key"] == "202701-ICN-LHR"
     assert item["response"]["arrivalAirport"] == "LHR"
     # parsed 매핑 검증
     assert item["parsed"]["days"][0]["flights"][0]["cabin_label"] == "일반석 보너스"
@@ -53,15 +53,15 @@ async def test_get_kal_bonus_empty(client, db):
 
 
 async def test_get_kal_bonus_filter_by_arrival(client, db):
-    await _seed(db, "ICN-LHR-202701", SAMPLE,
+    await _seed(db, "202701-ICN-LHR", SAMPLE,
                 datetime(2027, 1, 1, tzinfo=timezone.utc))
     other = {**SAMPLE, "arrivalAirport": "CDG"}
-    await _seed(db, "ICN-CDG-202701", other,
+    await _seed(db, "202701-ICN-CDG", other,
                 datetime(2027, 1, 2, tzinfo=timezone.utc))
     res = await client.get("/api/kal-bonus?arrival=CDG")
     body = res.json()
     assert body["meta"]["returned"] == 1
-    assert body["data"][0]["key"] == "ICN-CDG-202701"
+    assert body["data"][0]["key"] == "202701-ICN-CDG"
 
 
 async def test_crawl_trigger_plumbing(client, db, monkeypatch):

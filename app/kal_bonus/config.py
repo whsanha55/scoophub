@@ -33,8 +33,12 @@ PURPOSE = "bonus_seat"
 
 
 def make_key(departure: str, arrival: str, year_month: str) -> str:
-    """crawl_data.key — 호출 단위 = route×월. 예: ICN-LHR-202701."""
-    return f"{departure}-{arrival}-{year_month}"
+    """crawl_data.key — 호출 단위 = 월×route. 날짜 prefix.
+
+    예: 202701-ICN-LHR. 날짜가 prefix라 월 범위 스캔이 문자열 prefix로 가능
+    (WHERE key >= '202701' AND key < '202702').
+    """
+    return f"{year_month}-{departure}-{arrival}"
 
 
 def month_first_day(year_month: str) -> str:

@@ -75,8 +75,9 @@ async def get_kal_bonus(
     params: list = [CATEGORY, PURPOSE]
     idx = 3
     if arrival:
+        # key 포맷: {YYYYMM}-{DEPARTURE}-{ARRIVAL} → 도착은 접미사로 매칭
         conditions.append(f"key LIKE ${idx}")
-        params.append(f"{DEPARTURE}-{arrival.upper()}-%")
+        params.append(f"%-{DEPARTURE}-{arrival.upper()}")
         idx += 1
 
     where = " AND ".join(conditions)
