@@ -89,19 +89,19 @@ class CrawlDataRepo:
     ) -> list[dict[str, Any]]:
         """response JSONB 경로 값으로 필터.
 
-        path 예: 'flightList' / 'meta.score'. asyncpg Record의 JSONB는 이미
-        파싱된 dict/list로 반환되므로 app 단에서 비교하지 않고 DB측
-        `(response->>'<leaf>') = $value` 로 좁힌다.
+        path 예: 'flightList' / 'meta.score'. 점 표기를 text[] 로 쪼개어
+        asyncpg 바인딩(`response #>> $3`) → 값 검증 없이 주입 안전.
         """
-        leaf = path.split(".")[-1]
+        path_parts = path.split(".")
         rows = await self.db.fetch(
             "SELECT id, key, date_at, response, updated_at "
             "FROM crawl_data "
             "WHERE category=$1 AND purpose=$2 "
-            f"  AND (response #>> '{_json_path(path)}') = $3 "
-            "ORDER BY date_at DESC LIMIT $4",
+            "  AND response #>> $3 = $4 "
+            "ORDER BY date_at DESC LIMIT $5",
             category,
             purpose,
+            path_parts,
             str(value),
             limit,
         )
@@ -121,12 +121,6 @@ def _row_to_dict(row) -> dict[str, Any] | None:
         "response": resp,
         "updated_at": row["updated_at"],
     }
-
-
-def _json_path(path: str) -> str:
-    """`a.b.c` → `{a,b,c}` (Postgres jsonb #>> path 텍스트 형식)."""
-    parts = ",".join(path.split("."))
-    return "{" + parts + "}"
 
 
 async def upsert_crawl_data(
