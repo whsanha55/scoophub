@@ -61,7 +61,9 @@ async def exchange_code(code: str) -> dict[str, Any]:
         redirect_uri=settings.OAUTH_REDIRECT_URI,
     ) as client:
         token = await client.fetch_token(GOOGLE_TOKEN_URL, code=code)
-        resp = await client.get(GOOGLE_USERINFO_URL, token=token)
+        # (get(token=) 인수는 1.7에서 제거됨)
+        # authlib 1.x: fetch_token이 client.token 세팅 → 이후 get()은 자동 Bearer 주입.
+        resp = await client.get(GOOGLE_USERINFO_URL)
         resp.raise_for_status()
         return resp.json()
 
