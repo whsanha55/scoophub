@@ -7,6 +7,8 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import TYPE_CHECKING
 
+from app.crawl_data.repo import CrawlDataRepo
+
 if TYPE_CHECKING:
     from app.core.database import Database
 
@@ -65,8 +67,6 @@ class BaseCrawler(ABC):
         # crawl_logs → generic crawl_data(category=system, purpose=crawl_run).
         # append-only 히스토리 보존: key를 run마다 고유(name|detail|started_at)하게 →
         # upsert의 ON CONFLICT가 발생하지 않아 사실상 insert로 동작.
-        from app.crawl_data.repo import CrawlDataRepo
-
         finished_at = datetime.now(timezone.utc)
         await CrawlDataRepo(self.db).upsert(
             category="system",
