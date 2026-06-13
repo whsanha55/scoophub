@@ -7,6 +7,7 @@ from datetime import datetime
 from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel, Field
 
+from app.core.auth import get_current_user
 from app.core.database import Database
 from app.core.models import ApiResponse, ErrorDetail
 
@@ -51,6 +52,7 @@ async def health(db: Database = Depends(get_db)):
 
 @router.post(
     "/llm/test",
+    dependencies=[Depends(get_current_user)],
     summary="LLM 호출 테스트",
     description=(
         "요청 body의 message를 LLM에 전송해 응답을 반환합니다.\n\n"
@@ -82,6 +84,7 @@ async def llm_test(body: LLMTestRequest):
 
 @router.get(
     "/crawl-logs",
+    dependencies=[Depends(get_current_user)],
     summary="크롤 실행 로그 조회",
     description=(
         "크롤러 실행 이력을 최신순으로 반환합니다.\n\n"

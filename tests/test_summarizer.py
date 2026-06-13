@@ -23,7 +23,7 @@ class FakeLLM:
 
 async def _insert(db, *, title, status, age_days=0, summary="본문"):
     return await db.fetchval(
-        "INSERT INTO news_articles (source, title, url, normalized_url, summary, summary_status, created_at) "
+        "INSERT INTO feed_news (source, title, url, normalized_url, summary, summary_status, created_at) "
         "VALUES ('s', $1, $2, $2, $3, $4, NOW() - ($5 || ' days')::interval) RETURNING id",
         title, f"https://x.test/{title}", summary, status, str(age_days),
     )
@@ -39,7 +39,7 @@ async def test_summarize_incomplete_scope(db):
     res = await NewsSummarizer(db, FakeLLM()).summarize_incomplete()
 
     assert res == {"success": 1, "failed": 0, "error": 0, "total": 1}
-    row = await db.fetchrow("SELECT summary_status, category FROM news_articles WHERE id = $1", failed_id)
+    row = await db.fetchrow("SELECT summary_status, category FROM feed_news WHERE id = $1", failed_id)
     assert row["summary_status"] == "success"
     assert row["category"] == "economy"
 

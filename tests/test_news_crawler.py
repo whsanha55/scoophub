@@ -46,7 +46,7 @@ async def test_crawler_stores_articles(db):
     assert result is not None
     assert result.items_fetched >= 1
 
-    rows = await db.fetch("SELECT * FROM news_articles")
+    rows = await db.fetch("SELECT * FROM feed_news")
     assert len(rows) >= 1
     # category/importance는 크롤 시점엔 미정 (LLM 요약이 채움)
     assert rows[0]["category"] is None
