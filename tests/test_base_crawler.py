@@ -32,19 +32,12 @@ async def test_failing_crawler_isolated(db):
     result = await crawler.run()
     assert result is None
 
-    # Verify crawl_data has error entry (category=system, purpose=crawl_run)
+    # Verify crawl_logs has error entry
     rows = await db.fetch(
-        "SELECT date_at, response FROM crawl_data "
-        "WHERE category='system' AND purpose='crawl_run' "
-        "  AND response->>'crawler'=$1 "
-        "ORDER BY date_at DESC LIMIT 1",
+        "SELECT * FROM crawl_logs WHERE crawler=$1 ORDER BY started_at DESC LIMIT 1",
         "test_fail",
     )
     assert len(rows) == 1
-    resp = rows[0]["response"]
-    if isinstance(resp, str):
-        import json
-        resp = json.loads(resp)
-    assert resp["status"] == "error"
-    assert "boom" in resp["error_message"]
-    assert resp["crawler_detail"] == ""
+    assert rows[0]["status"] == "error"
+    assert "boom" in rows[0]["error_message"]
+    assert rows[0]["crawler_detail"] == ""
