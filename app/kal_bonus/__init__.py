@@ -6,6 +6,7 @@ diff→Telegram 알림 / openclaw cron 등록 / 서버 Chrome 설치는 별도 �
 """
 from app.kal_bonus.cabin import CABIN_LABELS, map_cabin
 from app.kal_bonus.config import ENDPOINT, ROUTES, TARGET_MONTHS, make_key
+from app.kal_bonus.crawler import KalBonusCrawler
 from app.kal_bonus.kal_bonus_scraper import KalBonusScraper, parse_bonus_response
 
 __all__ = [
@@ -15,6 +16,7 @@ __all__ = [
     "ROUTES",
     "TARGET_MONTHS",
     "make_key",
+    "KalBonusCrawler",
     "KalBonusScraper",
     "parse_bonus_response",
 ]

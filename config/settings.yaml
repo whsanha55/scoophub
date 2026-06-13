@@ -102,6 +102,9 @@ crawlers:
     source_timeout_seconds: 10
     retry_count: 3
     retry_delay_seconds: 10
+  kal_bonus:
+    # 1일 1회 KST 07:00 — real Chrome 필요 (channel='chrome')
+    schedule: "0 7 * * *"
 
 api:
   default_minutes: 30

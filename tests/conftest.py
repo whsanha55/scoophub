@@ -18,7 +18,7 @@ TEST_DB_URL = (
 )
 
 TRUNCATE_SQL = (
-    "TRUNCATE feed_news, weather_snapshots, crawl_logs, "
+    "TRUNCATE feed_news, weather_snapshots, crawl_logs, crawl_data, "
     "crawler_metadata, crawl_sources, users RESTART IDENTITY CASCADE"
 )
 
