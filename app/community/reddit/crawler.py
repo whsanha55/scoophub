@@ -5,6 +5,7 @@ from datetime import datetime, timezone
 
 from app.config import settings
 from app.core.base_crawler import BaseCrawler, CrawlResult
+from app.crawl_data.repo import CrawlDataRepo
 
 logger = logging.getLogger(__name__)
 
@@ -99,42 +100,41 @@ class RedditCrawler(BaseCrawler):
         if not all_items:
             return CrawlResult(items_fetched=0, items_new=0, errors=errors)
 
+        # community_reddit → crawl_data(category=community, purpose=reddit, key=reddit_id).
         reddit_ids = [item["reddit_id"] for item in all_items]
         existing = await self.db.fetch(
-            "SELECT reddit_id FROM community_reddit WHERE reddit_id = ANY($1)",
+            "SELECT key FROM crawl_data "
+            "WHERE category='community' AND purpose='reddit' AND key = ANY($1)",
             reddit_ids,
         )
-        existing_ids = {r["reddit_id"] for r in existing}
+        existing_ids = {r["key"] for r in existing}
         items_new = 0
+        repo = CrawlDataRepo(self.db)
 
         for item in all_items:
             try:
-                await self.db.execute(
-                    "INSERT INTO community_reddit "
-                    "(reddit_id, title, author, subreddit, score, upvote_ratio, "
-                    "num_comments, url, permalink, selftext, is_self, link_flair, "
-                    "domain, posted_at, fetched_at) "
-                    "VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15) "
-                    "ON CONFLICT (reddit_id) DO UPDATE SET "
-                    "score = EXCLUDED.score, "
-                    "upvote_ratio = EXCLUDED.upvote_ratio, "
-                    "num_comments = EXCLUDED.num_comments, "
-                    "fetched_at = EXCLUDED.fetched_at",
-                    item["reddit_id"],
-                    item["title"],
-                    item["author"],
-                    item["subreddit"],
-                    item["score"],
-                    item["upvote_ratio"],
-                    item["num_comments"],
-                    item["url"],
-                    item["permalink"],
-                    item["selftext"],
-                    item["is_self"],
-                    item["link_flair"],
-                    item["domain"],
-                    item["posted_at"],
-                    fetched_at,
+                await repo.upsert(
+                    category="community",
+                    purpose="reddit",
+                    key=item["reddit_id"],
+                    response={
+                        "reddit_id": item["reddit_id"],
+                        "title": item["title"],
+                        "author": item["author"],
+                        "subreddit": item["subreddit"],
+                        "score": item["score"],
+                        "upvote_ratio": item["upvote_ratio"],
+                        "num_comments": item["num_comments"],
+                        "url": item["url"],
+                        "permalink": item["permalink"],
+                        "selftext": item["selftext"],
+                        "is_self": item["is_self"],
+                        "link_flair": item["link_flair"],
+                        "domain": item["domain"],
+                        "posted_at": item["posted_at"].isoformat(),
+                        "fetched_at": fetched_at.isoformat(),
+                    },
+                    date_at=item["posted_at"],
                 )
                 if item["reddit_id"] not in existing_ids:
                     items_new += 1
