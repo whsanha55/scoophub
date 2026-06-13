@@ -36,7 +36,10 @@ from app.feed.devto_hashnode import wiring as devto_hashnode_wiring
 from app.feed.arxiv import wiring as arxiv_wiring
 from app.feed.youtube_trending import wiring as youtube_trending_wiring
 
-DOMAINS = [news_wiring, weather_wiring, stock_wiring, github_trending_wiring, hacker_news_wiring, arxiv_wiring, product_hunt_wiring, reddit_wiring, youtube_trending_wiring, devto_hashnode_wiring, tech_newsletter_wiring, system_wiring, auth_wiring]
+# kal 그룹
+from app.kal_bonus import wiring as kal_bonus_wiring
+
+DOMAINS = [news_wiring, weather_wiring, stock_wiring, github_trending_wiring, hacker_news_wiring, arxiv_wiring, product_hunt_wiring, reddit_wiring, youtube_trending_wiring, devto_hashnode_wiring, tech_newsletter_wiring, kal_bonus_wiring, system_wiring, auth_wiring]
 
 
 def create_app(db: Database | None = None) -> FastAPI:
@@ -63,6 +66,13 @@ def create_app(db: Database | None = None) -> FastAPI:
             logger.warning(
                 "JWT_SECRET is insecure (default or empty) — "
                 "set a strong random JWT_SECRET in production"
+            )
+
+        # 보안: AUTH_BYPASS는 로컬 전용 — 운영에서 켜지면 인증 전체 무력화
+        if settings.AUTH_BYPASS:
+            logger.warning(
+                "AUTH_BYPASS is ON — all auth checks skipped (local dev only, "
+                "NEVER enable in production)"
             )
 
         if settings.ENABLE_SCHEDULER:

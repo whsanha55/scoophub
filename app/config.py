@@ -23,6 +23,7 @@ class Settings(BaseSettings):
     GOOGLE_CLIENT_SECRET: str = ""
     JWT_SECRET: str = "dev-secret-change-me"
     JWT_EXPIRE_HOURS: int = 24
+    AUTH_BYPASS: bool = False  # 로컬 전용: True면 인증 건너뛰고 super user로 통과
     AUTH_REDIRECT_URL: str = "http://localhost:3000/auth/callback"
     OAUTH_REDIRECT_URI: str = "http://localhost:8000/api/auth/callback"
     CORS_ORIGINS: str = "http://localhost:3000,http://localhost:8000"
