@@ -40,7 +40,9 @@ def get_db() -> Database:
 async def health(db: Database = Depends(get_db)):
     logger.info("health check requested")
     news_count = await db.fetchval("SELECT COUNT(*) FROM feed_news")
-    weather_count = await db.fetchval("SELECT COUNT(*) FROM weather_snapshots")
+    weather_count = await db.fetchval(
+        "SELECT COUNT(*) FROM crawl_data WHERE category='weather' AND purpose='snapshot'"
+    )
     return ApiResponse(
         success=True,
         data={
