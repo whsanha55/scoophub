@@ -1,6 +1,7 @@
 # app/kal_bonus/router.py
 from __future__ import annotations
 
+import json
 import logging
 from typing import Any
 
@@ -39,7 +40,6 @@ def _row_to_public(row: Any) -> dict[str, Any]:
     """crawl_data row → API 응답 dict. response 원문 + 파싱 결과 같이 제공."""
     resp = row["response"]
     if isinstance(resp, str):
-        import json
         resp = json.loads(resp)
     return {
         "key": row["key"],
