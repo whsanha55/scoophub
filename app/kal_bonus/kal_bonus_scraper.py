@@ -13,6 +13,7 @@ TODO(scope 밖):
 """
 from __future__ import annotations
 
+import asyncio
 import logging
 from datetime import datetime, timezone
 from typing import Any
@@ -134,8 +135,11 @@ class KalBonusScraper:
             stored += 1
         return {"targets": len(targets), "stored": stored}
 
+    # in-page fetch 호출 간 대기(초). 병렬 금지 — 순차 + 간격으로 Akamai/RPS 완화.
+    REQUEST_INTERVAL_SEC = 2.0
+
     async def _crawl_all(self, targets: list[tuple[str, str, str]]) -> list[dict | None]:
-        """단일 Chrome 세션에서 in-page fetch 루프.
+        """단일 Chrome 세션에서 in-page fetch 루프 (순차, 요청 간 2초).
 
         Playwright 설치/실제 동작은 환경 의존. 여기서는 세션 기동 + fetch만.
         """
@@ -150,6 +154,8 @@ class KalBonusScraper:
                 # KAL 페이지 로드 → Akamai _abck 센서 자동 풀이
                 await page.goto("https://www.koreanair.com/award-seat-availability")
                 for i, (dep, arr, ym) in enumerate(targets):
+                    if i > 0:  # 첫 요청은 즉시, 이후 간격 대기
+                        await asyncio.sleep(self.REQUEST_INTERVAL_SEC)
                     try:
                         results[i] = await page.evaluate(_FETCH_JS, [dep, arr, month_first_day(ym)])
                     except Exception as e:  # 개별 조합 실패는 스킵, 전체는 계속

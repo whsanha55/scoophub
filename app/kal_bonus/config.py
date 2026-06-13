@@ -7,6 +7,7 @@ config JSONB에서 읽는다. 아래 상수는 폴백 기본값(첫 실행 / row
 """
 from __future__ import annotations
 
+import json
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -64,7 +65,6 @@ async def load_routes_config(
     )
     cfg = row["config"] if row else None
     if isinstance(cfg, str):
-        import json
         cfg = json.loads(cfg)
 
     if not cfg:
