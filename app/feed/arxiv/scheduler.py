@@ -12,20 +12,19 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-def register_jobs(
+async def register_jobs(
     scheduler,
     db: Database,
-    schedule: str,
     categories: list[str] | None = None,
     max_results_per_category: int = 25,
 ) -> None:
-    BaseScheduler.register_cron_job(
+    await BaseScheduler.register_cron_job(
         scheduler,
         db,
-        schedule=schedule,
+        crawler="arxiv",
+        job_id="arxiv_crawler",
         crawler_import="app.feed.arxiv.crawler",
         crawler_class="ArxivCrawler",
-        job_id="arxiv_crawler",
         categories=categories,
         max_results_per_category=max_results_per_category,
     )

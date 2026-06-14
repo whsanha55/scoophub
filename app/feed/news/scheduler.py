@@ -5,7 +5,8 @@ import logging
 from typing import TYPE_CHECKING
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
-from apscheduler.triggers.interval import IntervalTrigger
+
+from app.core.base_scheduler import BaseScheduler
 
 if TYPE_CHECKING:
     from app.core.database import Database
@@ -13,10 +14,9 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-def register_jobs(
+async def register_jobs(
     scheduler: AsyncIOScheduler,
     db: Database,
-    schedule_minutes: int,
     max_lookback_hours: int = 24,
     dedup_window_hours: int = 24,
 ) -> None:
@@ -56,10 +56,13 @@ def register_jobs(
         except Exception as e:
             logger.error("Summarization failed: %s", e)
 
+    trigger, enabled = await BaseScheduler.resolve_trigger(db, "news", "news_crawler")
     scheduler.add_job(
         _run_news_crawl,
-        trigger=IntervalTrigger(minutes=schedule_minutes),
+        trigger=trigger,
         id="news_crawler",
         replace_existing=True,
     )
-    logger.info(f"Scheduled job 'news_crawler' every {schedule_minutes} minutes")
+    if not enabled:
+        scheduler.pause_job("news_crawler")
+    logger.info("Scheduled job 'news_crawler' (crawler=news, enabled=%s)", enabled)

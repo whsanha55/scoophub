@@ -42,13 +42,19 @@ class NewsModule(BaseModule):
         if ctx.enable_scheduler:
             cfg = ctx.cfg["crawlers"]["news"]
             sched_mod = importlib.import_module(cls.scheduler_module)
-            sched_mod.register_jobs(
-                ctx.scheduler,
-                ctx.db,
-                schedule_minutes=cfg["schedule_minutes"],
-                max_lookback_hours=cfg.get("max_lookback_hours", 24),
-                dedup_window_hours=cfg.get("dedup_window_hours", 24),
-            )
+            max_lookback_hours = cfg.get("max_lookback_hours", 24)
+            dedup_window_hours = cfg.get("dedup_window_hours", 24)
+
+            # register_jobs는 async (DB에서 trigger 조회) → lifespan startup에서 실행.
+            async def _news_sched_hook() -> None:
+                await sched_mod.register_jobs(
+                    ctx.scheduler,
+                    ctx.db,
+                    max_lookback_hours=max_lookback_hours,
+                    dedup_window_hours=dedup_window_hours,
+                )
+
+            ctx.on_startup(_news_sched_hook)
 
 
 register = NewsModule.register

@@ -12,21 +12,20 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-def register_jobs(
+async def register_jobs(
     scheduler,
     db: Database,
-    schedule: str,
     api_key: str = "",
     region_codes: list[str] | None = None,
     max_results_per_region: int = 50,
 ) -> None:
-    BaseScheduler.register_cron_job(
+    await BaseScheduler.register_cron_job(
         scheduler,
         db,
-        schedule=schedule,
+        crawler="youtube_trending",
+        job_id="youtube_trending_crawler",
         crawler_import="app.feed.youtube_trending.crawler",
         crawler_class="YoutubeTrendingCrawler",
-        job_id="youtube_trending_crawler",
         api_key=api_key,
         region_codes=region_codes,
         max_results_per_region=max_results_per_region,

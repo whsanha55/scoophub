@@ -76,14 +76,20 @@ class BaseModule(ABC):
             sched_mod = importlib.import_module(cls.scheduler_module)
             register_jobs = getattr(sched_mod, "register_jobs")
             params = cls.get_scheduler_params(cfg)
-            register_jobs(ctx.scheduler, ctx.db, **params)
+
+            # register_jobs는 이제 async (DB에서 trigger 조회) → lifespan startup
+            # (scheduler.start + db.initialize 이후)에서 실행되도록 hook 등록.
+            # register 자체는 sync를 유지 (create_app 본문에서 동기 호출됨).
+            async def _sched_hook() -> None:
+                await register_jobs(ctx.scheduler, ctx.db, **params)
+
+            ctx.on_startup(_sched_hook)
 
     @classmethod
     def get_scheduler_params(cls, cfg: dict[str, Any]) -> dict[str, Any]:
-        """schedule_type에 따라 기본 스케줄 파라미터를 반환합니다.
+        """도메인 특화 스케줄 파라미터를 반환합니다.
 
-        서브클래스에서 override하여 도메인 특화 파라미터를 추가할 수 있습니다.
+        주기(schedule/schedule_minutes)는 crawl_schedule 테이블에서 조회하므로
+        여기서 반환하지 않습니다. 서브클래스는 도메인 파라미터만 추가합니다.
         """
-        if cls.schedule_type == "interval":
-            return {"schedule_minutes": cfg["schedule_minutes"]}
-        return {"schedule": cfg["schedule"]}
+        return {}

@@ -5,8 +5,8 @@ import logging
 from typing import TYPE_CHECKING
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
-from apscheduler.triggers.cron import CronTrigger
-from apscheduler.triggers.interval import IntervalTrigger
+
+from app.core.base_scheduler import BaseScheduler
 
 if TYPE_CHECKING:
     from app.core.database import Database
@@ -15,15 +15,12 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-def register_jobs(
+async def register_jobs(
     scheduler: AsyncIOScheduler,
     db: Database,
     provider_router: ProviderRouter,
-    sync_interval_minutes: int = 60,
-    sigma_schedule: str = "0 3 * * 1",      # cron: 월요일 03:00
-    analyze_schedule: str = "0 6 * * 2-6",   # cron: 화-토 06:00 (KST, 미국장 종료)
 ) -> None:
-    """Register stock scheduler jobs."""
+    """Register stock scheduler jobs (periods resolved from crawl_schedule)."""
 
     async def _sync_candles() -> None:
         from app.stock.repository import CandleRepo, WatchlistRepo
@@ -46,13 +43,16 @@ def register_jobs(
                 logger.exception("Sync failed for %s", ticker)
         logger.info("Candle sync: %d candles for %d tickers", total_synced, len(tickers))
 
+    sync_trigger, sync_enabled = await BaseScheduler.resolve_trigger(db, "stock", "stock_sync")
     scheduler.add_job(
         _sync_candles,
-        trigger=IntervalTrigger(minutes=sync_interval_minutes),
+        trigger=sync_trigger,
         id="stock_sync",
         replace_existing=True,
     )
-    logger.info("Scheduled 'stock_sync' every %d minutes", sync_interval_minutes)
+    if not sync_enabled:
+        scheduler.pause_job("stock_sync")
+    logger.info("Scheduled 'stock_sync' (enabled=%s)", sync_enabled)
 
     async def _crawl_sigma() -> None:
         from app.stock.crawler import SigmaCrawler
@@ -61,14 +61,16 @@ def register_jobs(
         if result:
             logger.info("Sigma crawl: %d fetched, %d new", result.items_fetched, result.items_new)
 
-    parts = sigma_schedule.split()
+    sigma_trigger, sigma_enabled = await BaseScheduler.resolve_trigger(db, "stock", "stock-sigma-scan")
     scheduler.add_job(
         _crawl_sigma,
-        trigger=CronTrigger(minute=parts[0], hour=parts[1], day=parts[2], month=parts[3], day_of_week=parts[4]),
+        trigger=sigma_trigger,
         id="stock-sigma-scan",
         replace_existing=True,
     )
-    logger.info("Scheduled 'stock-sigma-scan' with cron '%s'", sigma_schedule)
+    if not sigma_enabled:
+        scheduler.pause_job("stock-sigma-scan")
+    logger.info("Scheduled 'stock-sigma-scan' (enabled=%s)", sigma_enabled)
 
     async def _run_analysis() -> None:
         from app.stock.repository import WatchlistRepo
@@ -83,14 +85,16 @@ def register_jobs(
         resp = await _run_analysis_for_tickers(tickers, db)
         logger.info("Stock analysis: %d ok, %d errors", resp.ok, resp.errors)
 
-    parts_a = analyze_schedule.split()
+    analyze_trigger, analyze_enabled = await BaseScheduler.resolve_trigger(db, "stock", "stock_analyze")
     scheduler.add_job(
         _run_analysis,
-        trigger=CronTrigger(minute=parts_a[0], hour=parts_a[1], day=parts_a[2], month=parts_a[3], day_of_week=parts_a[4]),
+        trigger=analyze_trigger,
         id="stock_analyze",
         replace_existing=True,
     )
-    logger.info("Scheduled 'stock_analyze' with cron '%s'", analyze_schedule)
+    if not analyze_enabled:
+        scheduler.pause_job("stock_analyze")
+    logger.info("Scheduled 'stock_analyze' (enabled=%s)", analyze_enabled)
 
     async def _compute_daily_sigma() -> None:
         from datetime import datetime, timezone
@@ -121,10 +125,13 @@ def register_jobs(
                 logger.exception("Sigma computation failed for %s", ticker)
         logger.info("Sigma (straddle): %d saved for %d tickers", saved, len(tickers))
 
+    daily_trigger, daily_enabled = await BaseScheduler.resolve_trigger(db, "stock", "stock_daily_sigma")
     scheduler.add_job(
         _compute_daily_sigma,
-        trigger=CronTrigger(minute="30", hour="22", day="*", month="*", day_of_week="2-6"),
+        trigger=daily_trigger,
         id="stock_daily_sigma",
         replace_existing=True,
     )
-    logger.info("Scheduled 'stock_daily_sigma' with cron '30 22 * * 2-6'")
+    if not daily_enabled:
+        scheduler.pause_job("stock_daily_sigma")
+    logger.info("Scheduled 'stock_daily_sigma' (enabled=%s)", daily_enabled)

@@ -12,21 +12,20 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-def register_jobs(
+async def register_jobs(
     scheduler,
     db: Database,
-    schedule: str,
     since: str = "daily",
     language: str | None = None,
     max_repos: int = 25,
 ) -> None:
-    BaseScheduler.register_cron_job(
+    await BaseScheduler.register_cron_job(
         scheduler,
         db,
-        schedule=schedule,
+        crawler="github_trending",
+        job_id="github_trending_crawler",
         crawler_import="app.community.github_trending.crawler",
         crawler_class="GithubTrendingCrawler",
-        job_id="github_trending_crawler",
         since=since,
         language=language,
         max_repos=max_repos,

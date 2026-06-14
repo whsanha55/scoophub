@@ -1,10 +1,12 @@
 # system/wiring.py
 from __future__ import annotations
 
+import importlib
 import logging
 from typing import ClassVar
 
 from app.core.base_module import BaseModule
+from app.core.context import AppContext
 
 logger = logging.getLogger(__name__)
 
@@ -15,7 +17,18 @@ class SystemModule(BaseModule):
     scheduler_module = None  # scheduler 없음
     tags: ClassVar[list[dict[str, str]]] = [
         {"name": "System", "description": "시스템 상태 및 크롤 로그 API"},
+        {"name": "Schedules", "description": "크롤 주기 DB 동적 관리 API (super user)"},
     ]
+
+    @classmethod
+    def register(cls, ctx: AppContext) -> None:
+        super().register(ctx)
+
+        # schedules_router 추가 등록 + 의존성 주입
+        sched_mod = importlib.import_module("app.system.schedules_router")
+        ctx.app.dependency_overrides[sched_mod._get_db] = lambda: ctx.db
+        ctx.app.dependency_overrides[sched_mod._get_scheduler] = lambda: ctx.scheduler
+        ctx.app.include_router(sched_mod.router)
 
 
 register = SystemModule.register

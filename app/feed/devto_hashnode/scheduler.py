@@ -12,20 +12,19 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-def register_jobs(
+async def register_jobs(
     scheduler,
     db: Database,
-    schedule: str,
     tags: list[str] | None = None,
     max_articles_per_tag: int = 30,
 ) -> None:
-    BaseScheduler.register_cron_job(
+    await BaseScheduler.register_cron_job(
         scheduler,
         db,
-        schedule=schedule,
+        crawler="devto_hashnode",
+        job_id="devto_hashnode_crawler",
         crawler_import="app.feed.devto_hashnode.crawler",
         crawler_class="DevtoHashnodeCrawler",
-        job_id="devto_hashnode_crawler",
         tags=tags,
         max_articles_per_tag=max_articles_per_tag,
     )

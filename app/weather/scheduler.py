@@ -12,16 +12,15 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-def register_jobs(
+async def register_jobs(
     scheduler,
     db: Database,
-    schedule_minutes: int,
 ) -> None:
-    BaseScheduler.register_interval_job(
+    await BaseScheduler.register_interval_job(
         scheduler,
         db,
-        schedule_minutes=schedule_minutes,
+        crawler="weather",
+        job_id="weather_crawler",
         crawler_import="app.weather.crawler",
         crawler_class="WeatherCrawler",
-        job_id="weather_crawler",
     )
