@@ -18,6 +18,7 @@ class SystemModule(BaseModule):
     tags: ClassVar[list[dict[str, str]]] = [
         {"name": "System", "description": "시스템 상태 및 크롤 로그 API"},
         {"name": "Schedules", "description": "크롤 주기 DB 동적 관리 API (super user)"},
+        {"name": "Crawler Config", "description": "크롤 도메인 파라미터 DB 동적 관리 API (super user)"},
     ]
 
     @classmethod
@@ -29,6 +30,12 @@ class SystemModule(BaseModule):
         ctx.app.dependency_overrides[sched_mod._get_db] = lambda: ctx.db
         ctx.app.dependency_overrides[sched_mod._get_scheduler] = lambda: ctx.scheduler
         ctx.app.include_router(sched_mod.router)
+
+        # config_router 추가 등록 (도메인 파라미터 관리)
+        cfg_mod = importlib.import_module("app.system.config_router")
+        ctx.app.dependency_overrides[cfg_mod._get_db] = lambda: ctx.db
+        ctx.app.dependency_overrides[cfg_mod._get_scheduler] = lambda: ctx.scheduler
+        ctx.app.include_router(cfg_mod.router)
 
 
 register = SystemModule.register

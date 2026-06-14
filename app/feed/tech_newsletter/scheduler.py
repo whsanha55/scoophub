@@ -12,11 +12,8 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-async def register_jobs(
-    scheduler,
-    db: Database,
-    feeds: list[dict] | None = None,
-) -> None:
+async def register_jobs(scheduler, db: Database) -> None:
+    # 도메인 파라미터(feeds)는 crawl_config에서 조회.
     await BaseScheduler.register_cron_job(
         scheduler,
         db,
@@ -24,5 +21,4 @@ async def register_jobs(
         job_id="tech_newsletter_crawler",
         crawler_import="app.feed.tech_newsletter.crawler",
         crawler_class="TechNewsletterCrawler",
-        feeds=feeds,
     )

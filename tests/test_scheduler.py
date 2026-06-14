@@ -35,10 +35,11 @@ async def test_resolve_trigger_missing_raises(db):
 
 async def test_news_register_jobs_adds_job(db):
     scheduler = AsyncIOScheduler()
-    await news_register_jobs(scheduler, db, max_lookback_hours=24)
+    await news_register_jobs(scheduler, db)
     jobs = scheduler.get_jobs()
     assert len(jobs) == 1
     assert jobs[0].id == "news_crawler"
+    assert jobs[0].kwargs.get("max_lookback_hours") == 24  # crawl_config seed
 
 
 async def test_weather_register_jobs_adds_job(db):
@@ -51,17 +52,18 @@ async def test_weather_register_jobs_adds_job(db):
 
 async def test_cron_register_jobs_adds_job(db):
     scheduler = AsyncIOScheduler()
-    await gh_register_jobs(scheduler, db, since="daily", max_repos=10)
+    await gh_register_jobs(scheduler, db)
     jobs = scheduler.get_jobs()
     assert len(jobs) == 1
     assert jobs[0].id == "github_trending_crawler"
+    assert jobs[0].kwargs.get("max_repos") == 25  # crawl_config seed
 
 
 async def test_news_register_jobs_replace_existing(db):
     scheduler = AsyncIOScheduler()
     scheduler.start()
-    await news_register_jobs(scheduler, db, max_lookback_hours=24)
-    await news_register_jobs(scheduler, db, max_lookback_hours=12)
+    await news_register_jobs(scheduler, db)
+    await news_register_jobs(scheduler, db)
     jobs = scheduler.get_jobs()
     assert len(jobs) == 1
     assert jobs[0].id == "news_crawler"

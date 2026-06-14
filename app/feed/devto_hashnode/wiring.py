@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 import logging
-from typing import Any, ClassVar
+from typing import ClassVar
 
 from app.core.base_module import BaseModule
 
@@ -19,14 +19,6 @@ class DevtoHashnodeModule(BaseModule):
         {"name": "Dev.to Crawling", "description": "Dev.to 크롤 수동 실행 API"},
     ]
 
-    @classmethod
-    def get_scheduler_params(cls, cfg: dict[str, Any]) -> dict[str, Any]:
-        params = super().get_scheduler_params(cfg)
-        params.update(
-            tags=cfg.get("tags"),
-            max_articles_per_tag=cfg.get("max_articles_per_tag", 30),
-        )
-        return params
 
 
 # main.py 호환성

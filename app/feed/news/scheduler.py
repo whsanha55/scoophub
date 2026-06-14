@@ -14,13 +14,12 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-async def register_jobs(
-    scheduler: AsyncIOScheduler,
-    db: Database,
-    max_lookback_hours: int = 24,
-    dedup_window_hours: int = 24,
-) -> None:
-    async def _run_news_crawl() -> None:
+async def register_jobs(scheduler: AsyncIOScheduler, db: Database) -> None:
+    # 도메인 파라미터(max_lookback_hours, dedup_window_hours)는 crawl_config에서 조회.
+    # _run_news_crawl이 kwargs로 받아 modify_job(kwargs=)로 런타임 갱신 가능.
+    async def _run_news_crawl(
+        *, max_lookback_hours: int = 24, dedup_window_hours: int = 24
+    ) -> None:
         from app.feed.news.crawler import NewsCrawler
 
         crawler = NewsCrawler(
@@ -57,9 +56,11 @@ async def register_jobs(
             logger.error("Summarization failed: %s", e)
 
     trigger, enabled = await BaseScheduler.resolve_trigger(db, "news", "news_crawler")
+    params = await BaseScheduler.resolve_params(db, "news")
     scheduler.add_job(
         _run_news_crawl,
         trigger=trigger,
+        kwargs=params,
         id="news_crawler",
         replace_existing=True,
     )

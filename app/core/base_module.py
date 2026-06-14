@@ -8,24 +8,15 @@ dependency override, scheduler 등록이 자동 처리됩니다.
 사용 예:
     class HackerNewsModule(BaseModule):
         domain_name = "hacker_news"
-        router_module = "app.hacker_news.router"
-        scheduler_module = "app.hacker_news.scheduler"
+        router_module = "app.community.hacker_news.router"
+        scheduler_module = "app.community.hacker_news.scheduler"
         schedule_type = "cron"
         tags = [
             {"name": "Hacker News", "description": "Hacker News 아이템 조회 API"},
             {"name": "Hacker News Crawling", "description": "Hacker News 크롤 수동 실행 API"},
         ]
 
-        @classmethod
-        def get_scheduler_params(cls, cfg):
-            params = super().get_scheduler_params(cfg)
-            params.update(
-                max_items=cfg.get("max_items", 100),
-                min_score=cfg.get("min_score", 50),
-                story_types=cfg.get("story_types"),
-            )
-            return params
-
+    # 도메인 파라미터는 crawl_config 테이블에서 조회 (register_jobs 내부).
     # main.py 호환성
     register = HackerNewsModule.register
     TAGS = HackerNewsModule.tags
@@ -35,7 +26,7 @@ from __future__ import annotations
 import importlib
 import logging
 from abc import ABC
-from typing import Any, ClassVar
+from typing import ClassVar
 
 from app.core.context import AppContext
 
@@ -72,24 +63,14 @@ class BaseModule(ABC):
         ctx.app.include_router(router)
 
         if ctx.enable_scheduler and cls.scheduler_module:
-            cfg = ctx.cfg["crawlers"][cls.domain_name]
             sched_mod = importlib.import_module(cls.scheduler_module)
             register_jobs = getattr(sched_mod, "register_jobs")
-            params = cls.get_scheduler_params(cfg)
 
-            # register_jobs는 이제 async (DB에서 trigger 조회) → lifespan startup
+            # register_jobs는 async (DB에서 trigger + params 조회) → lifespan startup
             # (scheduler.start + db.initialize 이후)에서 실행되도록 hook 등록.
             # register 자체는 sync를 유지 (create_app 본문에서 동기 호출됨).
+            # 도메인 파라미터는 crawl_config에서 register_jobs 내부가 직접 resolve.
             async def _sched_hook() -> None:
-                await register_jobs(ctx.scheduler, ctx.db, **params)
+                await register_jobs(ctx.scheduler, ctx.db)
 
             ctx.on_startup(_sched_hook)
-
-    @classmethod
-    def get_scheduler_params(cls, cfg: dict[str, Any]) -> dict[str, Any]:
-        """도메인 특화 스케줄 파라미터를 반환합니다.
-
-        주기(schedule/schedule_minutes)는 crawl_schedule 테이블에서 조회하므로
-        여기서 반환하지 않습니다. 서브클래스는 도메인 파라미터만 추가합니다.
-        """
-        return {}

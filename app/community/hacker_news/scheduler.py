@@ -12,13 +12,8 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-async def register_jobs(
-    scheduler,
-    db: Database,
-    max_items: int = 100,
-    min_score: int = 50,
-    story_types: list[str] | None = None,
-) -> None:
+async def register_jobs(scheduler, db: Database) -> None:
+    # 도메인 파라미터(max_items, min_score, story_types)는 crawl_config에서 조회.
     await BaseScheduler.register_cron_job(
         scheduler,
         db,
@@ -26,7 +21,4 @@ async def register_jobs(
         job_id="hacker_news_crawler",
         crawler_import="app.community.hacker_news.crawler",
         crawler_class="HackerNewsCrawler",
-        max_items=max_items,
-        min_score=min_score,
-        story_types=story_types,
     )

@@ -10,7 +10,7 @@ async def _make_scheduler(db) -> AsyncIOScheduler:
     """crawl_schedule seed 기반으로 job들을 실제 등록한 scheduler 반환."""
     scheduler = AsyncIOScheduler()
     scheduler.start()
-    await gh_register_jobs(scheduler, db, since="daily", max_repos=10)
+    await gh_register_jobs(scheduler, db)
     return scheduler
 
 

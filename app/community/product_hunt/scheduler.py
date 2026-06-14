@@ -12,12 +12,8 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-async def register_jobs(
-    scheduler,
-    db: Database,
-    developer_token: str = "",
-    max_posts: int = 30,
-) -> None:
+async def register_jobs(scheduler, db: Database) -> None:
+    # 도메인 파라미터(max_posts)와 developer_token은 crawl_config에서 조회.
     await BaseScheduler.register_cron_job(
         scheduler,
         db,
@@ -25,6 +21,4 @@ async def register_jobs(
         job_id="product_hunt_crawler",
         crawler_import="app.community.product_hunt.crawler",
         crawler_class="ProductHuntCrawler",
-        developer_token=developer_token,
-        max_posts=max_posts,
     )
