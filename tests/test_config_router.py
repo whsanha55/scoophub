@@ -1,6 +1,7 @@
 # tests/test_config_router.py
 import pytest
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from fastapi import HTTPException
 
 from app.community.github_trending.scheduler import register_jobs as gh_register_jobs
 from app.core.base_scheduler import BaseScheduler
@@ -63,20 +64,22 @@ async def test_update_config_partial_merge(db):
     assert resp.data["params"]["since"] == "daily"  # 기존 키 보존
 
 
-async def test_update_config_unknown_key_rejected(db):
-    with pytest.raises(Exception):
+async def test_update_config_unknown_key_rejected_422(db):
+    with pytest.raises(HTTPException) as exc:
         await update_config(
             "github_trending", ConfigPatch(params={"bogus": 1}), db=db,
             scheduler=AsyncIOScheduler(),
         )
+    assert exc.value.status_code == 422
 
 
-async def test_update_config_wrong_type_rejected(db):
-    with pytest.raises(Exception):
+async def test_update_config_wrong_type_rejected_422(db):
+    with pytest.raises(HTTPException) as exc:
         await update_config(
             "github_trending", ConfigPatch(params={"max_repos": "not-int"}), db=db,
             scheduler=AsyncIOScheduler(),
         )
+    assert exc.value.status_code == 422
 
 
 async def test_update_config_unknown_crawler_404(db):

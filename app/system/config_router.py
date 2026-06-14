@@ -8,7 +8,7 @@ from typing import Any
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from app.core.auth import get_super_user
 from app.core.base_scheduler import BaseScheduler
@@ -168,8 +168,13 @@ async def update_config(
     if model_cls is None:
         raise HTTPException(status_code=404, detail=f"unknown crawler: {crawler!r}")
 
-    # per-crawler 검증 (extra='forbid' → unknown 키 422, 타입 오류 422)
-    validated = model_cls(**body.params)
+    # per-crawler 검증 (extra='forbid' → unknown 키 422, 타입 오류 422).
+    # body.params는 dict[str, Any]라 request-body 역직렬화 검증을 안 거치므로,
+    # 직접 잡아 422로 매핑하지 않으면 ValidationError가 500으로 노출됨.
+    try:
+        validated = model_cls(**body.params)
+    except ValidationError as e:
+        raise HTTPException(status_code=422, detail=e.errors())
     patch = {k: v for k, v in validated.model_dump().items() if v is not None}
     if not patch:
         raise HTTPException(status_code=422, detail="no updatable params provided")
