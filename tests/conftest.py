@@ -19,11 +19,26 @@ TEST_DB_URL = (
 
 TRUNCATE_SQL = (
     "TRUNCATE feed_news, crawl_logs, crawl_data, "
-    "crawler_metadata, crawl_sources, users RESTART IDENTITY CASCADE"
+    "crawl_sources, users RESTART IDENTITY CASCADE"
 )
 
 _MIGRATION_DIR = pathlib.Path(__file__).resolve().parent.parent / "db" / "migration"
 _migrated = False
+
+
+def _seed_statements(path: pathlib.Path) -> str:
+    """migration 파일에서 INSERT 문만 추출 (CREATE/주석 제거). 매 fixture seed 재주입용."""
+    text = path.read_text(encoding="utf-8")
+    parts = text.split("INSERT INTO")
+    return "".join("INSERT INTO" + p for p in parts[1:])
+
+
+# crawl_schedule / crawl_config seed: PATCH 테스트가 값을 바꾸므로 매 fixture마다 재주입.
+_RESEED_SQL = (
+    "TRUNCATE crawl_schedule, crawl_config RESTART IDENTITY CASCADE;\n"
+    + _seed_statements(_MIGRATION_DIR / "V11__crawl_schedule.sql")
+    + _seed_statements(_MIGRATION_DIR / "V12__crawl_config.sql")
+)
 
 
 async def _ensure_test_db() -> None:
@@ -72,6 +87,7 @@ async def db():
     pool = await database.pool
     async with pool.acquire() as conn:
         await conn.execute(TRUNCATE_SQL)
+        await conn.execute(_RESEED_SQL)  # crawl_schedule/crawl_config seed 재주입 (PATCH 테스트 격리)
     yield database
     await database.close()
 

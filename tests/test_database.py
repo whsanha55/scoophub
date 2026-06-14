@@ -15,7 +15,8 @@ async def test_create_tables(db):
     table_names = [t["table_name"] for t in tables]
     assert "feed_news" in table_names
     assert "crawl_data" in table_names
-    assert "crawler_metadata" in table_names
+    assert "crawl_config" in table_names
+    assert "crawler_metadata" not in table_names  # V12 (#127): DROP
     assert "crawl_logs" in table_names
     # V10 (#123): legacy 도메인 테이블은 crawl_data 이관 후 DROP됨
     assert "weather_snapshots" not in table_names

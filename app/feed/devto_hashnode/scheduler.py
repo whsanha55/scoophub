@@ -12,12 +12,8 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-async def register_jobs(
-    scheduler,
-    db: Database,
-    tags: list[str] | None = None,
-    max_articles_per_tag: int = 30,
-) -> None:
+async def register_jobs(scheduler, db: Database) -> None:
+    # 도메인 파라미터(tags, max_articles_per_tag)는 crawl_config에서 조회.
     await BaseScheduler.register_cron_job(
         scheduler,
         db,
@@ -25,6 +21,4 @@ async def register_jobs(
         job_id="devto_hashnode_crawler",
         crawler_import="app.feed.devto_hashnode.crawler",
         crawler_class="DevtoHashnodeCrawler",
-        tags=tags,
-        max_articles_per_tag=max_articles_per_tag,
     )

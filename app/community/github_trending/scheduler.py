@@ -12,13 +12,8 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-async def register_jobs(
-    scheduler,
-    db: Database,
-    since: str = "daily",
-    language: str | None = None,
-    max_repos: int = 25,
-) -> None:
+async def register_jobs(scheduler, db: Database) -> None:
+    # 도메인 파라미터(since, language, max_repos)는 crawl_config에서 조회.
     await BaseScheduler.register_cron_job(
         scheduler,
         db,
@@ -26,7 +21,4 @@ async def register_jobs(
         job_id="github_trending_crawler",
         crawler_import="app.community.github_trending.crawler",
         crawler_class="GithubTrendingCrawler",
-        since=since,
-        language=language,
-        max_repos=max_repos,
     )

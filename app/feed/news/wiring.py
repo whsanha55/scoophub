@@ -40,19 +40,12 @@ class NewsModule(BaseModule):
         logger.info("register 완료 - news 라우터 등록됨 (sources_router → news_router 순서)")
 
         if ctx.enable_scheduler:
-            cfg = ctx.cfg["crawlers"]["news"]
             sched_mod = importlib.import_module(cls.scheduler_module)
-            max_lookback_hours = cfg.get("max_lookback_hours", 24)
-            dedup_window_hours = cfg.get("dedup_window_hours", 24)
 
-            # register_jobs는 async (DB에서 trigger 조회) → lifespan startup에서 실행.
+            # register_jobs는 async (DB에서 trigger + params 조회) → lifespan startup에서 실행.
+            # 도메인 파라미터는 crawl_config에서 register_jobs 내부가 직접 resolve.
             async def _news_sched_hook() -> None:
-                await sched_mod.register_jobs(
-                    ctx.scheduler,
-                    ctx.db,
-                    max_lookback_hours=max_lookback_hours,
-                    dedup_window_hours=dedup_window_hours,
-                )
+                await sched_mod.register_jobs(ctx.scheduler, ctx.db)
 
             ctx.on_startup(_news_sched_hook)
 

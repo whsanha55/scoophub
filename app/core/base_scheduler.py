@@ -20,6 +20,24 @@ class BaseScheduler:
     """Shared scheduler registration logic — DB-driven triggers via crawl_schedule."""
 
     @staticmethod
+    async def resolve_params(db: "Database", crawler: str) -> dict:
+        """Resolve domain params dict from crawl_config row (crawler PK).
+
+        Returns params JSONB as dict. Returns {} when no row exists
+        (e.g. weather/kal_bonus — #127 이관 대상 아님, params 불필요).
+        """
+        row = await db.fetchrow(
+            "SELECT params FROM crawl_config WHERE crawler=$1", crawler
+        )
+        if row is None:
+            return {}
+        params = row["params"]
+        if isinstance(params, str):  # asyncpg returns JSONB as str without codec
+            import json
+            params = json.loads(params)
+        return params or {}
+
+    @staticmethod
     async def resolve_trigger(
         db: "Database", crawler: str, job_id: str
     ) -> tuple[BaseTrigger, bool]:
@@ -75,11 +93,11 @@ class BaseScheduler:
         job_id: str,
         crawler_import: str,
         crawler_class: str,
-        **kwargs,
     ) -> None:
         trigger, enabled = await BaseScheduler.resolve_trigger(db, crawler, job_id)
+        params = await BaseScheduler.resolve_params(db, crawler)
 
-        async def _run_crawl() -> None:
+        async def _run_crawl(**kwargs: object) -> None:
             module = importlib.import_module(crawler_import)
             cls = getattr(module, crawler_class)
             await cls(db, **kwargs).run()
@@ -87,6 +105,7 @@ class BaseScheduler:
         scheduler.add_job(
             _run_crawl,
             trigger=trigger,
+            kwargs=params,
             id=job_id,
             replace_existing=True,
         )
@@ -102,11 +121,11 @@ class BaseScheduler:
         job_id: str,
         crawler_import: str,
         crawler_class: str,
-        **kwargs,
     ) -> None:
         trigger, enabled = await BaseScheduler.resolve_trigger(db, crawler, job_id)
+        params = await BaseScheduler.resolve_params(db, crawler)
 
-        async def _run_crawl() -> None:
+        async def _run_crawl(**kwargs: object) -> None:
             module = importlib.import_module(crawler_import)
             cls = getattr(module, crawler_class)
             await cls(db, **kwargs).run()
@@ -114,6 +133,7 @@ class BaseScheduler:
         scheduler.add_job(
             _run_crawl,
             trigger=trigger,
+            kwargs=params,
             id=job_id,
             replace_existing=True,
         )

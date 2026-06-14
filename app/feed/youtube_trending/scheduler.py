@@ -12,13 +12,8 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-async def register_jobs(
-    scheduler,
-    db: Database,
-    api_key: str = "",
-    region_codes: list[str] | None = None,
-    max_results_per_region: int = 50,
-) -> None:
+async def register_jobs(scheduler, db: Database) -> None:
+    # 도메인 파라미터(region_codes, max_results_per_region)와 api_key는 crawl_config에서 조회.
     await BaseScheduler.register_cron_job(
         scheduler,
         db,
@@ -26,7 +21,4 @@ async def register_jobs(
         job_id="youtube_trending_crawler",
         crawler_import="app.feed.youtube_trending.crawler",
         crawler_class="YoutubeTrendingCrawler",
-        api_key=api_key,
-        region_codes=region_codes,
-        max_results_per_region=max_results_per_region,
     )

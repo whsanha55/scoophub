@@ -12,12 +12,8 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-async def register_jobs(
-    scheduler,
-    db: Database,
-    categories: list[str] | None = None,
-    max_results_per_category: int = 25,
-) -> None:
+async def register_jobs(scheduler, db: Database) -> None:
+    # 도메인 파라미터(categories, max_results_per_category)는 crawl_config에서 조회.
     await BaseScheduler.register_cron_job(
         scheduler,
         db,
@@ -25,6 +21,4 @@ async def register_jobs(
         job_id="arxiv_crawler",
         crawler_import="app.feed.arxiv.crawler",
         crawler_class="ArxivCrawler",
-        categories=categories,
-        max_results_per_category=max_results_per_category,
     )

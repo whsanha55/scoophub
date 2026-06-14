@@ -1,96 +1,45 @@
 crawlers:
   news:
-    max_lookback_hours: 24
     source_timeout_seconds: 10
     retry_count: 3
     retry_delay_seconds: 10
-    dedup_window_hours: 24
   weather:
     source_timeout_seconds: 15
   stock: {}
-  github_trending:
-    since: "daily"
-    language: null
-    max_repos: 25
+  github_trending: {}
   hacker_news:
-    max_items: 100
-    min_score: 50
-    story_types:
-      - top
-      - best
     source_timeout_seconds: 30
     retry_count: 3
     retry_delay_seconds: 10
     dedup_window_hours: 24
   arxiv:
-    categories:
-      - cs.AI
-      - cs.LG
-      - cs.CL
-      - stat.ML
-    max_results_per_category: 25
     source_timeout_seconds: 30
     retry_count: 3
     retry_delay_seconds: 5
     dedup_window_hours: 48
   product_hunt:
-    developer_token: ""
-    max_posts: 30
     source_timeout_seconds: 15
     retry_count: 3
     retry_delay_seconds: 10
   reddit:
-    client_id: ""
-    client_secret: ""
-    user_agent: "scoophub/1.0 by whsanha55"
-    subreddits:
-      - programming
-      - python
-      - javascript
-      - MachineLearning
-      - webdev
-      - datascience
-    listing_type: "hot"
-    max_posts_per_subreddit: 25
-    min_score: 50
     source_timeout_seconds: 15
     retry_count: 3
     retry_delay_seconds: 10
   youtube_trending:
-    api_key: ""
-    region_codes:
-      - KR
-      - US
-    max_results_per_region: 50
     source_timeout_seconds: 15
     retry_count: 3
     retry_delay_seconds: 10
   devto_hashnode:
-    tags:
-      - python
-      - javascript
-      - webdev
-      - tutorial
-      - beginners
-    max_articles_per_tag: 30
     source_timeout_seconds: 10
     retry_count: 3
     retry_delay_seconds: 10
   tech_newsletter:
-    feeds:
-      - url: "https://tldr.tech/api/rss/tech"
-        source: "TLDR Tech"
-      - url: "https://tldr.tech/api/rss/ai"
-        source: "TLDR AI"
-      - url: "https://techcrunch.com/feed/"
-        source: "TechCrunch"
-      - url: "https://www.theverge.com/rss/tech/index.xml"
-        source: "The Verge"
     source_timeout_seconds: 10
     retry_count: 3
     retry_delay_seconds: 10
   kal_bonus:
     # 1일 1회 KST 07:00 — real Chrome 필요 (channel='chrome')
+    # 도메인 파라미터는 crawl_sources.config (V9)에서 관리
 
 api:
   default_minutes: 30
