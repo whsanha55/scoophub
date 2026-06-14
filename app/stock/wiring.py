@@ -47,12 +47,8 @@ def register(ctx: AppContext) -> None:
     ctx.on_shutdown(_close_provider)
 
     if ctx.enable_scheduler:
-        cfg = ctx.cfg["crawlers"]["stock"]
-        register_jobs(
-            ctx.scheduler,
-            ctx.db,
-            provider_router,
-            sync_interval_minutes=cfg["sync_interval_minutes"],
-            sigma_schedule=cfg["sigma_schedule"],
-            analyze_schedule=cfg["analyze_schedule"],
-        )
+        # register_jobs는 async (DB에서 trigger 조회) → lifespan startup에서 실행.
+        async def _stock_sched_hook() -> None:
+            await register_jobs(ctx.scheduler, ctx.db, provider_router)
+
+        ctx.on_startup(_stock_sched_hook)

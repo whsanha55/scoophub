@@ -12,18 +12,17 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-def register_jobs(
+async def register_jobs(
     scheduler,
     db: Database,
-    schedule: str,
     feeds: list[dict] | None = None,
 ) -> None:
-    BaseScheduler.register_cron_job(
+    await BaseScheduler.register_cron_job(
         scheduler,
         db,
-        schedule=schedule,
+        crawler="tech_newsletter",
+        job_id="tech_newsletter_crawler",
         crawler_import="app.feed.tech_newsletter.crawler",
         crawler_class="TechNewsletterCrawler",
-        job_id="tech_newsletter_crawler",
         feeds=feeds,
     )

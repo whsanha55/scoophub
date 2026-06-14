@@ -12,10 +12,9 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-def register_jobs(
+async def register_jobs(
     scheduler,
     db: Database,
-    schedule: str,
     client_id: str = "",
     client_secret: str = "",
     user_agent: str = "scoophub/1.0",
@@ -24,13 +23,13 @@ def register_jobs(
     max_posts_per_subreddit: int = 25,
     min_score: int = 50,
 ) -> None:
-    BaseScheduler.register_cron_job(
+    await BaseScheduler.register_cron_job(
         scheduler,
         db,
-        schedule=schedule,
+        crawler="reddit",
+        job_id="reddit_crawler",
         crawler_import="app.community.reddit.crawler",
         crawler_class="RedditCrawler",
-        job_id="reddit_crawler",
         client_id=client_id,
         client_secret=client_secret,
         user_agent=user_agent,
