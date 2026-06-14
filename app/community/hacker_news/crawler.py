@@ -8,6 +8,7 @@ from datetime import datetime, timezone
 import httpx
 
 from app.core.base_crawler import BaseCrawler, CrawlResult
+from app.crawl_data.repo import CrawlDataRepo
 
 logger = logging.getLogger(__name__)
 
@@ -87,39 +88,39 @@ class HackerNewsCrawler(BaseCrawler):
             if not items:
                 return CrawlResult(items_fetched=0, items_new=0, errors=errors)
 
-            # 5) 기존 hn_id 집합 조회 (new 판별용)
-            hn_ids = [item["id"] for item in items]
+            # community_hackernews → crawl_data(category=community, purpose=hackernews, key=hn_id).
+            hn_ids = [str(item["id"]) for item in items]
             existing = await self.db.fetch(
-                "SELECT hn_id FROM community_hackernews WHERE hn_id = ANY($1)",
+                "SELECT key FROM crawl_data "
+                "WHERE category='community' AND purpose='hackernews' AND key = ANY($1)",
                 hn_ids,
             )
-            existing_ids = {r["hn_id"] for r in existing}
+            existing_ids = {r["key"] for r in existing}
             items_new = 0
+            repo = CrawlDataRepo(self.db)
 
-            # 6) upsert
             for item in items:
-                posted_at = datetime.fromtimestamp(item["time"], tz=timezone.utc) if item.get("time") else None
+                posted_at = datetime.fromtimestamp(item["time"], tz=timezone.utc) if item.get("time") else fetched_at
                 try:
-                    await self.db.execute(
-                        "INSERT INTO community_hackernews "
-                        "(hn_id, title, url, by_user, score, descendants, item_type, body_text, posted_at, fetched_at) "
-                        "VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) "
-                        "ON CONFLICT (hn_id) DO UPDATE SET "
-                        "score = EXCLUDED.score, "
-                        "descendants = EXCLUDED.descendants, "
-                        "fetched_at = EXCLUDED.fetched_at",
-                        item["id"],
-                        item.get("title"),
-                        item.get("url"),
-                        item.get("by"),
-                        item.get("score", 0),
-                        item.get("descendants"),
-                        item.get("type"),
-                        item.get("text"),
-                        posted_at,
-                        fetched_at,
+                    await repo.upsert(
+                        category="community",
+                        purpose="hackernews",
+                        key=str(item["id"]),
+                        response={
+                            "hn_id": item["id"],
+                            "title": item.get("title"),
+                            "url": item.get("url"),
+                            "by_user": item.get("by"),
+                            "score": item.get("score", 0),
+                            "descendants": item.get("descendants"),
+                            "item_type": item.get("type"),
+                            "body_text": item.get("text"),
+                            "posted_at": posted_at.isoformat(),
+                            "fetched_at": fetched_at.isoformat(),
+                        },
+                        date_at=posted_at,
                     )
-                    if item["id"] not in existing_ids:
+                    if str(item["id"]) not in existing_ids:
                         items_new += 1
                 except Exception as e:
                     errors.append(f"item {item.get('id')}: {e}")

@@ -1,7 +1,9 @@
 # reddit/router.py
 from __future__ import annotations
 
+import json
 import logging
+from datetime import datetime
 
 from fastapi import Depends, Query
 
@@ -56,28 +58,66 @@ async def get_reddit(
 ):
     logger.info("get_reddit requested: limit=%d subreddit=%s min_score=%s since=%s", limit, subreddit, min_score, since)
 
-    latest = await _base.get_latest(db)
+    # community_reddit → crawl_data(category=community, purpose=reddit).
+    latest = await db.fetchval(
+        "SELECT MAX((response->>'fetched_at')::timestamptz) FROM crawl_data "
+        "WHERE category='community' AND purpose='reddit'"
+    )
     if not latest:
         return _base.empty_response()
 
-    conditions: list[str] = ["fetched_at = $1"]
+    conditions: list[str] = ["(response->>'fetched_at')::timestamptz = $1"]
     params: list = [latest]
     idx = 2
 
     if subreddit is not None:
-        conditions.append(f"subreddit = ${idx}")
+        conditions.append(f"response->>'subreddit' = ${idx}")
         params.append(subreddit)
         idx += 1
 
     if min_score is not None:
-        conditions.append(f"score >= ${idx}")
+        conditions.append(f"(response->>'score')::int >= ${idx}")
         params.append(min_score)
         idx += 1
 
     if since is not None:
-        conditions.append(f"posted_at >= ${idx}")
-        params.append(since)
+        since_dt = datetime.fromisoformat(since.replace("Z", "+00:00"))
+        conditions.append(f"(response->>'posted_at')::timestamptz >= ${idx}")
+        params.append(since_dt)
         idx += 1
 
-    items = await _base.query_items(db, conditions, params, limit)
+    where = " AND ".join(conditions)
+    rows = await db.fetch(
+        f"SELECT id, key, date_at, response "
+        f"FROM crawl_data "
+        f"WHERE category='community' AND purpose='reddit' AND {where} "
+        f"ORDER BY (response->>'score')::int DESC NULLS LAST LIMIT ${idx}",
+        *params, limit,
+    )
+    items = [_reddit_item(r) for r in rows]
     return _base.items_response(items)
+
+
+def _reddit_item(row) -> dict:
+    """crawl_data row → 기존 community_reddit 응답 필드로 재구성."""
+    resp = row["response"]
+    if isinstance(resp, str):
+        resp = json.loads(resp)
+    return {
+        "id": row["id"],
+        "reddit_id": resp.get("reddit_id"),
+        "title": resp.get("title"),
+        "author": resp.get("author"),
+        "subreddit": resp.get("subreddit"),
+        "score": resp.get("score", 0),
+        "upvote_ratio": resp.get("upvote_ratio"),
+        "num_comments": resp.get("num_comments"),
+        "url": resp.get("url"),
+        "permalink": resp.get("permalink"),
+        "selftext": resp.get("selftext"),
+        "is_self": resp.get("is_self"),
+        "link_flair": resp.get("link_flair"),
+        "domain": resp.get("domain"),
+        "posted_at": resp.get("posted_at"),
+        "fetched_at": resp.get("fetched_at"),
+    }

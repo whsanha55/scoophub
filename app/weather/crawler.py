@@ -1,13 +1,13 @@
 # weather/crawler.py
 from __future__ import annotations
 
-import json
 import logging
 from datetime import datetime, timezone
 
 import httpx
 
 from app.core.base_crawler import BaseCrawler, CrawlResult
+from app.crawl_data.repo import CrawlDataRepo
 
 logger = logging.getLogger(__name__)
 
@@ -121,31 +121,35 @@ class WeatherCrawler(BaseCrawler):
         # wttr.in 주간 예보 (최대 3일치)
         weekly = wttr_data.get("weather", [])[:3]
 
-        # 수집된 데이터를 weather_snapshots 테이블에 저장
-        await self.db.execute(
-            "INSERT INTO weather_snapshots "
-            "(location, fetched_at, temperature, feels_like, humidity, wind_speed, wind_direction, "
-            "condition, precip_mm, rain_chance, pm10, pm10_grade, pm25, pm25_grade, "
-            "ozone, uv_index, uv_grade, weekly_forecast, raw_json) "
-            "VALUES ($1, NOW(), $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17::jsonb, $18::jsonb)",
-            "seoul",
-            float(cc.get("temp_C", 0)),
-            float(cc.get("FeelsLikeC", 0)),
-            int(cc.get("humidity", 0)),
-            float(cc.get("windspeedKmph", 0)),
-            cc.get("winddir16Point", ""),
-            _translate_condition(condition_en),
-            float(cc.get("precipMM", 0)),
-            int(cc.get("chanceofrain", 0)),
-            pm10,
-            _grade(pm10, PM10_THRESHOLDS),
-            pm25,
-            _grade(pm25, PM25_THRESHOLDS),
-            ozone,
-            uv_index,
-            _grade(uv_index, UV_THRESHOLDS),
-            json.dumps(weekly),
-            json.dumps(wttr_data),
+        # weather_snapshots → crawl_data(category=weather, purpose=snapshot, key=location).
+        # 동일 location 재크롤 = upsert(최신 덮어쓰기). 과거 스냅샷 히스토리는 손실(사용자 확정).
+        fetched_at = datetime.now(timezone.utc)
+        await CrawlDataRepo(self.db).upsert(
+            category="weather",
+            purpose="snapshot",
+            key="seoul",
+            response={
+                "location": "seoul",
+                "fetched_at": fetched_at.isoformat(),
+                "temperature": float(cc.get("temp_C", 0)),
+                "feels_like": float(cc.get("FeelsLikeC", 0)),
+                "humidity": int(cc.get("humidity", 0)),
+                "wind_speed": float(cc.get("windspeedKmph", 0)),
+                "wind_direction": cc.get("winddir16Point", ""),
+                "condition": _translate_condition(condition_en),
+                "precip_mm": float(cc.get("precipMM", 0)),
+                "rain_chance": int(cc.get("chanceofrain", 0)),
+                "pm10": pm10,
+                "pm10_grade": _grade(pm10, PM10_THRESHOLDS),
+                "pm25": pm25,
+                "pm25_grade": _grade(pm25, PM25_THRESHOLDS),
+                "ozone": ozone,
+                "uv_index": uv_index,
+                "uv_grade": _grade(uv_index, UV_THRESHOLDS),
+                "weekly_forecast": weekly,
+                "raw_json": wttr_data,
+            },
+            date_at=fetched_at,
         )
 
         logger.info("weather fetch completed: errors=%d", len(errors))

@@ -26,6 +26,7 @@ async def test_crawl_logs_with_detail_filter(client, db):
     """crawler_detail 필터 파라미터 동작 확인."""
     # 테스트 데이터 삽입
     from datetime import datetime, timezone
+
     now = datetime.now(timezone.utc)
     await db.execute(
         "INSERT INTO crawl_logs (crawler, crawler_detail, status, items_fetched, items_new, started_at, finished_at) "

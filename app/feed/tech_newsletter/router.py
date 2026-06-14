@@ -1,7 +1,9 @@
 # tech_newsletter/router.py
 from __future__ import annotations
 
+import json
 import logging
+from datetime import datetime
 
 from fastapi import Depends, Query
 
@@ -55,23 +57,55 @@ async def get_tech_newsletter(
 ):
     logger.info("get_tech_newsletter requested: limit=%d source=%s since=%s", limit, source, since)
 
-    latest = await _base.get_latest(db)
+    # feed_newsletter → crawl_data(category=feed, purpose=newsletter).
+    # 최신 배치 = response.fetched_at(크롤 run 단일 타임스탬프)의 MAX.
+    latest = await db.fetchval(
+        "SELECT MAX((response->>'fetched_at')::timestamptz) FROM crawl_data "
+        "WHERE category='feed' AND purpose='newsletter'"
+    )
     if not latest:
         return _base.empty_response()
 
-    conditions: list[str] = ["fetched_at = $1"]
+    conditions: list[str] = ["(response->>'fetched_at')::timestamptz = $1"]
     params: list = [latest]
     idx = 2
 
     if source is not None:
-        conditions.append(f"source = ${idx}")
+        conditions.append(f"response->>'source' = ${idx}")
         params.append(source)
         idx += 1
 
     if since is not None:
-        conditions.append(f"published_at >= ${idx}")
-        params.append(since)
+        since_dt = datetime.fromisoformat(since.replace("Z", "+00:00"))
+        conditions.append(f"(response->>'published_at')::timestamptz >= ${idx}")
+        params.append(since_dt)
         idx += 1
 
-    items = await _base.query_items(db, conditions, params, limit)
+    where = " AND ".join(conditions)
+    rows = await db.fetch(
+        f"SELECT id, key, date_at, response "
+        f"FROM crawl_data "
+        f"WHERE category='feed' AND purpose='newsletter' AND {where} "
+        f"ORDER BY date_at DESC NULLS LAST LIMIT ${idx}",
+        *params, limit,
+    )
+    items = [_newsletter_item(r) for r in rows]
     return _base.items_response(items)
+
+
+def _newsletter_item(row) -> dict:
+    """crawl_data row → 기존 feed_newsletter 응답 필드로 재구성."""
+    resp = row["response"]
+    if isinstance(resp, str):
+        resp = json.loads(resp)
+    return {
+        "id": row["id"],
+        "url": row["key"],
+        "title": resp.get("title"),
+        "source": resp.get("source"),
+        "summary": resp.get("summary"),
+        "author": resp.get("author"),
+        "category": resp.get("category"),
+        "published_at": resp.get("published_at"),
+        "fetched_at": resp.get("fetched_at"),
+    }
