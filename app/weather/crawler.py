@@ -121,7 +121,7 @@ class WeatherCrawler(BaseCrawler):
         # wttr.in 주간 예보 (최대 3일치)
         weekly = wttr_data.get("weather", [])[:3]
 
-        # weather_snapshots → crawl_data(category=weather, purpose=snapshot, key=location).
+        # crawl_data(category=weather, purpose=snapshot, key=location).
         # 동일 location 재크롤 = upsert(최신 덮어쓰기). 과거 스냅샷 히스토리는 손실(사용자 확정).
         fetched_at = datetime.now(timezone.utc)
         await CrawlDataRepo(self.db).upsert(

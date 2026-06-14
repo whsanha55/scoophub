@@ -58,7 +58,7 @@ async def get_hacker_news(
 ):
     logger.info("get_hacker_news requested: limit=%d min_score=%s item_type=%s since=%s", limit, min_score, item_type, since)
 
-    # community_hackernews → crawl_data(category=community, purpose=hackernews).
+    # crawl_data(category=community, purpose=hackernews) 최신 배치.
     latest = await db.fetchval(
         "SELECT MAX((response->>'fetched_at')::timestamptz) FROM crawl_data "
         "WHERE category='community' AND purpose='hackernews'"
@@ -99,7 +99,7 @@ async def get_hacker_news(
 
 
 def _hn_item(row) -> dict:
-    """crawl_data row → 기존 community_hackernews 응답 필드로 재구성."""
+    """crawl_data row → hacker news 응답 필드로 재구성."""
     resp = row["response"]
     if isinstance(resp, str):
         resp = json.loads(resp)

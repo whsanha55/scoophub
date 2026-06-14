@@ -1,4 +1,3 @@
-# community_hackernews/crawler.py
 from __future__ import annotations
 
 import asyncio
@@ -88,7 +87,7 @@ class HackerNewsCrawler(BaseCrawler):
             if not items:
                 return CrawlResult(items_fetched=0, items_new=0, errors=errors)
 
-            # community_hackernews → crawl_data(category=community, purpose=hackernews, key=hn_id).
+            # crawl_data(category=community, purpose=hackernews, key=hn_id).
             hn_ids = [str(item["id"]) for item in items]
             existing = await self.db.fetch(
                 "SELECT key FROM crawl_data "

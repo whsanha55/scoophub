@@ -59,7 +59,7 @@ async def get_arxiv(
 ):
     logger.info("get_arxiv requested: category=%s since=%s query=%s limit=%d", category, since, query, limit)
 
-    # feed_arxiv → crawl_data(category=feed, purpose=arxiv).
+    # crawl_data(category=feed, purpose=arxiv) 최신 배치.
     latest = await db.fetchval(
         "SELECT MAX((response->>'fetched_at')::timestamptz) FROM crawl_data "
         "WHERE category='feed' AND purpose='arxiv'"
@@ -100,7 +100,7 @@ async def get_arxiv(
 
 
 def _arxiv_item(row) -> dict:
-    """crawl_data row → 기존 feed_arxiv 응답 필드로 재구성."""
+    """crawl_data row → arxiv 응답 필드로 재구성."""
     resp = row["response"]
     if isinstance(resp, str):
         resp = json.loads(resp)

@@ -55,7 +55,7 @@ async def get_github_trending(
 ):
     logger.info("get_github_trending requested: period=%s language=%s limit=%d", period, language, limit)
 
-    # community_github → crawl_data(category=community, purpose=github).
+    # crawl_data(category=community, purpose=github).
     # period별 최신 배치 = response.fetched_at의 MAX (해당 period).
     latest = await db.fetchval(
         "SELECT MAX((response->>'fetched_at')::timestamptz) FROM crawl_data "
@@ -90,7 +90,7 @@ async def get_github_trending(
 
 
 def _github_item(row) -> dict:
-    """crawl_data row → 기존 community_github 응답 필드로 재구성."""
+    """crawl_data row → github trending 응답 필드로 재구성."""
     resp = row["response"]
     if isinstance(resp, str):
         resp = json.loads(resp)

@@ -7,7 +7,7 @@ trigger 엔드포인트가 자동 등록됩니다.
 
 사용 예:
     class HNRouter(BaseRouter):
-        table_name = "community_hackernews"
+        table_name = "hackernews"  # OpenAPI description 라벨용
         route_path = "/hacker-news"
         crawler_import = "app.community.hacker_news.crawler"
         crawler_class_name = "HackerNewsCrawler"
@@ -41,7 +41,7 @@ class BaseRouter(ABC):
     """도메인 router의 공통 로직을 제공하는 추상 기반 클래스.
 
     서브클래스가 설정하는 클래스 속성:
-        table_name: DB 테이블명 (예: "hacker_news")
+        table_name: OpenAPI description 라벨용 문자열 (예: "hacker_news")
         route_path: URL 경로 (예: "/hacker-news")
         api_tag: OpenAPI 태그명 (예: "Hacker News")
         crawler_import: crawler 모듈 경로 (예: "app.community.hacker_news.crawler")

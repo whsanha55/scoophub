@@ -57,7 +57,7 @@ async def get_tech_newsletter(
 ):
     logger.info("get_tech_newsletter requested: limit=%d source=%s since=%s", limit, source, since)
 
-    # feed_newsletter → crawl_data(category=feed, purpose=newsletter).
+    # crawl_data(category=feed, purpose=newsletter).
     # 최신 배치 = response.fetched_at(크롤 run 단일 타임스탬프)의 MAX.
     latest = await db.fetchval(
         "SELECT MAX((response->>'fetched_at')::timestamptz) FROM crawl_data "
@@ -94,7 +94,7 @@ async def get_tech_newsletter(
 
 
 def _newsletter_item(row) -> dict:
-    """crawl_data row → 기존 feed_newsletter 응답 필드로 재구성."""
+    """crawl_data row → newsletter 응답 필드로 재구성."""
     resp = row["response"]
     if isinstance(resp, str):
         resp = json.loads(resp)

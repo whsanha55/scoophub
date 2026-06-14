@@ -1,4 +1,3 @@
-# feed_devblog/crawler.py
 from __future__ import annotations
 
 import logging
@@ -55,7 +54,7 @@ class DevtoHashnodeCrawler(BaseCrawler):
                 seen_ids.add(aid)
                 unique_items.append(item)
 
-        # feed_devblog → crawl_data(category=feed, purpose=devblog, key=article_id).
+        # crawl_data(category=feed, purpose=devblog, key=article_id).
         article_ids = [str(aid) for aid in seen_ids]
         existing = await self.db.fetch(
             "SELECT key FROM crawl_data "

@@ -1,4 +1,3 @@
-# feed_newsletter/crawler.py
 from __future__ import annotations
 
 import asyncio
@@ -68,7 +67,7 @@ class TechNewsletterCrawler(BaseCrawler):
         if not all_entries:
             return CrawlResult(items_fetched=0, items_new=0, errors=errors)
 
-        # feed_newsletter → crawl_data(category=feed, purpose=newsletter, key=url).
+        # crawl_data(category=feed, purpose=newsletter, key=url).
         urls = [e["url"] for e in all_entries if e["url"]]
         existing = await self.db.fetch(
             "SELECT key FROM crawl_data "

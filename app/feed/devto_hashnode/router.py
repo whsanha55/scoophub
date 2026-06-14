@@ -56,7 +56,7 @@ async def get_devto_hashnode(
 ):
     logger.info("get_devto_hashnode requested: limit=%d tag=%s since=%s", limit, tag, since)
 
-    # feed_devblog → crawl_data(category=feed, purpose=devblog).
+    # crawl_data(category=feed, purpose=devblog).
     # 최신 배치 = response.fetched_at(크롤 run 단일 타임스탬프)의 MAX.
     latest = await db.fetchval(
         "SELECT MAX((response->>'fetched_at')::timestamptz) FROM crawl_data "
@@ -93,7 +93,7 @@ async def get_devto_hashnode(
 
 
 def _devblog_item(row) -> dict:
-    """crawl_data row → 기존 feed_devblog 응답 필드로 재구성."""
+    """crawl_data row → devblog 응답 필드로 재구성."""
     resp = row["response"]
     if isinstance(resp, str):
         resp = json.loads(resp)
