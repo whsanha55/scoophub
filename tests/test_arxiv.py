@@ -32,10 +32,10 @@ async def test_crawler_upserts_to_crawl_data(db):
     pub = datetime(2026, 6, 1, tzinfo=timezone.utc)
     papers = [_paper("2401.00001", "A", "cs.AI", pub), _paper("2401.00002", "B", "cs.LG", pub)]
 
-    search = MagicMock()
-    search.results.return_value = iter(papers)
+    client = MagicMock()
+    client.results.return_value = iter(papers)
 
-    with patch("arxiv.Search", return_value=search):
+    with patch("arxiv.Client", return_value=client):
         crawler = ArxivCrawler(db, categories=["cs.AI"])
         result = await crawler.run()
 
@@ -57,10 +57,10 @@ async def test_crawler_dedup_counts_new_only(db):
     )
     pub = datetime(2026, 6, 1, tzinfo=timezone.utc)
     papers = [_paper("2401.00001", "A-new", "cs.AI", pub), _paper("2401.00002", "B", "cs.AI", pub)]
-    search = MagicMock()
-    search.results.return_value = iter(papers)
+    client = MagicMock()
+    client.results.return_value = iter(papers)
 
-    with patch("arxiv.Search", return_value=search):
+    with patch("arxiv.Client", return_value=client):
         crawler = ArxivCrawler(db, categories=["cs.AI"])
         result = await crawler.run()
 

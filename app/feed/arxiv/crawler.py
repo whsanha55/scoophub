@@ -27,6 +27,7 @@ class ArxivCrawler(BaseCrawler):
         import arxiv
         fetched_at = datetime.now(timezone.utc)
 
+        client = arxiv.Client()
         all_papers: list[arxiv.Result] = []
         for category in self.categories:
             try:
@@ -36,8 +37,9 @@ class ArxivCrawler(BaseCrawler):
                     sort_by=arxiv.SortCriterion.SubmittedDate,
                     sort_order=arxiv.SortOrder.Descending,
                 )
+                # arxiv 4.0.0: Search.results() 제거 → Client.results(search)
                 # 동기 → 비동기 래핑
-                results = await asyncio.to_thread(list, search.results())
+                results = await asyncio.to_thread(list, client.results(search))
                 all_papers.extend(results)
             except Exception as e:
                 errors.append(f"{category}: {e}")
