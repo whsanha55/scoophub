@@ -60,7 +60,7 @@ async def get_weather(
     db: Database = Depends(_get_db),
 ):
     logger.info("get_weather requested: location=%s minutes=%s", location, minutes)
-    # weather_snapshots → crawl_data(category=weather, purpose=snapshot, key=location).
+    # crawl_data(category=weather, purpose=snapshot, key=location).
     # 최신 스냅샷 1건 (시간 필터로 신선도 확인).
     conditions = ["key = $1"]
     params: list = [location]
@@ -127,7 +127,7 @@ async def get_weather_forecast(
 
 
 def _weather_item(row) -> dict:
-    """crawl_data row → 기존 weather_snapshots 응답 필드로 재구성."""
+    """crawl_data row → weather snapshot 응답 필드로 재구성."""
     resp = row["response"]
     if isinstance(resp, str):
         resp = json.loads(resp)

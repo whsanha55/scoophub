@@ -84,7 +84,7 @@ class YoutubeTrendingCrawler(BaseCrawler):
         if not all_items:
             return CrawlResult(items_fetched=0, items_new=0, errors=errors)
 
-        # feed_youtube → crawl_data(category=feed, purpose=youtube,
+        # crawl_data(category=feed, purpose=youtube,
         # key={region_code}:{video_id}).
         keys = [f"{it['region_code']}:{it['video_id']}" for it in all_items]
         existing = await self.db.fetch(

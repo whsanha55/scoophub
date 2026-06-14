@@ -58,7 +58,7 @@ async def get_reddit(
 ):
     logger.info("get_reddit requested: limit=%d subreddit=%s min_score=%s since=%s", limit, subreddit, min_score, since)
 
-    # community_reddit → crawl_data(category=community, purpose=reddit).
+    # crawl_data(category=community, purpose=reddit) 최신 배치.
     latest = await db.fetchval(
         "SELECT MAX((response->>'fetched_at')::timestamptz) FROM crawl_data "
         "WHERE category='community' AND purpose='reddit'"
@@ -99,7 +99,7 @@ async def get_reddit(
 
 
 def _reddit_item(row) -> dict:
-    """crawl_data row → 기존 community_reddit 응답 필드로 재구성."""
+    """crawl_data row → reddit 응답 필드로 재구성."""
     resp = row["response"]
     if isinstance(resp, str):
         resp = json.loads(resp)

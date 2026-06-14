@@ -56,7 +56,7 @@ async def get_product_hunt(
 ):
     logger.info("get_product_hunt requested: limit=%d topic=%s since=%s", limit, topic, since)
 
-    # community_producthunt → crawl_data(category=community, purpose=producthunt).
+    # crawl_data(category=community, purpose=producthunt) 최신 배치.
     latest = await db.fetchval(
         "SELECT MAX((response->>'fetched_at')::timestamptz) FROM crawl_data "
         "WHERE category='community' AND purpose='producthunt'"
@@ -92,7 +92,7 @@ async def get_product_hunt(
 
 
 def _ph_item(row) -> dict:
-    """crawl_data row → 기존 community_producthunt 응답 필드로 재구성."""
+    """crawl_data row → product hunt 응답 필드로 재구성."""
     resp = row["response"]
     if isinstance(resp, str):
         resp = json.loads(resp)

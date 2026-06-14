@@ -48,7 +48,7 @@ class ArxivCrawler(BaseCrawler):
         if not all_papers:
             return CrawlResult(items_fetched=0, items_new=0, errors=errors)
 
-        # feed_arxiv → crawl_data(category=feed, purpose=arxiv, key=arxiv_id).
+        # crawl_data(category=feed, purpose=arxiv, key=arxiv_id).
         arxiv_ids = [p.get_short_id() for p in all_papers]
         existing = await self.db.fetch(
             "SELECT key FROM crawl_data "

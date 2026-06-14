@@ -100,7 +100,7 @@ class RedditCrawler(BaseCrawler):
         if not all_items:
             return CrawlResult(items_fetched=0, items_new=0, errors=errors)
 
-        # community_reddit → crawl_data(category=community, purpose=reddit, key=reddit_id).
+        # crawl_data(category=community, purpose=reddit, key=reddit_id).
         reddit_ids = [item["reddit_id"] for item in all_items]
         existing = await self.db.fetch(
             "SELECT key FROM crawl_data "

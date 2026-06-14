@@ -55,7 +55,7 @@ async def get_youtube_trending(
 ):
     logger.info("get_youtube_trending requested: region=%s category=%s limit=%d", region_code, category_id, limit)
 
-    # feed_youtube → crawl_data(category=feed, purpose=youtube).
+    # crawl_data(category=feed, purpose=youtube).
     # region별 최신 배치 = response.fetched_at의 MAX (해당 region).
     latest = await db.fetchval(
         "SELECT MAX((response->>'fetched_at')::timestamptz) FROM crawl_data "
@@ -87,7 +87,7 @@ async def get_youtube_trending(
 
 
 def _youtube_item(row) -> dict:
-    """crawl_data row → 기존 feed_youtube 응답 필드로 재구성."""
+    """crawl_data row → youtube 응답 필드로 재구성."""
     resp = row["response"]
     if isinstance(resp, str):
         resp = json.loads(resp)

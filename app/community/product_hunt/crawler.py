@@ -93,7 +93,7 @@ class ProductHuntCrawler(BaseCrawler):
         if not edges:
             return CrawlResult(items_fetched=0, items_new=0, errors=errors)
 
-        # community_producthunt → crawl_data(category=community, purpose=producthunt, key=ph_id).
+        # crawl_data(category=community, purpose=producthunt, key=ph_id).
         ph_ids = [str(edge["node"]["id"]) for edge in edges if edge.get("node")]
         existing = await self.db.fetch(
             "SELECT key FROM crawl_data "

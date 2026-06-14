@@ -42,7 +42,7 @@ class GithubTrendingCrawler(BaseCrawler):
         repos = repos[: self.max_repos]
         fetched_at = datetime.now(timezone.utc)
 
-        # community_github → crawl_data(category=community, purpose=github, key=url).
+        # crawl_data(category=community, purpose=github, key=url).
         urls = [r.get("url", "") for r in repos if r.get("url")]
         existing = await self.db.fetch(
             "SELECT key FROM crawl_data "

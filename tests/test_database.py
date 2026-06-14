@@ -14,9 +14,13 @@ async def test_create_tables(db):
         )
     table_names = [t["table_name"] for t in tables]
     assert "feed_news" in table_names
-    assert "weather_snapshots" in table_names
+    assert "crawl_data" in table_names
     assert "crawler_metadata" in table_names
     assert "crawl_logs" in table_names
+    # V10 (#123): legacy 도메인 테이블은 crawl_data 이관 후 DROP됨
+    assert "weather_snapshots" not in table_names
+    assert "community_hackernews" not in table_names
+    assert "feed_newsletter" not in table_names
 
 
 @pytest.mark.asyncio

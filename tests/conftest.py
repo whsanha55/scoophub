@@ -18,7 +18,7 @@ TEST_DB_URL = (
 )
 
 TRUNCATE_SQL = (
-    "TRUNCATE feed_news, weather_snapshots, crawl_logs, crawl_data, "
+    "TRUNCATE feed_news, crawl_logs, crawl_data, "
     "crawler_metadata, crawl_sources, users RESTART IDENTITY CASCADE"
 )
 
@@ -54,7 +54,12 @@ async def _ensure_schema(database: Database) -> None:
     async with pool.acquire() as conn:
         already = await conn.fetchval("SELECT to_regclass('public.feed_news')")
         if already is None:
-            for sql_file in sorted(_MIGRATION_DIR.glob("V*.sql")):
+            # V 번호 순 정렬 — 문자열 정렬 시 V10 < V2 가 되어 순서 꼬임 방지
+            mig_files = sorted(
+                _MIGRATION_DIR.glob("V*.sql"),
+                key=lambda p: int(p.name.split("__", 1)[0][1:]),
+            )
+            for sql_file in mig_files:
                 await conn.execute(sql_file.read_text(encoding="utf-8"))
     _migrated = True
 
