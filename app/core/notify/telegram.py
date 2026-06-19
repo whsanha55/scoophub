@@ -31,7 +31,7 @@ class TelegramNotifier(Notifier):
 
     async def send(self, chat_id: str, topic_id: int | None, message: NotifyMessage) -> None:
         for chunk in _split(message.text, _MAX_TEXT):
-            payload: dict[str, object] = {"chat_id": chat_id, "text": chunk}
+            payload: dict[str, object] = {"chat_id": chat_id, "text": chunk, "parse_mode": "HTML"}
             if topic_id is not None:
                 payload["message_thread_id"] = topic_id
             await self._post("sendMessage", payload)
