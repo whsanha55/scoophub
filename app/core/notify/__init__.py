@@ -25,6 +25,9 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
+# fire-and-forget task 참조 보관용 — GC 로 인한 task 중도 소멸 방지 (done 시 자동 제거).
+_background_tasks: set[asyncio.Task] = set()
+
 # 큰 섹터(category)별 토픽 이모지 — format_card 표식
 _EMOJI = {
     "news": "📰",
@@ -72,9 +75,12 @@ async def dispatch_crawl_notify(
     items_fetched = int(getattr(result, "items_fetched", 0) or 0)
     new_ids = list(getattr(result, "new_article_ids", None) or [])
     if payload_key is None:
-        # new_ids 있으면 최대값, 없으면 items_new 로 식별 — 같은 결과 재크롤 시 dedup
-        suffix = str(max(new_ids)) if new_ids else f"n{items_new}"
-        payload_key = f"{category}:{detail or ''}:{suffix}"
+        if new_ids:
+            # new_article_ids 있으면 최대값으로 식별 — 같은 결과 재크롤 시 dedup
+            payload_key = f"{category}:{detail or ''}:{max(new_ids)}"
+        else:
+            # 스냅샷 도메인(weather/stock)은 안정 식별키 없음 — 매 run 발신 (빈 키 → dedup 미적용)
+            payload_key = ""
 
     text = format_card(category, detail, items_new, items_fetched)
     # news: feed_news 에 이미 저장된 LLM summary 재활용 — 탑5 제목+요약 부착 (재호출 비용 0).
@@ -116,7 +122,10 @@ def fire_and_forget_crawl(
     payload_key: str | None = None,
 ) -> None:
     """크롤 런을 블록하지 않는 비동기 발신. BaseCrawler.run() / scraper 종료점에서 호출."""
-    asyncio.create_task(_safe_dispatch(db, category, detail, result, payload_key))
+    # 참조 보관 — 버리면 event loop 가 task 를 GC 해 발신이 조용히 누락됨 (CPython 공식 경고).
+    task = asyncio.create_task(_safe_dispatch(db, category, detail, result, payload_key))
+    _background_tasks.add(task)
+    task.add_done_callback(_background_tasks.discard)
 
 
 async def _safe_dispatch(

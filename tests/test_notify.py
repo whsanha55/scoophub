@@ -125,3 +125,14 @@ async def test_dispatch_skips_zero_new(db, monkeypatch):
     result = CrawlResult(items_fetched=5, items_new=0)
     await dispatch_crawl_notify(db, "news", "rss", result)
     assert await db.fetchval("SELECT COUNT(*) FROM notify_log") == 0
+
+
+async def test_router_empty_payload_key_no_dedup(db):
+    # 스냅샷 도메인(weather/stock)은 안정 식별키 없음 → payload_key="" → 매 run 발신 (dedup 미적용).
+    await _seed_route(db, category="weather", purpose="snapshot", topic_id=10)
+    fake = FakeNotifier()
+    router = NotifyRouter(db, notifier_override={"telegram": fake})
+    await router.dispatch("weather", "snapshot", "", NotifyMessage(text="a"))
+    await router.dispatch("weather", "snapshot", "", NotifyMessage(text="b"))
+    assert len(fake.sent) == 2
+
