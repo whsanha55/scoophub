@@ -34,6 +34,9 @@ class Settings(BaseSettings):
     REDDIT_CLIENT_SECRET: str = ""
     YOUTUBE_API_KEY: str = ""
 
+    # Telegram (Notify 서브시템 — 크롤 완료 발신)
+    TELEGRAM_BOT_TOKEN: str = ""
+
     @property
     def database_url(self) -> str:
         return (
