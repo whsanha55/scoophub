@@ -17,6 +17,7 @@ from typing import TYPE_CHECKING
 
 from app.config import settings
 from app.core.notify.notifier import Notifier, NotifyMessage
+from app.core.notify.provisioner import AutoTopicProvisioner
 from app.core.notify.router import NotifyRouter
 from app.core.notify.telegram import TelegramNotifier
 
@@ -91,6 +92,11 @@ async def dispatch_crawl_notify(
         except Exception as e:
             logger.warning("news enrich failed (category=news): %s", e)
     router = NotifyRouter(db)
+    # 라우트 부재 시 자동 토픽 생성 보장 (신규 category). 실패해도 발신/크롤은 계속 — 라우트 없으면 기존대로 스킵.
+    try:
+        await AutoTopicProvisioner(db).ensure_route(category, detail or "")
+    except Exception as e:
+        logger.warning("auto provision failed (category=%s detail=%s): %s", category, detail, e)
     await router.dispatch(category, detail or "", payload_key, NotifyMessage(text=text))
 
 
