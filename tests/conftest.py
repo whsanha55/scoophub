@@ -19,7 +19,7 @@ TEST_DB_URL = (
 
 TRUNCATE_SQL = (
     "TRUNCATE feed_news, crawl_logs, crawl_data, "
-    "crawl_sources, users RESTART IDENTITY CASCADE"
+    "crawl_sources, notify_routes, notify_log, users RESTART IDENTITY CASCADE"
 )
 
 _MIGRATION_DIR = pathlib.Path(__file__).resolve().parent.parent / "db" / "migration"

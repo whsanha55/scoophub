@@ -19,6 +19,7 @@ class SystemModule(BaseModule):
         {"name": "System", "description": "시스템 상태 및 크롤 로그 API"},
         {"name": "Schedules", "description": "크롤 주기 DB 동적 관리 API (super user)"},
         {"name": "Crawler Config", "description": "크롤 도메인 파라미터 DB 동적 관리 API (super user)"},
+        {"name": "Notify", "description": "크롤 완료 발신 라우팅 관리 API (super user)"},
     ]
 
     @classmethod
@@ -36,6 +37,11 @@ class SystemModule(BaseModule):
         ctx.app.dependency_overrides[cfg_mod._get_db] = lambda: ctx.db
         ctx.app.dependency_overrides[cfg_mod._get_scheduler] = lambda: ctx.scheduler
         ctx.app.include_router(cfg_mod.router)
+
+        # notify_router 추가 등록 (발신 라우팅 관리)
+        notify_mod = importlib.import_module("app.system.notify_router")
+        ctx.app.dependency_overrides[notify_mod._get_db] = lambda: ctx.db
+        ctx.app.include_router(notify_mod.router)
 
 
 register = SystemModule.register
