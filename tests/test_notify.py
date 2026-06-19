@@ -231,19 +231,19 @@ async def test_provision_no_chat_id_suppresses(db, monkeypatch):
 
 
 async def test_provision_on_conflict_do_nothing(db, monkeypatch):
-    # 동시 크롤 중복 INSERT → ON CONFLICT DO NOTHING 로 에러 없이 1행 유지.
+    # 비활성 라우트가 동일 (category,purpose,channel) 키를 선점 → provisioner INSERT 가
+    # ON CONFLICT DO NOTHING 로 충돌 처리. match 쿼리는 enabled 만 보므로 비활성 행은
+    # 스킵 → create_topic/INSERT 경로까지 도달. 예외 없이 통과 + 기존 행 보존 검증.
     monkeypatch.setattr(settings, "TELEGRAM_DEFAULT_CHAT_ID", "-1001")
-    await db.execute(
-        "INSERT INTO notify_routes (category, purpose, channel, chat_id, topic_id, topic_name) "
-        "VALUES ('news', '', 'telegram', '-1001', 1, '먼저')"
-    )
-    # provisioner INSERT 문과 동일 패턴으로 동일 키 재시도.
-    await db.execute(
-        "INSERT INTO notify_routes "
-        "(category, purpose, channel, chat_id, topic_id, topic_name, enabled) "
-        "VALUES ('news', '', 'telegram', '-1001', 2, '나중', TRUE) "
-        "ON CONFLICT (category, purpose, channel) DO NOTHING"
-    )
+    await _seed_route(db, category="news", purpose="", topic_id=1, topic_name="먼저", enabled=False)
+    llm = FakeLLM('{"name": "뉴스", "emoji": "📰"}')
+    fake = FakeNotifier()
+    await AutoTopicProvisioner(db, llm=llm, notifier=fake).ensure_route("news", "")
+    assert len(fake.topics) == 1  # match 누락 → create_topic 호출됨
+    # INSERT no-op → 행 1개, 비활성 원본 그대로 (ON CONFLICT 가 덮어쓰지 않음)
     assert await db.fetchval("SELECT COUNT(*) FROM notify_routes WHERE category='news'") == 1
-    assert await db.fetchval("SELECT topic_name FROM notify_routes WHERE category='news'") == "먼저"
+    row = await db.fetchrow(
+        "SELECT topic_name, enabled, topic_id FROM notify_routes WHERE category='news'"
+    )
+    assert row["topic_name"] == "먼저" and row["enabled"] is False and row["topic_id"] == 1
 
