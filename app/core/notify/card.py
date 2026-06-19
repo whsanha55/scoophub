@@ -117,6 +117,21 @@ def _row_to_dict(row: Any) -> dict[str, Any] | None:
     return resp
 
 
+# 한국 요일 — index 0 = 일요일 (Sakamoto 알고리즘 결과 기준).
+_WEEKDAY_KO = ["일", "월", "화", "수", "목", "금", "토"]
+
+
+def _weekday_ko(date_str: str) -> str:
+    """'YYYY-MM-DD' → 한국 요일. Sakamoto(0=일요일). 파싱 실패 시 빈 문자열."""
+    try:
+        y, m, d = (int(x) for x in date_str.split("-"))
+        t = [0, 3, 2, 5, 0, 3, 5, 1, 4, 6, 2, 4]
+        yy = y - (m < 3)
+        return _WEEKDAY_KO[(yy + yy // 4 - yy // 100 + yy // 400 + t[m - 1] + d) % 7]
+    except Exception:
+        return ""
+
+
 # ── news ──────────────────────────────────────────────────────────────
 
 async def _enrich_news(db: "Database", new_ids: list[int]) -> str | None:
@@ -193,19 +208,9 @@ async def _enrich_weather(db: "Database") -> str | None:
     weekly = resp.get("weekly_forecast") or []
     if weekly:
         day_strs: list[str] = []
-        weekday_ko = ["월", "화", "수", "목", "금", "토", "일"]
         for day in weekly:
             date_str = day.get("date") or ""
-            # wttr.in date 형식 "YYYY-MM-DD" → 요일 추출
-            wday = ""
-            try:
-                y, m, d = (int(x) for x in date_str.split("-"))
-                # 2001-01-01(월) 기준 율리안 요일 계산
-                t = [0, 3, 2, 5, 0, 3, 5, 1, 4, 6, 2, 4]
-                yy = y - (m < 3)
-                wday = weekday_ko[(yy + yy // 4 - yy // 100 + yy // 400 + t[m - 1] + d) % 7]
-            except Exception:
-                pass
+            wday = _weekday_ko(date_str)
 
             mx = day.get("maxtempC")
             mn = day.get("mintempC")
@@ -485,5 +490,11 @@ if __name__ == "__main__":
 
     none_line = _line_for("hacker_news", {"title": "", "url": "x"})
     assert none_line is None, none_line
+
+    # _weekday_ko — Sakamoto(0=일요일). 알려진 날짜 검증.
+    assert _weekday_ko("2026-06-19") == "금", _weekday_ko("2026-06-19")  # Friday
+    assert _weekday_ko("2024-01-01") == "월", _weekday_ko("2024-01-01")  # Monday
+    assert _weekday_ko("2025-12-25") == "목", _weekday_ko("2025-12-25")  # Thursday
+    assert _weekday_ko("") == ""
 
     print("card.py self-check OK")
