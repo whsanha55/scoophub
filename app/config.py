@@ -36,6 +36,8 @@ class Settings(BaseSettings):
 
     # Telegram (Notify 서브시템 — 크롤 완료 발신)
     TELEGRAM_BOT_TOKEN: str = ""
+    # 자동 토픽 프로비저닝 기본 chat_id. 미설정 시 자동 라우트 생성 無 (임의 category 폭증 가드).
+    TELEGRAM_DEFAULT_CHAT_ID: str = ""
 
     @property
     def database_url(self) -> str:

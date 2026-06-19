@@ -1,8 +1,11 @@
 # tests/test_notify.py
+import pytest
+
 from app.config import settings
 from app.core.base_crawler import CrawlResult
 from app.core.notify import dispatch_crawl_notify, format_card
 from app.core.notify.notifier import Notifier, NotifyMessage
+from app.core.notify.provisioner import AutoTopicProvisioner
 from app.core.notify.router import NotifyRouter
 
 
@@ -16,6 +19,7 @@ class FakeNotifier(Notifier):
         self.topics: list[tuple[str, str]] = []
         self._next = 100
         self.send_raises: Exception | None = None
+        self.create_raises: Exception | None = None
 
     async def send(self, chat_id, topic_id, message):
         if self.send_raises:
@@ -23,9 +27,26 @@ class FakeNotifier(Notifier):
         self.sent.append((chat_id, topic_id, message.text))
 
     async def create_topic(self, chat_id, name):
+        if self.create_raises:
+            raise self.create_raises
         self._next += 1
         self.topics.append((chat_id, name))
         return self._next
+
+
+class FakeLLM:
+    """chat 기록용 가짜 LLM (네트워크 없음)."""
+
+    def __init__(self, response: str = '{"name": "뉴스", "emoji": "📰"}', raises: Exception | None = None):
+        self.response = response
+        self.raises = raises
+        self.calls: list[str] = []
+
+    async def chat(self, system_prompt: str, user_prompt: str) -> str:
+        self.calls.append(user_prompt)
+        if self.raises:
+            raise self.raises
+        return self.response
 
 
 async def _seed_route(db, **kw) -> int:
@@ -135,4 +156,94 @@ async def test_router_empty_payload_key_no_dedup(db):
     await router.dispatch("weather", "snapshot", "", NotifyMessage(text="a"))
     await router.dispatch("weather", "snapshot", "", NotifyMessage(text="b"))
     assert len(fake.sent) == 2
+
+
+# ── AutoTopicProvisioner ────────────────────────────────────────────────
+# F1~F5 보완 반영: 매칭은 router._lookup 동일 조건, lazy, 이중실패, 폭증가드, ON CONFLICT.
+
+async def test_provision_existing_match_skips(db, monkeypatch):
+    # 동일 category+purpose 매칭 → create_topic/INSERT/LLM 전부 스킵.
+    monkeypatch.setattr(settings, "TELEGRAM_DEFAULT_CHAT_ID", "-1001")
+    await _seed_route(db, category="news", purpose="rss", topic_id=10)
+    llm, fake = FakeLLM(), FakeNotifier()
+    await AutoTopicProvisioner(db, llm=llm, notifier=fake).ensure_route("news", "rss")
+    assert fake.topics == [] and llm.calls == []
+    assert await db.fetchval("SELECT COUNT(*) FROM notify_routes") == 1  # INSERT 無
+
+
+async def test_provision_other_purpose_creates(db, monkeypatch):
+    # F1: purpose-specific 라우트 있어도 다른 purpose → 매칭 0건 갭 감지 → 자동생성.
+    monkeypatch.setattr(settings, "TELEGRAM_DEFAULT_CHAT_ID", "-1001")
+    await _seed_route(db, category="community", purpose="dcinside", topic_id=10)
+    llm = FakeLLM('{"name": "커뮤니티", "emoji": "👥"}')
+    fake = FakeNotifier()
+    await AutoTopicProvisioner(db, llm=llm, notifier=fake).ensure_route("community", "clien")
+    assert len(fake.topics) == 1
+    row = await db.fetchrow(
+        "SELECT category, purpose, topic_name FROM notify_routes WHERE purpose=''"
+    )
+    assert row["category"] == "community" and row["topic_name"] == "커뮤니티"
+
+
+async def test_provision_new_category_creates(db, monkeypatch):
+    # 라우트 無 + LLM 정상 → create_topic + INSERT (purpose='' category 통합).
+    monkeypatch.setattr(settings, "TELEGRAM_DEFAULT_CHAT_ID", "-1001")
+    llm = FakeLLM('{"name": "주식", "emoji": "📈"}')
+    fake = FakeNotifier()
+    await AutoTopicProvisioner(db, llm=llm, notifier=fake).ensure_route("stock", "")
+    assert fake.topics == [("-1001", "📈 주식")]
+    row = await db.fetchrow(
+        "SELECT topic_id, topic_name, purpose, enabled FROM notify_routes WHERE category='stock'"
+    )
+    assert row["topic_id"] == 101 and row["topic_name"] == "주식"
+    assert row["purpose"] == "" and row["enabled"] is True
+
+
+async def test_provision_llm_fail_raw_fallback(db, monkeypatch):
+    # LLM 실패 → raw 폴백(category, 📢)로 create_topic + INSERT (발신 유지).
+    monkeypatch.setattr(settings, "TELEGRAM_DEFAULT_CHAT_ID", "-1001")
+    llm = FakeLLM(raises=RuntimeError("llm boom"))
+    fake = FakeNotifier()
+    await AutoTopicProvisioner(db, llm=llm, notifier=fake).ensure_route("weather", "")
+    assert fake.topics == [("-1001", "📢 weather")]
+    name = await db.fetchval("SELECT topic_name FROM notify_routes WHERE category='weather'")
+    assert name == "weather"
+
+
+async def test_provision_create_topic_fail_raises(db, monkeypatch):
+    # F3: LLM 폴백 후 create_topic 도 실패 → 예외 전파 + INSERT 無. 호출부(T3)가 크롤 보호.
+    monkeypatch.setattr(settings, "TELEGRAM_DEFAULT_CHAT_ID", "-1001")
+    llm = FakeLLM(raises=RuntimeError("llm boom"))
+    fake = FakeNotifier()
+    fake.create_raises = RuntimeError("create boom")
+    with pytest.raises(RuntimeError, match="create boom"):
+        await AutoTopicProvisioner(db, llm=llm, notifier=fake).ensure_route("weather", "")
+    assert await db.fetchval("SELECT COUNT(*) FROM notify_routes WHERE category='weather'") == 0
+
+
+async def test_provision_no_chat_id_suppresses(db, monkeypatch):
+    # 폭증 가드: 기본 chat_id 미설정 → 자동생성 無.
+    monkeypatch.setattr(settings, "TELEGRAM_DEFAULT_CHAT_ID", "")
+    llm, fake = FakeLLM(), FakeNotifier()
+    await AutoTopicProvisioner(db, llm=llm, notifier=fake).ensure_route("news", "")
+    assert fake.topics == [] and llm.calls == []
+    assert await db.fetchval("SELECT COUNT(*) FROM notify_routes") == 0
+
+
+async def test_provision_on_conflict_do_nothing(db, monkeypatch):
+    # 동시 크롤 중복 INSERT → ON CONFLICT DO NOTHING 로 에러 없이 1행 유지.
+    monkeypatch.setattr(settings, "TELEGRAM_DEFAULT_CHAT_ID", "-1001")
+    await db.execute(
+        "INSERT INTO notify_routes (category, purpose, channel, chat_id, topic_id, topic_name) "
+        "VALUES ('news', '', 'telegram', '-1001', 1, '먼저')"
+    )
+    # provisioner INSERT 문과 동일 패턴으로 동일 키 재시도.
+    await db.execute(
+        "INSERT INTO notify_routes "
+        "(category, purpose, channel, chat_id, topic_id, topic_name, enabled) "
+        "VALUES ('news', '', 'telegram', '-1001', 2, '나중', TRUE) "
+        "ON CONFLICT (category, purpose, channel) DO NOTHING"
+    )
+    assert await db.fetchval("SELECT COUNT(*) FROM notify_routes WHERE category='news'") == 1
+    assert await db.fetchval("SELECT topic_name FROM notify_routes WHERE category='news'") == "먼저"
 
