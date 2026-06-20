@@ -49,10 +49,13 @@ class BaseCrawler(ABC):
             # 에러가 일부 있으면 partial, 없으면 success
             status = "partial" if result.errors else "success"
             await self._log_crawl(status, result, started_at)
-            # Notify — fire-and-forget (크롤 블록 X). 신규 0건/토큰 미설정 시 내부 스킵.
-            from app.core.notify import fire_and_forget_crawl
+            # Notify — fire-and-forget (크롤 블록 X). news는 summarizer 이후 발신
+            # (news/scheduler — importance 갱신 후). 그 외는 크롤 직후 즉시.
+            # 신규 0건/토큰 미설정은 dispatch_crawl_notify 내부에서 스킵.
+            if self.name != "news":
+                from app.core.notify import fire_and_forget_crawl
 
-            fire_and_forget_crawl(self.db, self.name, self.detail, result)
+                fire_and_forget_crawl(self.db, self.name, self.detail, result)
             logger.info(
                 "BaseCrawler.run 완료 - crawler=%s detail=%s, status=%s, fetched=%d, new=%d",
                 self.name, self.detail, status, result.items_fetched, result.items_new,
