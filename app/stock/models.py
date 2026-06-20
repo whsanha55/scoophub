@@ -164,8 +164,8 @@ def compute_sigma_range(wem: WeeklyExpectedMove, current_price: float) -> SigmaR
     center = (wem.expected_move_high + wem.expected_move_low) / 2
     # 예상 변동폭의 절반 (1σ 추정의 기준)
     half_range = (wem.expected_move_high - wem.expected_move_low) / 2
-    # 1σ ≈ 예상 변동폭 절반의 절반 (정규분포 가정 시 1σ 구간 근사)
-    sigma = half_range / 2
+    # crawler가 high/low를 ±1σ로 제공하므로 half_range 자체가 1σ
+    sigma = half_range
 
     upper_1 = center + sigma
     lower_1 = center - sigma

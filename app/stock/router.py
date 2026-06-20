@@ -149,6 +149,12 @@ async def _run_analysis_for_tickers(
             # Fetch daily candles
             candles = await provider.chart(ticker.upper(), "1D")
 
+            # 빈 캔들(provider 실패) 시 가짜 분석이 'ok'로 영속화되는 것 방지
+            if not candles:
+                results.append(AnalyzeResult(ticker=ticker, status="error", detail="No candle data — provider returned empty"))
+                errors += 1
+                continue
+
             # Resolve exchange from watchlist
             wl_item = await wl_repo.find_by_ticker(ticker.upper())
             exchange = wl_item.exchange if wl_item else "NAS"
