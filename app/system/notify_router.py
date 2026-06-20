@@ -152,3 +152,48 @@ async def test_route(route_id: int, db: Database = Depends(_get_db)):
         "status": log["status"] if log else "unknown",
         "error": log["error"] if log else None,
     })
+
+
+# 발신 이력 조회는 routes CRUD 와 경로가 달라 별도 router.
+log_router = APIRouter(
+    prefix="/api/notify/log",
+    tags=["Notify"],
+    dependencies=[Depends(get_super_user)],
+)
+
+_LOG_STATUSES = ("success", "error")
+
+
+@log_router.get("", summary="notify 발신 이력 조회")
+async def list_logs(
+    route_id: int | None = None,
+    status: str | None = None,
+    limit: int = 100,
+    db: Database = Depends(_get_db),
+):
+    if status is not None and status not in _LOG_STATUSES:
+        raise HTTPException(422, detail=f"status must be one of {_LOG_STATUSES} or omitted")
+    limit = min(max(limit, 1), 500)
+
+    where: list[str] = []
+    params: list = []
+    if route_id is not None:
+        params.append(route_id)
+        where.append(f"l.route_id=${len(params)}")
+    if status is not None:
+        params.append(status)
+        where.append(f"l.status=${len(params)}")
+    params.append(limit)
+    where_clause = ("WHERE " + " AND ".join(where)) if where else ""
+
+    rows = await db.fetch(
+        f"SELECT l.id, l.route_id, l.payload_key, l.status, l.error, l.sent_at, "
+        f"r.category, r.purpose "
+        f"FROM notify_log l "
+        f"LEFT JOIN notify_routes r ON r.id = l.route_id "
+        f"{where_clause} "
+        f"ORDER BY l.sent_at DESC LIMIT ${len(params)}",
+        *params,
+    )
+    logs = [_row_to_dict(r) for r in rows]
+    return ApiResponse(success=True, data=logs, meta={"total": len(logs)})
