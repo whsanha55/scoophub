@@ -7,13 +7,13 @@ schedules_router / config_router 와 동일 패턴: DB 단일 진실 + 런타임
 from __future__ import annotations
 
 import logging
-from datetime import datetime
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
 from app.core.auth import get_super_user
+from app.core.base_router import row_to_dict as _row_to_dict
 from app.core.database import Database
 from app.core.models import ApiResponse
 
@@ -49,14 +49,6 @@ class RouteUpdate(BaseModel):
     topic_id: int | None = None
     topic_name: str | None = None
     enabled: bool | None = None
-
-
-def _row_to_dict(row) -> dict:
-    d = dict(row)
-    for key, val in d.items():
-        if isinstance(val, datetime):
-            d[key] = val.isoformat()
-    return d
 
 
 @router.get("", summary="전체 notify 라우트 조회")
@@ -134,13 +126,16 @@ async def test_route(route_id: int, db: Database = Depends(_get_db)):
         raise HTTPException(404, detail="Route not found")
 
     from app.core.notify import NotifyMessage
+    from app.core.notify.card import escape_html
     from app.core.notify.router import NotifyRouter
 
     payload_key = f"test:{uuid4().hex}"  # dedup 우회용 고유키
     router_ = NotifyRouter(db)
+    # category 는 DB 외부값 → parse_mode=HTML 발신이므로 escape 필수.
+    category_label = escape_html(row["category"] or "(default)")
     await router_.dispatch(
         row["category"], row["purpose"], payload_key,
-        NotifyMessage(text=f"[test] {row['category'] or '(default)'} 발신 테스트"),
+        NotifyMessage(text=f"[test] {category_label} 발신 테스트"),
     )
     log = await db.fetchrow(
         "SELECT status, error FROM notify_log WHERE route_id=$1 AND payload_key=$2",

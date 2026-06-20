@@ -12,7 +12,11 @@ from dataclasses import dataclass
 
 @dataclass
 class NotifyMessage:
-    """발신 단위 메시지. text 는 plain (Telegram parse_mode 미사용 — 특수문자 안전)."""
+    """발신 단위 메시지. text 는 Telegram HTML (parse_mode=HTML).
+
+    동적 텍스트(category 등 외부값)는 발신 전 escape_html 적용 필수.
+    card.format_card / enrich 경로는 이미 escape 포함.
+    """
 
     text: str
 

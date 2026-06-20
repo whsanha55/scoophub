@@ -8,6 +8,7 @@ from fastapi import APIRouter, Depends, Query
 from fastapi.responses import JSONResponse
 
 from app.core.auth import get_super_user
+from app.core.base_router import row_to_dict as _row_to_dict
 from app.core.database import Database
 from app.core.models import ApiResponse, ErrorDetail
 
@@ -52,7 +53,7 @@ async def get_news(
     db: Database = Depends(_get_db),
 ):
     logger.info("get_news 시작 - minutes=%s, category=%s, min_importance=%s, limit=%d", minutes, category, min_importance, limit)
-    conditions = []
+    conditions = ["duplicated = FALSE"]
     params: list = []
     idx = 1
 
@@ -106,7 +107,7 @@ async def get_news_by_id(
     db: Database = Depends(_get_db),
 ):
     logger.info("get_news_by_id 시작 - article_id=%d", article_id)
-    row = await db.fetchrow("SELECT * FROM feed_news WHERE id = $1", article_id)
+    row = await db.fetchrow("SELECT * FROM feed_news WHERE id = $1 AND duplicated = FALSE", article_id)
     if not row:
         return JSONResponse(
             status_code=404,
@@ -121,14 +122,6 @@ async def get_news_by_id(
             ).model_dump(mode='json'),
         )
     return ApiResponse(success=True, data=_row_to_dict(row))
-
-
-def _row_to_dict(row) -> dict:
-    d = dict(row)
-    for key, val in d.items():
-        if isinstance(val, datetime):
-            d[key] = val.isoformat()
-    return d
 
 
 # ────────────────────────────────────────────────────────────
