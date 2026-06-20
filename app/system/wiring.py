@@ -40,11 +40,9 @@ class SystemModule(BaseModule):
 
         # notify_router 추가 등록 (발신 라우팅 관리 + 발신 이력 조회)
         notify_mod = importlib.import_module("app.system.notify_router")
-        notify_log_mod = importlib.import_module("app.system.notify_router")
         ctx.app.dependency_overrides[notify_mod._get_db] = lambda: ctx.db
-        ctx.app.dependency_overrides[notify_log_mod._get_db] = lambda: ctx.db
         ctx.app.include_router(notify_mod.router)
-        ctx.app.include_router(notify_log_mod.log_router)
+        ctx.app.include_router(notify_mod.log_router)
 
 
 register = SystemModule.register
