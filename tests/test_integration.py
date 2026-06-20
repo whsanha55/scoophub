@@ -49,17 +49,11 @@ async def test_full_weather_flow(client, db):
 
 
 @pytest.mark.asyncio
-async def test_health_with_data(client, db):
-    await db.execute(
-        "INSERT INTO feed_news (source, title, url, category, importance) "
-        "VALUES ($1, $2, $3, $4, $5)",
-        "test",
-        "Health test",
-        "https://example.com/health-test",
-        "tech",
-        2,
-    )
+async def test_health_no_db_dependency(client):
+    """헬스체크는 DB 조회 없이 서버 통신만 확인한다 (이슈 #141)."""
     resp = await client.get("/api/health")
     body = resp.json()
+    assert resp.status_code == 200
     assert body["success"] is True
-    assert body["data"]["total_records"]["news"] >= 1
+    assert body["data"]["status"] == "ok"
+    assert "total_records" not in body["data"]

@@ -29,27 +29,11 @@ def get_db() -> Database:
 @router.get(
     "/health",
     summary="헬스 체크",
-    description=(
-        "서비스 상태와 주요 테이블 레코드 수를 반환합니다.\n\n"
-        "## 확인 항목\n"
-        "- API 서버 상태\n"
-        "- 데이터베이스 연결 상태\n"
-        "- 각 도메인별 테이블 레코드 수"
-    ),
+    description="API 서버 통신 가능 여부를 반환합니다.",
 )
-async def health(db: Database = Depends(get_db)):
+async def health():
     logger.info("health check requested")
-    news_count = await db.fetchval("SELECT COUNT(*) FROM feed_news")
-    weather_count = await db.fetchval(
-        "SELECT COUNT(*) FROM crawl_data WHERE category='weather' AND purpose='snapshot'"
-    )
-    return ApiResponse(
-        success=True,
-        data={
-            "status": "ok",
-            "total_records": {"news": news_count, "weather": weather_count},
-        },
-    )
+    return ApiResponse(success=True, data={"status": "ok"})
 
 
 @router.post(
