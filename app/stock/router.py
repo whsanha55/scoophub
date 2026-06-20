@@ -31,7 +31,7 @@ from app.stock.schemas import (
 
 logger = logging.getLogger(__name__)
 
-VALID_TIMEFRAMES = {"1D"}
+VALID_TIMEFRAMES = {"1D", "1W", "1M"}
 
 # router-level 인증 제거 — GET(report, sigma, watchlist 조회, market-status) 공개.
 # POST/PUT/DELETE mutation(analyze, watchlist CRUD, crawl triggers)은 get_super_user 보호.
@@ -182,6 +182,12 @@ async def _run_analysis_for_tickers(
                 technical_details=details_dict,
             )
 
+            # 다중 기간 분석(1W/1M): 1D 캔들 resample → 분석 → 평면 저장.
+            # resample 캔들 부족 시 빈 리스트 → 스킵(가짜 분석 영속화 방지).
+            await _save_multi_timeframe(
+                ticker.upper(), exchange, candles, price, change, change_rate, db, repo
+            )
+
             results.append(AnalyzeResult(ticker=ticker, status="ok"))
             ok += 1
 
@@ -191,7 +197,60 @@ async def _run_analysis_for_tickers(
             errors += 1
 
     logger.info("_run_analysis_for_tickers() 완료 — total=%d, ok=%d, errors=%d", len(tickers), ok, errors)
+
+    # 발신 연쇄: 분석 종료 후 다계층 리포트 빌드 + 발신 (성공 1건 이상 시).
+    # 발신 실패해도 분석 결과는 이미 저장됨(분석과 발신 분리).
+    if ok > 0:
+        try:
+            from app.stock.report import ReportBuilder
+
+            await ReportBuilder(db).run(tickers=tickers)
+        except Exception as e:
+            logger.warning("daily report dispatch failed (non-fatal): %s", e)
+
     return AnalyzeResponse(total=len(tickers), ok=ok, errors=errors, results=results)
+
+
+async def _save_multi_timeframe(
+    ticker: str,
+    exchange: str,
+    daily_candles: list,
+    price: float,
+    change: float,
+    change_rate: float,
+    db: Database,
+    repo,
+) -> None:
+    """1D 캔들 → 1W/1M resample → 분석 → analysis_results 평면 저장.
+
+    resample 캔들 부족(resample_xxx 가 빈 리스트 반환) 시 해당 기간은 스킵.
+    보조 기간의 technical_details 에 sigma_data 는 미포함(1D 에서만 풍부).
+    """
+    from app.stock.resample import resample_monthly, resample_weekly
+    from app.stock.signal import generate_report
+
+    for rule, resample_fn in (("1W", resample_weekly), ("1M", resample_monthly)):
+        try:
+            resampled = resample_fn(list(daily_candles))
+            if not resampled:
+                continue
+            report = generate_report(ticker, price, change, change_rate, resampled)
+            await repo.save(
+                ticker=ticker,
+                exchange=exchange,
+                timeframe=rule,
+                signal=report.signal.value,
+                total_score=report.total_score,
+                confidence=report.confidence,
+                market_regime=report.market_regime.value,
+                price=price,
+                change=change,
+                change_rate=change_rate,
+                technical_scores=report.technical_scores,
+                technical_details=asdict(report.technical_details),
+            )
+        except Exception as e:
+            logger.warning("multi-timeframe %s analysis failed for %s: %s", rule, ticker, e)
 
 
 def _analysis_row_to_report(row: dict) -> StockReport:
@@ -295,6 +354,7 @@ def _watchlist_item_to_out(item) -> WatchlistItemOut:
         memo=item.memo,
         added_at=added_at_str,
         is_active=item.is_active,
+        group=getattr(item, "group", "individual"),
     )
 
 
@@ -588,6 +648,7 @@ async def add_watchlist(item: WatchlistItemIn, db: Database = Depends(_get_db)):
         name=item.name,
         memo=item.memo,
         is_active=True,
+        group=item.group,
     )
     created = await repo.add(new_item)
     if created is None:
@@ -844,3 +905,34 @@ async def crawling_sync(db: Database = Depends(_get_db)):
     return ApiResponse(success=True, data={
         "synced": total_saved,
     })
+
+
+# ── Daily Report Send (on-demand) ─────────────────────────────────────────────
+
+
+@router.post(
+    "/stock/report/send",
+    tags=["Stock"],
+    summary="일간 분석 리포트 발신",
+    dependencies=[Depends(get_super_user)],
+    description=(
+        "저장된 최신 분석 결과로 다계층(시장/섹터/개별) 리포트를 빌드해 텔레그램으로 발신합니다.\n\n"
+        "- `tickers` 생략 시 전체 watchlist(활성) 대상\n"
+        "- 발신은 분석과 독립: 이미 저장된 분석 결과 기반으로만 발신\n"
+        "- 동일 날짜 재발신은 notify_log dedup(payload_key=날짜)로 1회 차단"
+    ),
+)
+async def send_stock_report(
+    tickers: list[str] | None = Query(None, description="발신 대상 티커. 생략 시 전체 watchlist"),
+    db: Database = Depends(_get_db),
+):
+    from app.stock.report import ReportBuilder
+
+    target = [t.upper() for t in tickers] if tickers else None
+    report_text = await ReportBuilder(db).run(tickers=target)
+    if report_text is None:
+        return ApiResponse(success=False, error=ErrorDetail(
+            code="no_data",
+            message="발신할 분석 데이터가 없습니다. 먼저 /crawling/stock/analyze 실행 필요.",
+        ))
+    return ApiResponse(success=True, data={"sent": True, "length": len(report_text)})

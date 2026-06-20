@@ -115,6 +115,12 @@ class SigmaSignal:
     sigma_range: SigmaRange | None = None
 
 
+class WatchlistGroup(StrEnum):
+    MARKET = "market"
+    SECTOR = "sector"
+    INDIVIDUAL = "individual"
+
+
 @dataclass
 class WatchlistItem:
     """Watchlist item tracked by the user."""
@@ -126,6 +132,7 @@ class WatchlistItem:
     memo: str | None = None
     added_at: date | None = None
     is_active: bool = True
+    group: str = WatchlistGroup.INDIVIDUAL
 
 
 @dataclass

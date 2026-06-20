@@ -73,6 +73,7 @@ class WatchlistItemIn(BaseModel):
     exchange: str = Field("NAS", description="거래소 코드 (예: NAS, NYE)")
     name: str = Field("", description="종목명 (선택)")
     memo: str | None = Field(None, description="메모 (선택)")
+    group: str = Field("individual", description="계층 (market | sector | individual). 기본 individual.")
 
 
 class SigmaDataOut(BaseModel):
@@ -103,6 +104,7 @@ class WatchlistItemOut(BaseModel):
     memo: str | None = Field(None, description="메모")
     added_at: str = Field(..., description="추가 일시 (ISO 8601)")
     is_active: bool = Field(..., description="활성 상태 여부")
+    group: str = Field("individual", description="계층 (market | sector | individual)")
 
 
 class WatchlistUpdateIn(BaseModel):
@@ -111,3 +113,4 @@ class WatchlistUpdateIn(BaseModel):
     name: str | None = Field(None, description="종목명")
     memo: str | None = Field(None, description="메모")
     is_active: bool | None = Field(None, description="활성 상태 여부 (false 시 비활성화)")
+    group: str | None = Field(None, description="계층 (market | sector | individual)")

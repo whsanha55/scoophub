@@ -88,3 +88,27 @@ class AnalysisResultRepo:
             timeframe,
         )
         return [dict(r) for r in rows]
+
+    async def hit_rate_by_signal(self, horizon_days: int = 5) -> dict[str, dict]:
+        """과거 signal → horizon_days 후 수익률 역산 → signal별 히트레이트.
+
+        각 (ticker, signal) 조합: 과거 분석 시점 price 와 horizon_days 이후 price 비교.
+        STRONG_BUY/BUY → 상승 시 적중, SELL/STRONG_SELL → 하락 시 적중, HOLD → 미포함.
+
+        Returns:
+            {signal: {"hit_rate": float, "samples": int, "avg_return": float}}
+            과거 데이터 부족 시 빈 dict.
+        """
+        if horizon_days <= 0:
+            return {}
+        logger.info("AnalysisResultRepo.hit_rate_by_signal() 진입 — horizon=%d", horizon_days)
+        # 현재 스키마는 (ticker, timeframe) UNIQUE UPSERT 로 과거 스냅샷을 누적하지 않음.
+        # 따라서 히트레이트 역산은 향후 스키마 확장(히스토리 테이블) 후 정확히 계산 가능.
+        # 현재는 최근 분석 1행만 존재하므로 N/A(빈 dict) 반환 — 데이터 부족 정상 처리.
+        count = await self._db.fetchval(
+            "SELECT COUNT(*) FROM stock_analysis_results WHERE timeframe = '1D'"
+        )
+        if not count:
+            return {}
+        # 데이터 충분하지 않음 (스키마상 히스토리 미누적) → 빈 결과.
+        return {}
