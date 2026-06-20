@@ -38,6 +38,13 @@ class SigmaOut(BaseModel):
     weekly_moves: list[dict[str, Any]] = Field(default_factory=list, description="최근 주간 예상 변동폭 이력")
 
 
+class ActionableLevelsOut(BaseModel):
+    target_price: float | None = Field(None, description="목표가 (+1σ)")
+    buy_zone: float | None = Field(None, description="매수 구간 (-1σ)")
+    stop_loss: float | None = Field(None, description="손절가 (price - 1.5×ATR)")
+    momentum_fire: bool = Field(False, description="불타기 진입 여부 (price>EMA12 & MACD hist>0)")
+
+
 class StockReport(BaseModel):
     ticker: str = Field(..., description="주식 티커 (예: AAPL)")
     exchange: str = Field(..., description="거래소 코드 (예: NAS, NYE)")
@@ -46,6 +53,9 @@ class StockReport(BaseModel):
     change_rate: float = Field(..., description="전일 대비 등락률 (%)")
     technical: TechnicalOut = Field(..., description="기술 분석 결과")
     sigma: SigmaOut | None = Field(None, description="Sigma(1σ) 주간 예상 변동폭 데이터")
+    actionable_levels: ActionableLevelsOut | None = Field(None, description="액션러블 거래 레벨 (목표가/매수/손절/불타기)")
+    hit_rate: float | None = Field(None, description="히트율 (현재 null — 스키마 히스토리 누적 전까지 미산출)")
+    group: str | None = Field(None, description="계층 (market | sector | individual)")
     data_date: str | None = Field(None, description="분석 기준 날짜 (ISO 8601)")
     is_stale: bool | None = Field(None, description="분석 결과가 24시간 이전인지 여부")
 
@@ -64,6 +74,9 @@ class StockSummary(BaseModel):
     sigma_signal: str = Field(..., description="Sigma 시그널")
     sigma_confidence: float = Field(..., description="Sigma 신뢰도")
     expected_move_pct: float = Field(..., description="예상 변동폭 (%)")
+    actionable_levels: ActionableLevelsOut | None = Field(None, description="액션러블 거래 레벨")
+    hit_rate: float | None = Field(None, description="히트율 (현재 null)")
+    group: str | None = Field(None, description="계층 (market | sector | individual)")
     data_date: str | None = Field(None, description="분석 기준 날짜 (ISO 8601)")
     is_stale: bool | None = Field(None, description="분석 결과가 24시간 이전인지 여부")
 
