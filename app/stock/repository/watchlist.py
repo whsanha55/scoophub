@@ -27,14 +27,24 @@ class WatchlistRepo:
     def __init__(self, db: Database):
         self._db = db
 
-    async def find_all(self, active_only: bool = False) -> list[WatchlistItem]:
-        logger.info("WatchlistRepo.find_all() 진입 — active_only=%s", active_only)
+    async def find_all(
+        self,
+        active_only: bool = False,
+        group: str | None = None,
+    ) -> list[WatchlistItem]:
+        logger.info("WatchlistRepo.find_all() 진입 — active_only=%s, group=%s", active_only, group)
+        clauses: list[str] = []
+        params: list[object] = []
         if active_only:
-            rows = await self._db.fetch(
-                "SELECT * FROM stock_watchlist WHERE is_active = TRUE ORDER BY added_at"
-            )
-        else:
-            rows = await self._db.fetch("SELECT * FROM stock_watchlist ORDER BY added_at")
+            clauses.append("is_active = TRUE")
+        if group is not None:
+            params.append(group)
+            clauses.append(f'"group" = ${len(params)}')
+        where = f"WHERE {' AND '.join(clauses)}" if clauses else ""
+        rows = await self._db.fetch(
+            f'SELECT * FROM stock_watchlist {where} ORDER BY added_at',
+            *params,
+        )
         return [row_to_watchlist(r) for r in rows]
 
     async def find_by_id(self, item_id: int) -> WatchlistItem | None:
@@ -50,13 +60,14 @@ class WatchlistRepo:
     async def add(self, item: WatchlistItem) -> WatchlistItem:
         logger.info("WatchlistRepo.add() 진입 — ticker=%s", item.ticker)
         row = await self._db.fetchrow(
-            "INSERT INTO stock_watchlist (ticker, exchange, name, memo, is_active) "
-            "VALUES ($1, $2, $3, $4, $5) RETURNING *",
+            'INSERT INTO stock_watchlist (ticker, exchange, name, memo, is_active, "group") '
+            "VALUES ($1, $2, $3, $4, $5, $6) RETURNING *",
             item.ticker.upper(),
             item.exchange.upper(),
             item.name,
             item.memo,
             item.is_active,
+            item.group or "individual",
         )
         return row_to_watchlist(row)
 
@@ -98,11 +109,11 @@ class WatchlistRepo:
         params: list[object] = []
         idx = 1
         for ticker, exchange, name in M7_DEFAULTS:
-            parts.append(f"(${idx}, ${idx+1}, ${idx+2}, ${idx+3}, ${idx+4})")
-            params.extend([ticker, exchange, name, "M7", True])
-            idx += 5
+            parts.append(f"(${idx}, ${idx+1}, ${idx+2}, ${idx+3}, ${idx+4}, ${idx+5})")
+            params.extend([ticker, exchange, name, "M7", True, "individual"])
+            idx += 6
         await self._db.execute(
-            "INSERT INTO stock_watchlist (ticker, exchange, name, memo, is_active) "
+            'INSERT INTO stock_watchlist (ticker, exchange, name, memo, is_active, "group") '
             "VALUES " + ", ".join(parts),
             *params,
         )

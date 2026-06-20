@@ -88,3 +88,12 @@ class AnalysisResultRepo:
             timeframe,
         )
         return [dict(r) for r in rows]
+
+    async def hit_rate_by_signal(self, horizon_days: int = 5) -> dict[str, dict]:
+        """과거 signal → horizon_days 후 수익률 역산 → signal별 히트레이트.
+
+        현재 스키마는 (ticker, timeframe) UNIQUE UPSERT 로 과거 스냅샷을 누적하지 않아
+        역산 불가 — 항상 빈 dict(N/A) 반환. 향후 히스토리 테이블 확장 후 구현.
+        (T8 Phase 3 인터페이스 — 리포트에서 호출 시 데이터 부족 N/A 정상 처리)
+        """
+        return {}

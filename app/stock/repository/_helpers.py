@@ -21,6 +21,7 @@ def row_to_watchlist(row: object) -> WatchlistItem:
         memo=row["memo"],
         added_at=row["added_at"].date() if hasattr(row["added_at"], "date") else row["added_at"],
         is_active=row["is_active"],
+        group=row["group"] if "group" in row.keys() else "individual",
     )
 
 
