@@ -126,7 +126,8 @@ class YFinanceProvider:
             t = yf.Ticker(ticker)
             info = t.info or {}
             return {
-                "regularMarketPrice": float(info.get("currentPrice", 0)),
+                # currentPrice 없는 지수(^IXIC)/ETF → regularMarketPrice fallback
+                "regularMarketPrice": float(info.get("currentPrice") or info.get("regularMarketPrice") or 0),
                 "regularMarketChange": float(info.get("regularMarketChange", 0)),
                 "regularMarketChangePercent": float(info.get("regularMarketChangePercent", 0)),
                 "open": float(info.get("open", 0)),
