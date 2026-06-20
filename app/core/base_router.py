@@ -37,6 +37,19 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
+def row_to_dict(row: Any) -> dict:
+    """asyncpg Record → dict 변환. datetime은 ISO 8601 문자열로 직렬화.
+
+    system/news 라우터 공통 헬퍼. config_router 처럼 JSONB 추가 디코딩이
+    필요한 곳은 별도로 처리한다.
+    """
+    d = dict(row)
+    for key, val in d.items():
+        if isinstance(val, datetime):
+            d[key] = val.isoformat()
+    return d
+
+
 class BaseRouter(ABC):
     """도메인 router의 공통 로직을 제공하는 추상 기반 클래스.
 
@@ -140,12 +153,8 @@ class BaseRouter(ABC):
 
     @staticmethod
     def _row_to_dict(row: Any) -> dict:
-        """asyncpg Record → dict 변환. datetime은 ISO 8601 문자열로 직렬화."""
-        d = dict(row)
-        for key, val in d.items():
-            if isinstance(val, datetime):
-                d[key] = val.isoformat()
-        return d
+        """asyncpg Record → dict 변환. 모듈 수준 row_to_dict 로 위임."""
+        return row_to_dict(row)
 
     async def get_latest(self, db: Database) -> Any | None:
         """``table_name``에서 MAX(fetched_at) 조회. 없으면 None."""

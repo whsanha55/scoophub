@@ -8,6 +8,7 @@ from fastapi import APIRouter, Depends, Query
 from fastapi.responses import JSONResponse
 
 from app.core.auth import get_super_user
+from app.core.base_router import row_to_dict as _row_to_dict
 from app.core.database import Database
 from app.core.models import ApiResponse, ErrorDetail
 
@@ -121,14 +122,6 @@ async def get_news_by_id(
             ).model_dump(mode='json'),
         )
     return ApiResponse(success=True, data=_row_to_dict(row))
-
-
-def _row_to_dict(row) -> dict:
-    d = dict(row)
-    for key, val in d.items():
-        if isinstance(val, datetime):
-            d[key] = val.isoformat()
-    return d
 
 
 # ────────────────────────────────────────────────────────────

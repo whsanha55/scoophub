@@ -86,7 +86,7 @@ class BaseScheduler:
         return trigger, enabled
 
     @staticmethod
-    async def register_cron_job(
+    async def register_job(
         scheduler: AsyncIOScheduler,
         db: "Database",
         crawler: str,
@@ -94,6 +94,11 @@ class BaseScheduler:
         crawler_import: str,
         crawler_class: str,
     ) -> None:
+        """trigger/cron 공통 등록. schedule_type 분기는 resolve_trigger 내부.
+
+        register_cron_job / register_interval_job 은 이 메서드로 위임한다
+        (두 구현이 줄 단위 동일했으므로 단일화).
+        """
         trigger, enabled = await BaseScheduler.resolve_trigger(db, crawler, job_id)
         params = await BaseScheduler.resolve_params(db, crawler)
 
@@ -114,6 +119,17 @@ class BaseScheduler:
         logger.info("Scheduled job '%s' (crawler=%s, enabled=%s)", job_id, crawler, enabled)
 
     @staticmethod
+    async def register_cron_job(
+        scheduler: AsyncIOScheduler,
+        db: "Database",
+        crawler: str,
+        job_id: str,
+        crawler_import: str,
+        crawler_class: str,
+    ) -> None:
+        await BaseScheduler.register_job(scheduler, db, crawler, job_id, crawler_import, crawler_class)
+
+    @staticmethod
     async def register_interval_job(
         scheduler: AsyncIOScheduler,
         db: "Database",
@@ -122,21 +138,4 @@ class BaseScheduler:
         crawler_import: str,
         crawler_class: str,
     ) -> None:
-        trigger, enabled = await BaseScheduler.resolve_trigger(db, crawler, job_id)
-        params = await BaseScheduler.resolve_params(db, crawler)
-
-        async def _run_crawl(**kwargs: object) -> None:
-            module = importlib.import_module(crawler_import)
-            cls = getattr(module, crawler_class)
-            await cls(db, **kwargs).run()
-
-        scheduler.add_job(
-            _run_crawl,
-            trigger=trigger,
-            kwargs=params,
-            id=job_id,
-            replace_existing=True,
-        )
-        if not enabled:
-            scheduler.pause_job(job_id)
-        logger.info("Scheduled job '%s' (crawler=%s, enabled=%s)", job_id, crawler, enabled)
+        await BaseScheduler.register_job(scheduler, db, crawler, job_id, crawler_import, crawler_class)

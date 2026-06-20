@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import logging
-from datetime import datetime
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
@@ -10,6 +9,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
 from app.core.auth import get_super_user
+from app.core.base_router import row_to_dict as _row_to_dict
 from app.core.base_scheduler import BaseScheduler
 from app.core.database import Database
 from app.core.models import ApiResponse
@@ -35,14 +35,6 @@ class ScheduleUpdate(BaseModel):
     schedules: list[str] | None = Field(None, description="cron expr 배열 (cron 타입)")
     schedule_minutes: int | None = Field(None, gt=0, description="분 (interval 타입, 양수)")
     enabled: bool | None = Field(None, description="활성화 토글")
-
-
-def _row_to_dict(row) -> dict:
-    d = dict(row)
-    for key, val in d.items():
-        if isinstance(val, datetime):
-            d[key] = val.isoformat()
-    return d
 
 
 def _attach_runtime(scheduler: AsyncIOScheduler, d: dict) -> dict:

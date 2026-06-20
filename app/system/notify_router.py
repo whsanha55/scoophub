@@ -7,13 +7,13 @@ schedules_router / config_router 와 동일 패턴: DB 단일 진실 + 런타임
 from __future__ import annotations
 
 import logging
-from datetime import datetime
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
 from app.core.auth import get_super_user
+from app.core.base_router import row_to_dict as _row_to_dict
 from app.core.database import Database
 from app.core.models import ApiResponse
 
@@ -49,14 +49,6 @@ class RouteUpdate(BaseModel):
     topic_id: int | None = None
     topic_name: str | None = None
     enabled: bool | None = None
-
-
-def _row_to_dict(row) -> dict:
-    d = dict(row)
-    for key, val in d.items():
-        if isinstance(val, datetime):
-            d[key] = val.isoformat()
-    return d
 
 
 @router.get("", summary="전체 notify 라우트 조회")
