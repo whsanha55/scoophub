@@ -134,13 +134,16 @@ async def test_route(route_id: int, db: Database = Depends(_get_db)):
         raise HTTPException(404, detail="Route not found")
 
     from app.core.notify import NotifyMessage
+    from app.core.notify.card import escape_html
     from app.core.notify.router import NotifyRouter
 
     payload_key = f"test:{uuid4().hex}"  # dedup 우회용 고유키
     router_ = NotifyRouter(db)
+    # category 는 DB 외부값 → parse_mode=HTML 발신이므로 escape 필수.
+    category_label = escape_html(row["category"] or "(default)")
     await router_.dispatch(
         row["category"], row["purpose"], payload_key,
-        NotifyMessage(text=f"[test] {row['category'] or '(default)'} 발신 테스트"),
+        NotifyMessage(text=f"[test] {category_label} 발신 테스트"),
     )
     log = await db.fetchrow(
         "SELECT status, error FROM notify_log WHERE route_id=$1 AND payload_key=$2",

@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import logging
 from datetime import datetime, timezone
+from zoneinfo import ZoneInfo
 
 import httpx
 
@@ -99,7 +100,8 @@ class WeatherCrawler(BaseCrawler):
         if meteo_data:
             hourly = meteo_data.get("hourly", {})
             times = hourly.get("time", [])
-            now_str = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:00")
+            # API 요청 timezone=Asia/Seoul → times 는 KST. now_str 도 KST 로 매칭.
+            now_str = datetime.now(ZoneInfo("Asia/Seoul")).strftime("%Y-%m-%dT%H:00")
             idx = None
             for i, t in enumerate(times):
                 if t == now_str:
@@ -115,8 +117,7 @@ class WeatherCrawler(BaseCrawler):
                 pm10 = pm10_list[idx] if idx < len(pm10_list) else None
                 pm25 = pm25_list[idx] if idx < len(pm25_list) else None
                 ozone = ozone_list[idx] if idx < len(ozone_list) else None
-                uv_clean = [v for v in uv_list if v is not None]
-                uv_index = max(uv_clean) if uv_clean else None
+                uv_index = uv_list[idx] if idx < len(uv_list) else None
 
         # wttr.in 주간 예보 (최대 3일치)
         weekly = wttr_data.get("weather", [])[:3]

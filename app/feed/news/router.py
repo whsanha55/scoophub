@@ -52,7 +52,7 @@ async def get_news(
     db: Database = Depends(_get_db),
 ):
     logger.info("get_news 시작 - minutes=%s, category=%s, min_importance=%s, limit=%d", minutes, category, min_importance, limit)
-    conditions = []
+    conditions = ["duplicated = FALSE"]
     params: list = []
     idx = 1
 
@@ -106,7 +106,7 @@ async def get_news_by_id(
     db: Database = Depends(_get_db),
 ):
     logger.info("get_news_by_id 시작 - article_id=%d", article_id)
-    row = await db.fetchrow("SELECT * FROM feed_news WHERE id = $1", article_id)
+    row = await db.fetchrow("SELECT * FROM feed_news WHERE id = $1 AND duplicated = FALSE", article_id)
     if not row:
         return JSONResponse(
             status_code=404,

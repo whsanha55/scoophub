@@ -51,6 +51,20 @@ async ([departure, arrival, dateStr]) => {
 """ % repr(ENDPOINT)
 
 
+def _has_seat(value: Any) -> bool:
+    """availableSeat → 잔석 존재 여부.
+
+    API가 문자열("0")/정수(0)/None 혼합으로 올 수 있어 bool() 오탐 방지:
+    int 캐스트 후 > 0. 캐스트 불가/None → False.
+    """
+    if value is None:
+        return False
+    try:
+        return int(value) > 0
+    except (TypeError, ValueError):
+        return False
+
+
 def parse_bonus_response(raw: dict[str, Any]) -> dict[str, Any]:
     """API 원문 → 구조화. frontBookingClass 기준 cabin_label 부여.
 
@@ -77,7 +91,7 @@ def parse_bonus_response(raw: dict[str, Any]) -> dict[str, Any]:
                     "dep_time": d.get("departureTime"),
                     "front_booking_class": fbc,
                     "cabin_label": map_cabin(fbc),
-                    "available": bool(d.get("availableSeat")),
+                    "available": _has_seat(d.get("availableSeat")),
                 }
             )
         days.append({"date": flight_day.get("departureDate"), "flights": flights})

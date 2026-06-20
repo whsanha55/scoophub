@@ -77,7 +77,7 @@ class DevtoHashnodeCrawler(BaseCrawler):
                         "article_id": item["id"],
                         "title": item.get("title", ""),
                         "url": item.get("url", ""),
-                        "author": item.get("user", {}).get("name") or item.get("user", {}).get("username"),
+                        "author": (item.get("user") or {}).get("name") or (item.get("user") or {}).get("username"),
                         "description": item.get("description"),
                         "reactions_count": item.get("public_reactions_count", 0),
                         "comments_count": item.get("comments_count", 0),
