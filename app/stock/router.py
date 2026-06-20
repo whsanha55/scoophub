@@ -10,7 +10,7 @@ from typing import TYPE_CHECKING
 from fastapi import APIRouter, Depends, Query
 from fastapi.responses import JSONResponse
 
-from app.core.auth import get_current_user
+from app.core.auth import get_super_user
 from app.core.database import Database
 from app.core.models import ApiResponse, ErrorDetail
 
@@ -33,7 +33,9 @@ logger = logging.getLogger(__name__)
 
 VALID_TIMEFRAMES = {"1D"}
 
-router = APIRouter(prefix="/api", dependencies=[Depends(get_current_user)])
+# router-level 인증 제거 — GET(report, sigma, watchlist 조회, market-status) 공개.
+# POST/PUT/DELETE mutation(analyze, watchlist CRUD, crawl triggers)은 get_super_user 보호.
+router = APIRouter(prefix="/api")
 
 # ── Provider router (module-level singleton) ────────────────────────────────
 
@@ -297,6 +299,7 @@ def _watchlist_item_to_out(item) -> WatchlistItemOut:
     "/crawling/stock/analyze",
     tags=["Stock Crawling"],
     summary="분석 수동 실행",
+    dependencies=[Depends(get_super_user)],
     description=(
         "watchlist 종목의 기술 분석 수동 실행 + 결과 저장합니다.\n\n"
         "## 자동 스케줄\n"
@@ -565,6 +568,7 @@ async def get_watchlist(db: Database = Depends(_get_db)):
     tags=["Stock Watchlist"],
     summary="관심종목 추가",
     description="watchlist에 새 종목을 추가합니다. 티커는 자동 대문자 변환.",
+    dependencies=[Depends(get_super_user)],
 )
 async def add_watchlist(item: WatchlistItemIn, db: Database = Depends(_get_db)):
     logger.info("add_watchlist 엔드포인트 진입 — ticker=%s", item.ticker)
@@ -590,6 +594,7 @@ async def add_watchlist(item: WatchlistItemIn, db: Database = Depends(_get_db)):
     tags=["Stock Watchlist"],
     summary="관심종목 수정",
     description="watchlist 종목의 필드를 부분 수정합니다. `is_active=false`로 비활성화 가능.",
+    dependencies=[Depends(get_super_user)],
 )
 async def update_watchlist(
     item_id: int,
@@ -624,6 +629,7 @@ async def update_watchlist(
     tags=["Stock Watchlist"],
     summary="관심종목 삭제",
     description="watchlist에서 종목을 영구 삭제합니다.",
+    dependencies=[Depends(get_super_user)],
 )
 async def delete_watchlist(item_id: int, db: Database = Depends(_get_db)):
     logger.info("delete_watchlist 엔드포인트 진입 — item_id=%d", item_id)
@@ -684,6 +690,7 @@ async def _do_sync_candles(db: Database) -> int:
     "/crawling/stock/sigma",
     tags=["Stock Crawling"],
     summary="Sigma(1σ) 주간 예상 변동폭 크롤 (월 03:00 자동 / 수동 트리거)",
+    dependencies=[Depends(get_super_user)],
     description=(
         "usstocksigma.com에서 이번 주 **예상 주간 변동폭(1σ)** 데이터를 크롤링합니다.\n\n"
         "## 크롤링 데이터\n"
@@ -742,6 +749,7 @@ async def crawling_sigma(db: Database = Depends(_get_db)):
     "/crawling/stock/sigma/compute",
     tags=["Stock Crawling"],
     summary="Sigma 즉시 계산 (ATM straddle 기반)",
+    dependencies=[Depends(get_super_user)],
     description=(
         "yfinance 옵션 체인 ATM straddle 기반 sigma 즉시 계산 + 저장합니다.\n\n"
         "## 자동 스케줄\n"
@@ -808,6 +816,7 @@ async def compute_sigma(
     "/crawling/stock/sync",
     tags=["Stock Crawling"],
     summary="캔들 동기화 수동 실행",
+    dependencies=[Depends(get_super_user)],
     description=(
         "watchlist 종목의 일봉(OHLCV) 캔들 데이터를 yfinance에서 동기화합니다.\n\n"
         "## 자동 스케줄\n"

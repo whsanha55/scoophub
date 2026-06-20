@@ -7,13 +7,15 @@ from datetime import datetime
 from fastapi import APIRouter, Depends, Query
 from fastapi.responses import JSONResponse
 
-from app.core.auth import get_current_user
+from app.core.auth import get_super_user
 from app.core.database import Database
 from app.core.models import ApiResponse, ErrorDetail
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/api", dependencies=[Depends(get_current_user)])
+# router-level 인증 제거 — GET /news, /news/{id} 공개.
+# POST crawl/요약 trigger는 get_super_user 보호.
+router = APIRouter(prefix="/api")
 
 
 def _get_db() -> Database:
@@ -137,6 +139,7 @@ def _row_to_dict(row) -> dict:
 @router.post(
     "/crawling/news",
     summary="뉴스 크롤 수동 실행",
+    dependencies=[Depends(get_super_user)],
     description=(
         "RSS 피드를 수집해 뉴스 기사를 저장하고, 신규 기사를 LLM으로 요약합니다.\n\n"
         "## 자동 스케줄\n"
@@ -204,6 +207,7 @@ async def crawling_news(db: Database = Depends(_get_db)):
 @router.post(
     "/crawling/news/summarize/retry",
     summary="뉴스 요약 재시도",
+    dependencies=[Depends(get_super_user)],
     description=(
         "최근 1일 이내이면서 아직 성공하지 않은(summary_status != 'success': pending/failed/error) 기사를 20개 단위로 다시 LLM 요약합니다.\n\n"
         "## 재시도 조건\n"

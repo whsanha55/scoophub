@@ -20,7 +20,6 @@ logger = logging.getLogger(__name__)
 router = APIRouter(
     prefix="/api/config",
     tags=["Crawler Config"],
-    dependencies=[Depends(get_super_user)],
 )
 
 
@@ -157,6 +156,7 @@ async def get_config(crawler: str, db: Database = Depends(_get_db)):
         "params를 부분 병합한 뒤 APScheduler job kwargs를 즉시 교체(live reload). "
         "잘못된 키/타입은 422. 미지원 crawler는 404."
     ),
+    dependencies=[Depends(get_super_user)],
 )
 async def update_config(
     crawler: str,

@@ -28,7 +28,7 @@ from typing import TYPE_CHECKING, Any, Callable
 
 from fastapi import APIRouter, Depends
 
-from app.core.auth import get_current_user
+from app.core.auth import get_super_user
 from app.core.models import ApiResponse, ErrorDetail
 
 if TYPE_CHECKING:
@@ -57,10 +57,9 @@ class BaseRouter(ABC):
     order_by: str = "created_at DESC NULLS LAST"
 
     def __init__(self) -> None:
-        self.router = APIRouter(
-            prefix="/api",
-            dependencies=[Depends(get_current_user)],
-        )
+        # router-level 인증 제거 — GET 조회 엔드포인트는 공개.
+        # mutation(POST crawl trigger)은 _register_crawl_trigger에서 get_super_user 적용.
+        self.router = APIRouter(prefix="/api")
         self._get_db_fn = self._make_get_db()
         self._register_crawl_trigger()
 
@@ -134,6 +133,7 @@ class BaseRouter(ABC):
             summary=summary,
             description=description,
             tags=[tag],
+            dependencies=[Depends(get_super_user)],
         )(_trigger)
 
     # ── 헬퍼 메서드 ─────────────────────────────────────────
