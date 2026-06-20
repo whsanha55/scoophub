@@ -209,6 +209,10 @@ class ReportBuilder:
         if not rows_1d:
             return ""
 
+        # 보조 기간(1W/1M)을 group 단위로 한 번에 조회 — N+1 방지.
+        aux_w_map = await self._aux_signal_map(ar_repo, tickers, "1W")
+        aux_m_map = await self._aux_signal_map(ar_repo, tickers, "1M")
+
         lines = [f"<b>{title}</b>"]
 
         for row in rows_1d:
@@ -217,10 +221,6 @@ class ReportBuilder:
             if price <= 0:
                 continue
 
-            # 보조 기간 (1W/1M) — 별도 조회.
-            aux_w = await self._aux_signal(ar_repo, ticker, "1W")
-            aux_m = await self._aux_signal(ar_repo, ticker, "1M")
-
             # sigma range 산출 (WEM 기반).
             sigma_range = await self._sigma_range_for(
                 wem_repo, compute_sigma_range, ticker, price
@@ -228,21 +228,23 @@ class ReportBuilder:
             tech_details = row.get("technical_details") or {}
             levels = compute_actionable_levels(price, sigma_range, tech_details)
 
-            lines.append(self._format_ticker(ticker, row, aux_w, aux_m, levels))
+            lines.append(self._format_ticker(
+                ticker, row, aux_w_map.get(ticker), aux_m_map.get(ticker), levels
+            ))
 
         if len(lines) <= 1:  # 제목만
             return ""
         return "\n".join(lines)
 
-    async def _aux_signal(self, ar_repo, ticker: str, timeframe: str) -> str | None:
-        """보조 기간(1W/1M) 시그널. 없으면 None."""
+    async def _aux_signal_map(
+        self, ar_repo, tickers: list[str], timeframe: str
+    ) -> dict[str, str]:
+        """보조 기간(1W/1M) 시그널을 다중 티커로 한 번에 조회 → {ticker: signal}."""
         try:
-            rows = await ar_repo.find_by_tickers([ticker], timeframe)
+            rows = await ar_repo.find_by_tickers(tickers, timeframe)
         except Exception:
-            return None
-        if not rows:
-            return None
-        return rows[0].get("signal")
+            return {}
+        return {r["ticker"]: r.get("signal") for r in rows}
 
     async def _sigma_range_for(
         self, wem_repo, compute_sigma_range, ticker: str, price: float

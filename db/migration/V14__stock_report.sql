@@ -29,10 +29,10 @@ VALUES
     ('^IXIC', 'NAS', 'NASDAQ Composite',   'market', TRUE, 'market'),
     ('^NDX',  'NAS', 'NASDAQ 100',         'market', TRUE, 'market'),
     ('QQQ',   'NAS', 'Invesco QQQ Trust',  'market', TRUE, 'market'),
-    -- 섹터층 (sector SPDR ETF)
-    ('XLK',   'ARS', 'Technology Select',  'sector', TRUE, 'sector'),
-    ('XLV',   'ARS', 'Health Care Select', 'sector', TRUE, 'sector'),
-    ('XLE',   'ARS', 'Energy Select',      'sector', TRUE, 'sector')
+    -- 섹터층 (sector SPDR ETF) — NYSE Arca 상장
+    ('XLK',   'NYE', 'Technology Select',  'sector', TRUE, 'sector'),
+    ('XLV',   'NYE', 'Health Care Select', 'sector', TRUE, 'sector'),
+    ('XLE',   'NYE', 'Energy Select',      'sector', TRUE, 'sector')
 ON CONFLICT DO NOTHING;
 
 -- ────────────────────────────────────────────────────────────────
