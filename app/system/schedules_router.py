@@ -19,7 +19,6 @@ logger = logging.getLogger(__name__)
 router = APIRouter(
     prefix="/api/schedules",
     tags=["Schedules"],
-    dependencies=[Depends(get_super_user)],
 )
 
 
@@ -108,6 +107,7 @@ async def get_schedule(
         "주기(schedules/schedule_minutes) 또는 활성화(enabled) 변경. "
         "변경 즉시 APScheduler에 반영(reschedule_job / pause_job / resume_job)."
     ),
+    dependencies=[Depends(get_super_user)],
 )
 async def update_schedule(
     crawler: str,

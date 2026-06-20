@@ -8,13 +8,15 @@ from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 
-from app.core.auth import get_current_user
+from app.core.auth import get_super_user
 from app.core.database import Database
 from app.core.models import ApiResponse
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/api", tags=["News Sources"], dependencies=[Depends(get_current_user)])
+# router-level 인증 제거 — GET /news/sources 공개.
+# POST/PATCH/DELETE mutation은 get_super_user 보호.
+router = APIRouter(prefix="/api", tags=["News Sources"])
 
 
 def _get_db() -> Database:
@@ -73,6 +75,7 @@ async def list_sources(
     status_code=201,
     summary="뉴스 소스 추가",
     description="새로운 RSS 뉴스 소스를 등록합니다. 동일한 crawler+url 조합은 허용되지 않습니다.",
+    dependencies=[Depends(get_super_user)],
 )
 async def create_source(
     body: SourceCreate,
@@ -96,6 +99,7 @@ async def create_source(
     "/news/sources/{source_id}",
     summary="뉴스 소스 수정",
     description="지정한 RSS 뉴스 소스의 속성을 부분 수정합니다. active 토글, 이름/URL 변경 등에 사용합니다.",
+    dependencies=[Depends(get_super_user)],
 )
 async def update_source(
     source_id: int,
@@ -146,6 +150,7 @@ async def update_source(
     "/news/sources/{source_id}",
     summary="뉴스 소스 삭제",
     description="지정한 RSS 뉴스 소스를 삭제합니다.",
+    dependencies=[Depends(get_super_user)],
 )
 async def delete_source(
     source_id: int,

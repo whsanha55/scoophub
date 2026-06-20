@@ -22,7 +22,6 @@ logger = logging.getLogger(__name__)
 router = APIRouter(
     prefix="/api/notify/routes",
     tags=["Notify"],
-    dependencies=[Depends(get_super_user)],
 )
 
 _CHANNELS = ("telegram", "discord", "email")
@@ -70,7 +69,7 @@ async def list_routes(db: Database = Depends(_get_db)):
     return ApiResponse(success=True, data=routes, meta={"total": len(routes)})
 
 
-@router.post("", summary="notify 라우트 생성")
+@router.post("", summary="notify 라우트 생성", dependencies=[Depends(get_super_user)])
 async def create_route(body: RouteCreate, db: Database = Depends(_get_db)):
     if body.channel not in _CHANNELS:
         raise HTTPException(422, detail=f"channel must be one of {_CHANNELS}")
@@ -86,7 +85,7 @@ async def create_route(body: RouteCreate, db: Database = Depends(_get_db)):
     return ApiResponse(success=True, data=_row_to_dict(row))
 
 
-@router.patch("/{route_id}", summary="notify 라우트 수정")
+@router.patch("/{route_id}", summary="notify 라우트 수정", dependencies=[Depends(get_super_user)])
 async def update_route(route_id: int, body: RouteUpdate, db: Database = Depends(_get_db)):
     existing = await db.fetchrow("SELECT id FROM notify_routes WHERE id=$1", route_id)
     if existing is None:
@@ -117,7 +116,7 @@ async def update_route(route_id: int, body: RouteUpdate, db: Database = Depends(
     return ApiResponse(success=True, data=_row_to_dict(row))
 
 
-@router.delete("/{route_id}", summary="notify 라우트 삭제")
+@router.delete("/{route_id}", summary="notify 라우트 삭제", dependencies=[Depends(get_super_user)])
 async def delete_route(route_id: int, db: Database = Depends(_get_db)):
     result = await db.execute("DELETE FROM notify_routes WHERE id=$1", route_id)
     if result == "DELETE 0":
@@ -126,7 +125,7 @@ async def delete_route(route_id: int, db: Database = Depends(_get_db)):
     return ApiResponse(success=True, data={"deleted": route_id})
 
 
-@router.post("/{route_id}/test", summary="발신 테스트 (해당 라우트로 강제 1회 발신)")
+@router.post("/{route_id}/test", summary="발신 테스트 (해당 라우트로 강제 1회 발신)", dependencies=[Depends(get_super_user)])
 async def test_route(route_id: int, db: Database = Depends(_get_db)):
     row = await db.fetchrow(
         "SELECT category, purpose FROM notify_routes WHERE id=$1", route_id

@@ -82,9 +82,26 @@ async def test_health_is_public(real_client):
     assert resp.status_code == 200
 
 
-async def test_protected_route_requires_token(real_client):
-    resp = await real_client.get("/api/news")
+async def test_get_routes_are_public(real_client):
+    # GET 조회 엔드포인트는 인증 없이 200 (이슈 #139)
+    for path in ("/api/news", "/api/stock/watchlist", "/api/schedules"):
+        resp = await real_client.get(path)
+        assert resp.status_code == 200, f"{path} should be public: {resp.status_code}"
+
+
+async def test_mutation_requires_token(real_client):
+    # mutation 엔드포인트는 비인가 시 401 (이슈 #139)
+    resp = await real_client.post("/api/crawling/news")
     assert resp.status_code == 401
+
+
+async def test_mutation_denies_non_super(real_client):
+    # 일반 사용자(is_super=False)는 mutation 시 403 (이슈 #139)
+    token = auth.create_jwt("bob@example.com", False)
+    resp = await real_client.post(
+        "/api/crawling/news", headers={"Authorization": f"Bearer {token}"}
+    )
+    assert resp.status_code == 403
 
 
 async def test_me_requires_token(real_client):
