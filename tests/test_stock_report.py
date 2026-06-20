@@ -9,6 +9,7 @@ from app.stock.report import (
     ReportBuilder,
     compute_actionable_levels,
 )
+from app.stock.router import _analysis_row_to_report, _enrich_report_levels
 
 
 # ── T4: compute_actionable_levels ──────────────────────────────────────────
@@ -272,3 +273,171 @@ async def test_builder_run_multi_group(monkeypatch):
     assert result is not None
     assert "시장층" in result and "섹터층" in result and "개별종목" in result
     assert "^NDX" in result and "XLK" in result and "AAPL" in result
+
+
+# ── T6(#149): _analysis_row_to_report + _enrich_report_levels ────────────────
+
+
+def _make_row_with_sigma(ticker: str, price: float = 100.0) -> dict:
+    """sigma_data 가 technical_details 에 저장된 분석 행."""
+    return {
+        "ticker": ticker,
+        "exchange": "NAS",
+        "price": price,
+        "change": 1.0,
+        "change_rate": 1.0,
+        "signal": "BUY",
+        "total_score": 3.5,
+        "confidence": 65.0,
+        "market_regime": "bull",
+        "technical_scores": {"rsi": 10},
+        "technical_details": {
+            "atr": 4.0,
+            "ema12": 99.0,
+            "macd_histogram": 0.5,
+            "sigma_data": {
+                "weekly_expected_move": {
+                    "upper_1sigma": 110.0,
+                    "lower_1sigma": 90.0,
+                    "expected_move_pct": 10.0,
+                    "sigma_position": "NEAR_CENTER",
+                    "sigma_signal": "NEUTRAL",
+                    "sigma_confidence": 0.3,
+                    "expected_move_high": 110.0,
+                    "expected_move_low": 90.0,
+                },
+            },
+        },
+        "analyzed_at": None,
+    }
+
+
+class _FakeWlRepoWithGroup:
+    """WatchlistRepo stub — find_by_ticker 가 group 을 가진 item 반환."""
+
+    def __init__(self, group_map: dict[str, str]):
+        self._group_map = group_map
+
+    async def find_by_ticker(self, ticker):
+        from app.stock.models import WatchlistItem
+
+        grp = self._group_map.get(ticker)
+        if grp is None:
+            return None
+        return WatchlistItem(ticker=ticker, group=grp)
+
+
+class _FakeWemRepoEmpty:
+    """WEMRepo stub — sigma_data 가 이미 행에 있어 find_by_ticker 호출 안 됨."""
+
+    async def find_by_ticker(self, ticker, limit=1):
+        return []
+
+
+def test_analysis_row_to_report_base_fields():
+    """_analysis_row_to_report 동기 부분 — actionable_levels 미포함(None)."""
+
+    row = _make_row_with_sigma("AAPL")
+    report = _analysis_row_to_report(row)
+    assert report.ticker == "AAPL"
+    assert report.price == 100.0
+    # 동기 변환만 수행 → actionable_levels/group 은 아직 None
+    assert report.actionable_levels is None
+    assert report.group is None
+    assert report.hit_rate is None  # 스키마 한계 (#148 T8)
+    # sigma 는 저장된 snapshot 으로 채워짐
+    assert report.sigma is not None
+
+
+@pytest.mark.asyncio
+async def test_enrich_report_levels_populates_actionable_and_group():
+    """sigma_data + tech_details 있을 때 actionable_levels + group 산출."""
+
+    row = _make_row_with_sigma("AAPL", price=100.0)
+    report = _analysis_row_to_report(row)
+    wl_repo = _FakeWlRepoWithGroup({"AAPL": "individual"})
+    wem_repo = _FakeWemRepoEmpty()
+
+    await _enrich_report_levels(report, row, wl_repo, wem_repo)
+
+    assert report.actionable_levels is not None
+    assert report.actionable_levels.target_price == 110.0  # upper_1sigma
+    assert report.actionable_levels.buy_zone == 90.0       # lower_1sigma
+    assert report.actionable_levels.stop_loss == pytest.approx(100 - 1.5 * 4.0)  # 94.0
+    assert report.actionable_levels.momentum_fire is True  # price>ema12 & macd>0
+    assert report.group == "individual"
+
+
+@pytest.mark.asyncio
+async def test_enrich_report_levels_no_sigma_data_falls_back_to_wem():
+    """sigma_data 없으면 WEMRepo 로 sigma range 산출."""
+
+    row = {
+        "ticker": "AAPL",
+        "exchange": "NAS",
+        "price": 100.0,
+        "change": 1.0,
+        "change_rate": 1.0,
+        "signal": "BUY",
+        "total_score": 3.5,
+        "confidence": 65.0,
+        "market_regime": "bull",
+        "technical_scores": {},
+        "technical_details": {"atr": 4.0, "ema12": 99.0, "macd_histogram": 0.5},
+        "analyzed_at": None,
+    }
+    report = _analysis_row_to_report(row)
+
+    class _WemRepoWithData:
+        async def find_by_ticker(self, ticker, limit=1):
+            return [WeeklyExpectedMove(
+                ticker=ticker, expected_move_high=110, expected_move_low=90
+            )]
+
+    wl_repo = _FakeWlRepoWithGroup({"AAPL": "sector"})
+    await _enrich_report_levels(report, row, wl_repo, _WemRepoWithData())
+
+    assert report.actionable_levels is not None
+    assert report.actionable_levels.target_price == 110.0
+    assert report.actionable_levels.buy_zone == 90.0
+    assert report.group == "sector"
+
+
+@pytest.mark.asyncio
+async def test_enrich_report_levels_none_when_no_sigma_and_no_wem():
+    """sigma_data 도 WEM 도 없으면 actionable_levels=None (정상 스킵)."""
+
+    row = {
+        "ticker": "AAPL",
+        "exchange": "NAS",
+        "price": 100.0,
+        "change": 0.0,
+        "change_rate": 0.0,
+        "signal": "NEUTRAL",
+        "total_score": 0.0,
+        "confidence": 50.0,
+        "market_regime": "neutral",
+        "technical_scores": {},
+        "technical_details": {"atr": 4.0, "ema12": 99.0, "macd_histogram": 0.5},
+        "analyzed_at": None,
+    }
+    report = _analysis_row_to_report(row)
+    wl_repo = _FakeWlRepoWithGroup({})  # group 매핑 없음
+    await _enrich_report_levels(report, row, wl_repo, _FakeWemRepoEmpty())
+
+    assert report.actionable_levels is None
+    assert report.group is None  # watchlist 에도 없음
+
+
+@pytest.mark.asyncio
+async def test_enrich_report_levels_group_none_when_not_in_watchlist():
+    """watchlist 에 없는 종목 → group=None."""
+
+    row = _make_row_with_sigma("UNKNOWN")
+    report = _analysis_row_to_report(row)
+    wl_repo = _FakeWlRepoWithGroup({})  # 빈 매핑
+    await _enrich_report_levels(report, row, wl_repo, _FakeWemRepoEmpty())
+
+    # actionable_levels 는 sigma_data 있으므로 산출됨
+    assert report.actionable_levels is not None
+    assert report.group is None

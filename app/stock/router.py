@@ -254,7 +254,11 @@ async def _save_multi_timeframe(
 
 
 def _analysis_row_to_report(row: dict) -> StockReport:
-    """Convert analysis_results row dict to StockReport schema."""
+    """Convert analysis_results row dict to StockReport schema (동기 부분).
+
+    sigma/actionable_levels/group 등 DB 조회가 필요한 enrichment는
+    _enrich_report_levels 에서 별도 수행 (async).
+    """
     tech_scores = row.get("technical_scores", {})
     if isinstance(tech_scores, str):
         tech_scores = json.loads(tech_scores)
@@ -307,6 +311,60 @@ def _analysis_row_to_report(row: dict) -> StockReport:
         data_date=data_date,
         is_stale=is_stale,
     )
+
+
+async def _enrich_report_levels(
+    report: StockReport, row: dict, wl_repo, wem_repo
+) -> None:
+    """StockReport 에 actionable_levels + group 채우기 (#149).
+
+    - actionable_levels: 저장된 sigma_data(±1σ) + technical_details(atr/ema12/macd) 로
+      compute_actionable_levels 재사용. sigma_data 없으면 WEMRepo fallback.
+    - group: WatchlistRepo.find_by_ticker 매핑.
+    데이터 부족 시 actionable_levels=None 유지 (정상 스킵).
+    """
+    from app.stock.models import compute_sigma_range
+    from app.stock.report import compute_actionable_levels
+    from app.stock.schemas import ActionableLevelsOut
+
+    # 1. sigma range 확보 (저장된 snapshot 우선, 없으면 WEMRepo 실시간 산출)
+    tech_details = row.get("technical_details", {})
+    if isinstance(tech_details, str):
+        tech_details = json.loads(tech_details)
+
+    sigma_range = None
+    sigma_snapshot = tech_details.get("sigma_data") or {}
+    wem_snapshot = sigma_snapshot.get("weekly_expected_move") or {}
+    if wem_snapshot.get("upper_1sigma") is not None and wem_snapshot.get("lower_1sigma") is not None:
+        # 저장된 ±1σ 가격으로 SigmaRange-like 구성 (compute_actionable_levels 는 두 속성만 읽음)
+        from app.stock.models import SigmaRange
+
+        sigma_range = SigmaRange(
+            ticker=report.ticker,
+            upper_1sigma=float(wem_snapshot["upper_1sigma"]),
+            lower_1sigma=float(wem_snapshot["lower_1sigma"]),
+        )
+    else:
+        wem_list = await wem_repo.find_by_ticker(report.ticker, limit=1)
+        if wem_list:
+            try:
+                sigma_range = compute_sigma_range(wem_list[0], report.price)
+            except Exception as e:
+                logger.warning("sigma range compute failed for %s: %s", report.ticker, e)
+
+    levels = compute_actionable_levels(report.price, sigma_range, tech_details)
+    if levels is not None:
+        report.actionable_levels = ActionableLevelsOut(
+            target_price=levels.target_price,
+            buy_zone=levels.buy_zone,
+            stop_loss=levels.stop_loss,
+            momentum_fire=levels.momentum_fire,
+        )
+
+    # 2. group 매핑
+    wl_item = await wl_repo.find_by_ticker(report.ticker)
+    if wl_item and getattr(wl_item, "group", None):
+        report.group = wl_item.group
 
 
 async def _enrich_sigma_fallback(
@@ -442,10 +500,11 @@ async def stock_report(
     if not ticker_list:
         return ApiResponse(success=True, data=[])
 
-    from app.stock.repository import AnalysisResultRepo, WeeklyExpectedMoveRepo
+    from app.stock.repository import AnalysisResultRepo, WatchlistRepo, WeeklyExpectedMoveRepo
 
     repo = AnalysisResultRepo(db)
     wem_repo = WeeklyExpectedMoveRepo(db)
+    wl_repo = WatchlistRepo(db)
     rows = await repo.find_by_tickers(ticker_list, timeframe)
 
     reports: list[StockReport] = []
@@ -453,6 +512,7 @@ async def stock_report(
         report = _analysis_row_to_report(row)
         if report.sigma is None:
             await _enrich_sigma_fallback(report, row["ticker"], wem_repo)
+        await _enrich_report_levels(report, row, wl_repo, wem_repo)
 
         reports.append(report)
 
@@ -486,10 +546,11 @@ async def stock_report_all(
             )).model_dump(mode="json"),
         )
 
-    from app.stock.repository import AnalysisResultRepo, WeeklyExpectedMoveRepo
+    from app.stock.repository import AnalysisResultRepo, WatchlistRepo, WeeklyExpectedMoveRepo
 
     repo = AnalysisResultRepo(db)
     wem_repo = WeeklyExpectedMoveRepo(db)
+    wl_repo = WatchlistRepo(db)
     rows = await repo.find_all(timeframe)
 
     if not summarize:
@@ -498,6 +559,7 @@ async def stock_report_all(
             report = _analysis_row_to_report(row)
             if report.sigma is None:
                 await _enrich_sigma_fallback(report, row["ticker"], wem_repo)
+            await _enrich_report_levels(report, row, wl_repo, wem_repo)
             reports.append(report)
         return ApiResponse(success=True, data=reports)
 
@@ -507,6 +569,7 @@ async def stock_report_all(
         report = _analysis_row_to_report(row)
         if report.sigma is None:
             await _enrich_sigma_fallback(report, row["ticker"], wem_repo, limit=1)
+        await _enrich_report_levels(report, row, wl_repo, wem_repo)
 
         sigma = report.sigma
         _sget = (lambda k, d: sigma.get(k, d)) if isinstance(sigma, dict) else (lambda k, d: getattr(sigma, k, d))
@@ -524,6 +587,8 @@ async def stock_report_all(
             sigma_signal=_sget("sigma_signal", "NEUTRAL") if sigma else "NEUTRAL",
             sigma_confidence=_sget("sigma_confidence", 0.0) if sigma else 0.0,
             expected_move_pct=_sget("expected_move_pct", 0.0) if sigma else 0.0,
+            actionable_levels=report.actionable_levels,
+            group=report.group,
             data_date=report.data_date,
             is_stale=report.is_stale,
         ))
