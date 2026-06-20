@@ -5,7 +5,7 @@ import pytest
 
 from app.stock.models import SigmaRange, WeeklyExpectedMove, compute_sigma_range
 from app.stock.report import (
-    DISCLAIMER,
+    REPORT_LINK,
     ReportBuilder,
     compute_actionable_levels,
 )
@@ -240,7 +240,7 @@ async def test_builder_run_dispatches_with_disclaimer(monkeypatch):
     result, rec = await _run_builder(monkeypatch, groups, rows)
     assert result is not None
     assert "AAPL" in result
-    assert DISCLAIMER in result
+    assert REPORT_LINK in result
     assert len(rec.calls) == 1
     cat, pur, key, txt = rec.calls[0]
     assert cat == "stock" and pur == "daily-report"

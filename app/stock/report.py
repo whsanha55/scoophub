@@ -26,10 +26,7 @@ logger = logging.getLogger(__name__)
 # Telegram 메시지 한도(HTML). 여유를 두고 분할.
 _TELEGRAM_MAX = 4000
 
-DISCLAIMER = (
-    "⚠️ 본 리포트는 기술적 지표 기반 자동 분석이며 투자 권유가 아닙니다. "
-    "최종 판단은 본인 책임입니다."
-)
+REPORT_LINK = '<a href="https://scoophub.gonamu.com/stock">🔗 Scoophub에서 보기</a>'
 
 # ATR 기반 손절가 배수. 일반적 day/swing 가이드라인(1.5×ATR).
 _STOP_ATR_MULT = 1.5
@@ -155,7 +152,7 @@ class ReportBuilder:
 
         header = self._header()
         body = "\n\n".join(blocks)
-        full = f"{header}\n\n{body}\n\n{DISCLAIMER}"
+        full = f"{header}\n\n{body}\n\n{REPORT_LINK}"
 
         # 날짜 기반 dedup 키 (하루 1회 발신).
         today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
