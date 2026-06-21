@@ -30,8 +30,6 @@ class Settings(BaseSettings):
 
     # External API Keys
     PRODUCTHUNT_TOKEN: str = ""
-    REDDIT_CLIENT_ID: str = ""
-    REDDIT_CLIENT_SECRET: str = ""
     YOUTUBE_API_KEY: str = ""
 
     # Telegram (Notify 서브시템 — 크롤 완료 발신)

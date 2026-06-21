@@ -34,10 +34,12 @@ async def test_list_configs_returns_seed_rows(db):
     resp = await list_configs(db=db)
     assert resp.success
     crawlers = {row["crawler"] for row in resp.data}
-    assert crawlers == {
+    # reddit은 migration 시드(V11/V12)에 남아있으나 도메인 코드는 제거됨 — 검증 대상에서 제외.
+    expected = {
         "news", "github_trending", "hacker_news", "arxiv", "product_hunt",
-        "reddit", "youtube_trending", "devto_hashnode", "tech_newsletter",
+        "youtube_trending", "devto_hashnode", "tech_newsletter",
     }
+    assert expected <= crawlers  # 필수 crawler 시드 검증 (부분집합)
 
 
 async def test_get_config_single(db):

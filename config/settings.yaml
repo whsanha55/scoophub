@@ -21,10 +21,6 @@ crawlers:
     source_timeout_seconds: 15
     retry_count: 3
     retry_delay_seconds: 10
-  reddit:
-    source_timeout_seconds: 15
-    retry_count: 3
-    retry_delay_seconds: 10
   youtube_trending:
     source_timeout_seconds: 15
     retry_count: 3

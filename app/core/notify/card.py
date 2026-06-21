@@ -35,7 +35,6 @@ _EMOJI = {
 _NAME_PURPOSE = {
     "weather": ("weather", "snapshot"),
     "hacker_news": ("community", "hackernews"),
-    "reddit": ("community", "reddit"),
     "product_hunt": ("community", "producthunt"),
     "github_trending": ("community", "github"),
     "devto_hashnode": ("feed", "devblog"),
@@ -48,7 +47,6 @@ _NAME_PURPOSE = {
 # None 은 updated_at 순 그대로(최신순).
 _SORT_KEY = {
     "hacker_news": "score",
-    "reddit": "score",
     "product_hunt": "votes_count",
     "github_trending": "stars",
     "devto_hashnode": "reactions_count",
@@ -258,9 +256,6 @@ def _meta_for(name: str, r: dict[str, Any]) -> str:
     if name == "hacker_news":
         score = r.get("score")
         return f"{escape_html(score)}점" if score is not None else ""
-    if name == "reddit":
-        score = r.get("score")
-        return f"{escape_html(score)}점" if score is not None else ""
     if name == "product_hunt":
         votes = r.get("votes_count")
         return f"▲{escape_html(votes)}" if votes is not None else ""
@@ -305,11 +300,6 @@ def _line_for(name: str, r: dict[str, Any]) -> str | None:
     else:
         title = (r.get("title") or "").strip()
         url = (r.get("url") or "").strip()
-        # reddit: permalink 우선(M2) — url 이 외부 링크일 수 있음
-        if name == "reddit":
-            permalink = (r.get("permalink") or "").strip()
-            if permalink:
-                url = permalink
 
     if not title:
         return None
@@ -504,9 +494,6 @@ if __name__ == "__main__":
 
     gh_line = _line_for("github_trending", {"fullname": "a/b", "url": "http://g", "stars": 10})
     assert "<b>a/b</b>" in gh_line and "★10" in gh_line, gh_line
-
-    rd_line = _line_for("reddit", {"title": "R", "permalink": "http://r/x", "score": 50})
-    assert 'href="http://r/x"' in rd_line and "50점" in rd_line, rd_line
 
     ph_line = _line_for("product_hunt", {"name": "PH", "ph_url": "http://p", "votes_count": 7})
     assert "<b>PH</b>" in ph_line and "▲7" in ph_line, ph_line
