@@ -241,10 +241,11 @@ async def _enrich_weather(db: "Database") -> str | None:
     if air_parts:
         lines.append(" · ".join(air_parts))
 
-    # 4줄: 주간예보 (wttr.in weather[:3])
-    if weekly:
+    # 4줄: 예보 (wttr.in weather — 오늘[0]은 위 오늘 줄과 중복 → 제외, 내일~모레)
+    forecast = weekly[1:]
+    if forecast:
         day_strs: list[str] = []
-        for day in weekly:
+        for day in forecast:
             date_str = day.get("date") or ""
             wday = _weekday_ko(date_str)
 
@@ -609,7 +610,11 @@ if __name__ == "__main__":
                 "uv_grade": "보통",
                 "weekly_forecast": [
                     {"date": "2026-06-21", "mintempC": "18", "maxtempC": "27",
-                     "hourly": [{"chanceofrain": "10"}]},  # <30 → 비 미표기
+                     "hourly": [{"chanceofrain": "10"}]},  # 오늘(일) → 예보 줄 제외
+                    {"date": "2026-06-22", "mintempC": "17", "maxtempC": "25",
+                     "hourly": [{"chanceofrain": "40"}]},  # 내일(월) → 비 40%
+                    {"date": "2026-06-23", "mintempC": "16", "maxtempC": "24",
+                     "hourly": [{"chanceofrain": "5"}]},   # 모레(화) → 비 미표기
                 ],
             },
         }
@@ -620,6 +625,8 @@ if __name__ == "__main__":
     assert "미세먼지 좋음(15)" in w_body, w_body
     assert "초미세먼지 보통(18)" in w_body, w_body  # 18.4 → 18
     assert "23°C" in w_body and "습도 60%" in w_body, w_body
-    assert "주간: 일 18/27" in w_body, w_body  # 2026-06-21 = 일요일
+    # 예보 줄: 오늘(일) 제외 → 내일(월) 17/25 비40% · 모레(화) 16/24.
+    assert "주간: 월 17/25 비40% · 화 16/24" in w_body, w_body
+    assert "일 18/27" not in w_body, w_body  # 오늘은 예보 줄에 없음
 
     print("card.py self-check OK")
