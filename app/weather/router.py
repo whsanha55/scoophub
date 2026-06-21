@@ -43,7 +43,7 @@ _get_db = _base.get_db_fn
         "## 시간 필터\n"
         "- `minutes`: 최근 N분 (예: `?minutes=60` → 최근 1시간)\n"
         "- `from`/`to`: ISO 8601 범위 지정\n"
-        "- 둘 다 없으면 최근 30분\n"
+        "- 시간 필터가 없으면 최신 1건 (신선도 검사 생략)\n"
         "- 해당 기간에 데이터가 없으면 `data=null`\n\n"
         "## 지역\n"
         "- `location`: 지역 이름 (예: seoul, busan)\n\n"
@@ -72,8 +72,7 @@ async def get_weather(
         conditions.append(f"date_at BETWEEN ${idx} AND ${idx + 1}")
         params.extend([fr, to])
         idx += 2
-    else:
-        conditions.append("date_at >= NOW() - interval '30 minutes'")
+    # 시간 파라미터가 없으면 신선도 필터 생략 — 최신 snapshot 1건 (forecast 엔드포인트와 동일 패턴).
 
     where = " AND ".join(conditions)
     row = await db.fetchrow(
