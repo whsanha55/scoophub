@@ -72,11 +72,11 @@ async def dispatch_crawl_notify(
     items_fetched = int(getattr(result, "items_fetched", 0) or 0)
     new_ids = list(getattr(result, "new_article_ids", None) or [])
 
-    # weather: 매일 KST 17시+ 1회 발신 게이트.
+    # weather: 매일 KST 7시+ 1회 발신 게이트 (아침 날씨).
     today = None
     if category == "weather":
         now_kst = datetime.now(ZoneInfo("Asia/Seoul"))
-        if now_kst.hour < 17:
+        if now_kst.hour < 7:
             return
         today = now_kst.strftime("%Y-%m-%d")
         if await CrawlDataRepo(db).get(
