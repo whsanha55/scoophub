@@ -272,7 +272,7 @@ async def _enrich_weather(db: "Database") -> str | None:
             if seg or temp_seg or rain_seg:
                 day_strs.append(f"{seg}{temp_seg}{rain_seg}".strip())
         if day_strs:
-            lines.append("주간: " + " · ".join(day_strs))
+            lines.append("예보: " + " · ".join(day_strs))
 
     if not lines:
         return None
@@ -613,7 +613,7 @@ if __name__ == "__main__":
     assert "초미세먼지 보통(18)" in w_body, w_body  # 18.4 → 18
     assert "23°C" in w_body and "습도 60%" in w_body, w_body
     # 예보 줄: 오늘(일) 제외 → 내일(월) 17/25 비40% · 모레(화) 16/24.
-    assert "주간: 월 17/25 비40% · 화 16/24" in w_body, w_body
+    assert "예보: 월 17/25 비40% · 화 16/24" in w_body, w_body
     assert "일 18/27" not in w_body, w_body  # 오늘은 예보 줄에 없음
 
     print("card.py self-check OK")
