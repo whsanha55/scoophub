@@ -64,6 +64,46 @@ async def test_get_kal_bonus_filter_by_arrival(client, db):
     assert body["data"][0]["key"] == "202701-ICN-CDG"
 
 
+async def test_get_kal_bonus_months_meta(client, db):
+    """파라미터 없 → data는 빈 배열, meta.months에 전체 월 목록."""
+    await _seed(db, "202701-ICN-LHR", SAMPLE,
+                datetime(2027, 1, 1, tzinfo=timezone.utc))
+    cdg = {**SAMPLE, "arrivalAirport": "CDG"}
+    await _seed(db, "202702-ICN-CDG", cdg,
+                datetime(2027, 2, 1, tzinfo=timezone.utc))
+    res = await client.get("/api/kal-bonus")
+    body = res.json()
+    assert body["success"] is True
+    assert body["data"] == []
+    assert body["meta"]["months"] == ["202701", "202702"]
+
+
+async def test_get_kal_bonus_filter_by_month(client, db):
+    """month=YYYYMM → 해당 월 row만."""
+    await _seed(db, "202701-ICN-LHR", SAMPLE,
+                datetime(2027, 1, 1, tzinfo=timezone.utc))
+    cdg = {**SAMPLE, "arrivalAirport": "CDG"}
+    await _seed(db, "202702-ICN-CDG", cdg,
+                datetime(2027, 2, 1, tzinfo=timezone.utc))
+    res = await client.get("/api/kal-bonus?month=202701")
+    body = res.json()
+    assert body["meta"]["returned"] == 1
+    assert body["data"][0]["key"] == "202701-ICN-LHR"
+
+
+async def test_get_kal_bonus_month_and_arrival(client, db):
+    """month + arrival 조합."""
+    await _seed(db, "202701-ICN-LHR", SAMPLE,
+                datetime(2027, 1, 1, tzinfo=timezone.utc))
+    cdg = {**SAMPLE, "arrivalAirport": "CDG"}
+    await _seed(db, "202701-ICN-CDG", cdg,
+                datetime(2027, 1, 2, tzinfo=timezone.utc))
+    res = await client.get("/api/kal-bonus?month=202701&arrival=CDG")
+    body = res.json()
+    assert body["meta"]["returned"] == 1
+    assert body["data"][0]["key"] == "202701-ICN-CDG"
+
+
 async def test_crawl_trigger_plumbing(client, db, monkeypatch):
     """POST /api/crawling/kal-bonus 가 crawler를 로드·실행하는지 (크롤 자체는 치환)."""
     from app.kal_bonus import crawler as crawler_mod
