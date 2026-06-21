@@ -26,6 +26,9 @@ class ResponseMeta(BaseModel):
     )
     total: int | None = Field(None, description="전체 결과 수")
     returned: int | None = Field(None, description="이번 응답에 포함된 항목 수")
+    months: list[str] | None = Field(
+        None, description="월별 조회 엔드포인트에서 파라미터 생략 시 전체 월 목록(YYYYMM)"
+    )
 
 
 class ApiResponse(BaseModel, Generic[T]):

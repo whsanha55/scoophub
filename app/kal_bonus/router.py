@@ -58,24 +58,44 @@ def _row_to_public(row: Any) -> dict[str, Any]:
         "최신 보너스 좌석 스냅샷을 조회합니다. crawl_data(category=kal, "
         "purpose=bonus_seat)에서 읽습니다.\n\n"
         "## 파라미터\n"
-        "- `arrival`: 도착 공항 코드 (예: LHR). 생략 시 전 노선.\n"
-        "- `limit`: 최대 건수 (기본 30)\n\n"
+        "- `month`: 조회 월 YYYYMM (예: 202702). 해당 월 row만 반환.\n"
+        "- `arrival`: 도착 공항 코드 (예: LHR). month와 조합 가능.\n"
+        "- `month`·`arrival` 모두 생략 → data는 빈 배열, `meta.months`에 전체 월 목록만 반환.\n"
+        "- `limit`: 최대 건수 (기본 500)\n\n"
         "## 사용 예시\n"
-        "- ICN→LHR 최신: `?arrival=LHR`\n"
-        "- 전 노선 최신 10건: `?limit=10`"
+        "- 월 목록(탭 헤더): (파라미터 없)\n"
+        "- 2027년 2월 전 노선: `?month=202702`\n"
+        "- ICN→LHR 해당 월: `?month=202702&arrival=LHR`"
     ),
 )
 async def get_kal_bonus(
     arrival: str | None = Query(None, description="도착 공항 코드 (예: LHR)"),
-    limit: int = Query(30, ge=1, le=100, description="최대 건수"),
+    month: str | None = Query(None, pattern=r"^\d{6}$", description="조회 월 YYYYMM (예: 202702)"),
+    limit: int = Query(500, ge=1, le=1000, description="최대 건수"),
     db: Database = Depends(_get_db),
 ):
-    logger.info("get_kal_bonus requested: arrival=%s limit=%d", arrival, limit)
+    logger.info("get_kal_bonus requested: arrival=%s month=%s limit=%d", arrival, month, limit)
+
+    # month·arrival 모두 생략 → 월 목록만 메타로 반환 (UI 월 탭 헤더용, 경량)
+    if month is None and arrival is None:
+        rows = await db.fetch(
+            "SELECT DISTINCT substring(key from 1 for 6) AS ym "
+            "FROM crawl_data WHERE category = $1 AND purpose = $2 ORDER BY 1",
+            CATEGORY, PURPOSE,
+        )
+        months = [r["ym"] for r in rows]
+        return ApiResponse(success=True, data=[], meta={"months": months, "total": len(months)})
+
     conditions = ["category = $1", "purpose = $2"]
     params: list = [CATEGORY, PURPOSE]
     idx = 3
+    if month:
+        # key 포맷: {YYYYMM}-{DEPARTURE}-{ARRIVAL} → 월은 접두사로 매칭
+        conditions.append(f"key LIKE ${idx}")
+        params.append(f"{month}%")
+        idx += 1
     if arrival:
-        # key 포맷: {YYYYMM}-{DEPARTURE}-{ARRIVAL} → 도착은 접미사로 매칭
+        # 도착은 접미사로 매칭
         conditions.append(f"key LIKE ${idx}")
         params.append(f"%-{DEPARTURE}-{arrival.upper()}")
         idx += 1
