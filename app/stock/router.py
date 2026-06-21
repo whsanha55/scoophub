@@ -21,6 +21,7 @@ from app.stock.schemas import (
     AnalyzeResponse,
     AnalyzeResult,
     SigmaDataOut,
+    StockQuoteOut,
     StockReport,
     StockSummary,
     TechnicalOut,
@@ -517,6 +518,63 @@ async def stock_report(
         reports.append(report)
 
     return ApiResponse(success=True, data=reports)
+
+
+@router.get(
+    "/stock/detail/{ticker}",
+    tags=["Stock"],
+    summary="티커 상세 통합 조회",
+    description=(
+        "티커 1개에 대한 분석 리포트 + 실시간 시세(quote)를 한 번에 반환.\n\n"
+        "- 분석 미저장 티커: `data=null` (에러 아님)\n"
+        "- `quote`: yfinance 실시간 시세. 실패 시 `null` (나머지 정상)\n"
+        "- UI `/stock/[ticker]` 상세 페이지 단일 fetch 목적"
+    ),
+)
+async def stock_detail(
+    ticker: str,
+    db: Database = Depends(_get_db),
+):
+    """티커 단일 상세 통합 조회 — 분석 리포트 + 실시간 quote."""
+    logger.info("stock_detail 엔드포인트 진입 — ticker=%s", ticker)
+    from app.stock.repository import AnalysisResultRepo, WatchlistRepo, WeeklyExpectedMoveRepo
+
+    ticker = ticker.upper()
+
+    repo = AnalysisResultRepo(db)
+    wem_repo = WeeklyExpectedMoveRepo(db)
+    wl_repo = WatchlistRepo(db)
+
+    rows = await repo.find_by_tickers([ticker])
+    if not rows:
+        return ApiResponse(success=True, data=None)
+
+    row = rows[0]
+    report = _analysis_row_to_report(row)
+    if report.sigma is None:
+        await _enrich_sigma_fallback(report, row["ticker"], wem_repo)
+    await _enrich_report_levels(report, row, wl_repo, wem_repo)
+
+    # 실시간 quote (yfinance). 실패(빈 dict) 시 quote=None, 나머지 정상.
+    try:
+        provider = get_provider_router()
+        q = await provider.quote(ticker)
+        if q and q.get("regularMarketPrice"):
+            report.quote = StockQuoteOut(
+                price=float(q["regularMarketPrice"]),
+                change=float(q.get("regularMarketChange", 0)),
+                change_rate=float(q.get("regularMarketChangePercent", 0)),
+                volume=float(q["volume"]) if q.get("volume") else None,
+                high=float(q["high"]) if q.get("high") else None,
+                low=float(q["low"]) if q.get("low") else None,
+                open=float(q["open"]) if q.get("open") else None,
+                source="yfinance",
+                timestamp=datetime.now(timezone.utc).isoformat(),
+            )
+    except Exception as e:
+        logger.warning("quote fetch failed for %s: %s", ticker, e)
+
+    return ApiResponse(success=True, data=report)
 
 
 @router.get(

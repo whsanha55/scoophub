@@ -45,6 +45,18 @@ class ActionableLevelsOut(BaseModel):
     momentum_fire: bool = Field(False, description="불타기 진입 여부 (price>EMA12 & MACD hist>0)")
 
 
+class StockQuoteOut(BaseModel):
+    price: float = Field(..., description="실시간 현재가")
+    change: float = Field(..., description="전일 대비 가격 변화")
+    change_rate: float = Field(..., description="전일 대비 등락률 (%)")
+    volume: float | None = Field(None, description="거래량")
+    high: float | None = Field(None, description="당일 고가")
+    low: float | None = Field(None, description="당일 저가")
+    open: float | None = Field(None, description="시가")
+    source: str = Field("yfinance", description="데이터 출처")
+    timestamp: str | None = Field(None, description="조회 시각 (UTC, ISO 8601)")
+
+
 class StockReport(BaseModel):
     ticker: str = Field(..., description="주식 티커 (예: AAPL)")
     exchange: str = Field(..., description="거래소 코드 (예: NAS, NYE)")
@@ -58,6 +70,7 @@ class StockReport(BaseModel):
     group: str | None = Field(None, description="계층 (market | sector | individual)")
     data_date: str | None = Field(None, description="분석 기준 날짜 (ISO 8601)")
     is_stale: bool | None = Field(None, description="분석 결과가 24시간 이전인지 여부")
+    quote: StockQuoteOut | None = Field(None, description="실시간 시세 (/detail 엔드포인트에서만 채움, /report에서는 None)")
 
 
 class StockSummary(BaseModel):
