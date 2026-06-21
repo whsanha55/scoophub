@@ -65,17 +65,6 @@ class ProductHuntParams(BaseModel):
     max_posts: int | None = Field(None, gt=0)
 
 
-class RedditParams(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-    client_id: str | None = None
-    client_secret: str | None = None
-    user_agent: str | None = None
-    subreddits: list[str] | None = None
-    listing_type: str | None = None
-    max_posts_per_subreddit: int | None = Field(None, gt=0)
-    min_score: int | None = Field(None, ge=0)
-
-
 class YoutubeTrendingParams(BaseModel):
     model_config = ConfigDict(extra="forbid")
     api_key: str | None = None
@@ -106,7 +95,6 @@ PARAM_MODELS: dict[str, type[BaseModel]] = {
     "hacker_news": HackerNewsParams,
     "arxiv": ArxivParams,
     "product_hunt": ProductHuntParams,
-    "reddit": RedditParams,
     "youtube_trending": YoutubeTrendingParams,
     "devto_hashnode": DevtoHashnodeParams,
     "tech_newsletter": TechNewsletterParams,

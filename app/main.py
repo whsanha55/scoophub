@@ -25,7 +25,6 @@ from app.stock import wiring as stock_wiring
 
 # community 그룹
 from app.community.hacker_news import wiring as hacker_news_wiring
-from app.community.reddit import wiring as reddit_wiring
 from app.community.product_hunt import wiring as product_hunt_wiring
 from app.community.github_trending import wiring as github_trending_wiring
 
@@ -39,7 +38,7 @@ from app.feed.youtube_trending import wiring as youtube_trending_wiring
 # kal 그룹
 from app.kal_bonus import wiring as kal_bonus_wiring
 
-DOMAINS = [news_wiring, weather_wiring, stock_wiring, github_trending_wiring, hacker_news_wiring, arxiv_wiring, product_hunt_wiring, reddit_wiring, youtube_trending_wiring, devto_hashnode_wiring, tech_newsletter_wiring, kal_bonus_wiring, system_wiring, auth_wiring]
+DOMAINS = [news_wiring, weather_wiring, stock_wiring, github_trending_wiring, hacker_news_wiring, arxiv_wiring, product_hunt_wiring, youtube_trending_wiring, devto_hashnode_wiring, tech_newsletter_wiring, kal_bonus_wiring, system_wiring, auth_wiring]
 
 
 def create_app(db: Database | None = None) -> FastAPI:
