@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 import pytest
 
 from app.kal_bonus.cabin import CABIN_LABELS, map_cabin
-from app.kal_bonus.config import ROUTES, TARGET_MONTHS, load_routes_config, make_key
+from app.kal_bonus.config import ROUTES, TARGET_MONTHS, generate_target_months, load_routes_config, make_key
 from app.kal_bonus.kal_bonus_scraper import KalBonusScraper, parse_bonus_response
 from app.crawl_data.repo import CrawlDataRepo
 
@@ -57,10 +57,12 @@ def test_parse_bonus_response_empty():
 
 
 def test_config_scope():
-    # 10노선 × 3월 = 30 호출/일
+    # TARGET_MONTHS 는 오늘(UTC) 기준 13개월 자동생성.
+    now = datetime.now(timezone.utc)
     assert len(ROUTES) == 10
-    assert len(TARGET_MONTHS) == 3
-    assert len(ROUTES) * len(TARGET_MONTHS) == 30
+    assert len(TARGET_MONTHS) == 13
+    assert TARGET_MONTHS == generate_target_months(13)
+    assert TARGET_MONTHS[0] == f"{now.year:04d}{now.month:02d}"
     assert make_key("ICN", "LHR", "202701") == "202701-ICN-LHR"
 
 
@@ -83,14 +85,14 @@ async def test_scraper_uses_custom_routes_months():
 
 
 async def test_load_routes_config_fallback(db):
-    """crawl_sources row 없으면 폴백 기본값(10노선×3월)."""
+    """crawl_sources row 없으면 폴백 기본값(10노선 × 자동생성 13개월)."""
     pool = await db.pool
     async with pool.acquire() as conn:
         await conn.execute("DELETE FROM crawl_sources WHERE crawler='kal_bonus'")
     dep, routes, months = await load_routes_config(db)
     assert dep == "ICN"
     assert len(routes) == 10
-    assert months == ["202701", "202702", "202703"]
+    assert months == generate_target_months(13)
 
 
 async def test_load_routes_config_from_db(db):

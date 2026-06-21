@@ -8,6 +8,7 @@ config JSONB에서 읽는다. 아래 상수는 폴백 기본값(첫 실행 / row
 from __future__ import annotations
 
 import json
+from datetime import datetime, timezone
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -36,8 +37,25 @@ ROUTES: list[tuple[str, str]] = [
     ("FRA", "프랑크푸르트"),
 ]
 
-# 2027 Q1 (월 첫날 YYYYMMDD → 그 달 전체 응답)
-TARGET_MONTHS: list[str] = ["202701", "202702", "202703"]
+def generate_target_months(count: int = 13) -> list[str]:
+    """오늘(UTC) 기준월부터 +count-1개월까지 YYYYMM 리스트 생성.
+
+    기본 13개월(오늘월 + 향후 12개월 = 1년). stdlib만 사용.
+    """
+    now = datetime.now(timezone.utc)
+    months: list[str] = []
+    y, m = now.year, now.month
+    for _ in range(count):
+        months.append(f"{y:04d}{m:02d}")
+        m += 1
+        if m > 12:
+            m = 1
+            y += 1
+    return months
+
+
+# 폴백 기본값 — 오늘(UTC) 기준 13개월. crawl_sources.config.months 미지정 시 사용.
+TARGET_MONTHS: list[str] = generate_target_months()
 
 # crawl_data 자연키(category/purpose 고정)
 CATEGORY = "kal"

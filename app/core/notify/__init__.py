@@ -13,7 +13,7 @@
 카테고리 정책:
     - news   : importance>=3 만 (발신은 summarizer 이후 — news/scheduler)
     - weather: 매일 KST 17시+ 1회 (state: crawl_data weather/notify_sent/<date>)
-    - kal    : 비즈니스 보너스(P) 잔석만
+    - kal    : 2027 Q1 프레스티지(P) 잔석만
     - stock  : 발신 스킵 (별도 티켓)
     - 그 외  : crawl_data batch 탑5
 """
