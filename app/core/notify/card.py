@@ -6,7 +6,7 @@ dispatch_crawl_notify 가 base 카드(format_card)를 만들면 enrich 가
 
 - news   : feed_news 테이블(importance>=3) 탑5 제목+요약+원문
 - weather: crawl_data(weather, snapshot) 스냅샷 → 온도/대기질/주간예보
-- kal_bonus: crawl_data(kal, bonus_seat) → 비즈니스 보너스(P) 잔석 집계
+- kal_bonus: crawl_data(kal, bonus_seat) → 2027 Q1 프레스티지(P) 잔석 나라별 집계
 - community/feed: crawl_data batch(updated_at DESC) → 도메인 sort key 탑5
 """
 from __future__ import annotations
@@ -15,6 +15,7 @@ import json
 from typing import TYPE_CHECKING, Any
 
 from app.crawl_data.repo import CrawlDataRepo
+from app.kal_bonus.config import ROUTES as _KAL_ROUTES
 
 if TYPE_CHECKING:
     from app.core.database import Database
@@ -59,6 +60,12 @@ _SORT_KEY = {
 # kal_bonus — config 상수와 동일 (순환 import 방지용 로컬 복제).
 _KAL_CATEGORY = "kal"
 _KAL_PURPOSE = "bonus_seat"
+
+# arrival(공항코드) → 도시명. config ROUTES 기반 1회 구성.
+_KAL_ARR_CITY: dict[str, str] = {arr: city for arr, city in _KAL_ROUTES}
+
+# 2027 Q1 잔석 집계 대상 기간(YYYYMM).
+_KAL_PRESTIGE_Q1 = ("202701", "202703")
 
 __all__ = ["escape_html", "format_card", "enrich"]
 
@@ -350,11 +357,26 @@ async def _enrich_batch(db: "Database", name: str) -> str | None:
 
 # ── kal_bonus ─────────────────────────────────────────────────────────
 
+def _has_seat(value: Any) -> bool:
+    """availableSeat → 잔석 존재 여부. scraper._has_seat 와 동일 로직.
+
+    API가 문자열("0")/정수(0)/None 혼합으로 올 수 있어 bool() 오탐 방지:
+    int 캐스트 후 > 0. 캐스트 불가/None → False.
+    """
+    if value is None:
+        return False
+    try:
+        return int(value) > 0
+    except (TypeError, ValueError):
+        return False
+
+
 async def _enrich_kal(db: "Database") -> str | None:
-    """crawl_data(kal, bonus_seat) → 비즈니스 보너스(P) 잔석 노선별 집계.
+    """crawl_data(kal, bonus_seat) → 2027 Q1 프레스티지(P) 잔석 나라별 집계.
 
     저장된 response 는 KAL API 원문(departureAirport/arrivalAirport/flightList).
-    flightDetailList 의 frontBookingClass=='P' && availableSeat 만 집계.
+    flightDetailList 의 frontBookingClass=='P' && availableSeat>0 && 2027 Q1 만
+    나라(arr)별로 월 합산(2027년 1~3월 합). 도시명은 config ROUTES 매핑.
     """
     rows = await db.fetch(
         "SELECT response FROM crawl_data "
@@ -364,36 +386,37 @@ async def _enrich_kal(db: "Database") -> str | None:
         _KAL_PURPOSE,
     )
 
-    # (dep, arr, yyyymm) → P 잔석 수
-    seats: dict[tuple[str, str, str], int] = {}
+    # arr(공항코드) → 2027 Q1 P 잔석 건수
+    seats: dict[str, int] = {}
+    ym_lo, ym_hi = _KAL_PRESTIGE_Q1
 
     for row in rows:
         r = _row_to_dict(row)
         if not r:
             continue
-        dep = r.get("departureAirport") or ""
         arr = r.get("arrivalAirport") or ""
         for flight_day in r.get("flightList", []) or []:
             date_str = flight_day.get("departureDate") or ""
             ym = date_str[:6]  # YYYYMMDD → YYYYMM
+            if not (ym_lo <= ym <= ym_hi):
+                continue
             for d in flight_day.get("flightDetailList", []) or []:
                 if d.get("frontBookingClass") != "P":
                     continue
-                if not d.get("availableSeat"):
+                if not _has_seat(d.get("availableSeat")):
                     continue
-                key = (dep, arr, ym)
-                seats[key] = seats.get(key, 0) + 1
+                seats[arr] = seats.get(arr, 0) + 1
 
     if not seats:
         return None
 
     # 잔석 수 기준 정렬 후 top8 (4096 한도 방지)
     ranked = sorted(seats.items(), key=lambda kv: kv[1], reverse=True)[:8]
-    lines = [
-        f"\n• {escape_html(dep)}→{escape_html(arr)} {escape_html(ym)}: "
-        f"비즈니스 잔석 {escape_html(cnt)}"
-        for (dep, arr, ym), cnt in ranked
-    ]
+    lines: list[str] = []
+    for arr, cnt in ranked:
+        city = _KAL_ARR_CITY.get(arr)
+        label = f"{escape_html(city)}({escape_html(arr)})" if city else escape_html(arr)
+        lines.append(f"\n• {label}: P 잔석 {escape_html(cnt)}건")
     return "".join(lines)
 
 
@@ -410,7 +433,7 @@ async def enrich(
 
     - news      : importance>=3 탑5. count = 해당 건수.
     - weather   : 스냅샷. count 의미 없음(0).
-    - kal_bonus : P 잔석 집계.
+    - kal_bonus : 2027 Q1 프레스티지(P) 잔석 나라별 집계.
     - community/feed(_NAME_PURPOSE 키): batch 탑5.
     - 그 외     : base 카드 text 그대로 반환(degrade).
     """
@@ -496,5 +519,47 @@ if __name__ == "__main__":
     assert _weekday_ko("2024-01-01") == "월", _weekday_ko("2024-01-01")  # Monday
     assert _weekday_ko("2025-12-25") == "목", _weekday_ko("2025-12-25")  # Thursday
     assert _weekday_ko("") == ""
+
+    # _has_seat — scraper._has_seat 동일 로직. "0" 오탐 방지.
+    assert _has_seat("5") is True
+    assert _has_seat(3) is True
+    assert _has_seat("0") is False
+    assert _has_seat(0) is False
+    assert _has_seat(None) is False
+    assert _has_seat("") is False
+
+    # _enrich_kal 집계 — DB fetch 를 fake coroutine 으로 주입.
+    async def _fake_fetch(*_a, **_kw):
+        # LHR: 2027 Q1 두 달 P 잔석(나라별 합산) + 매진("0") 제외 + 2026 데이터 제외.
+        return [
+            {"response": {"departureAirport": "ICN", "arrivalAirport": "LHR", "flightList": [
+                {"departureDate": "20270115", "flightDetailList": [
+                    {"frontBookingClass": "P", "availableSeat": "2"},
+                    {"frontBookingClass": "P", "availableSeat": "0"},  # 매진 → 제외
+                    {"frontBookingClass": "C", "availableSeat": "9"},  # P 아님 → 제외
+                ]},
+                {"departureDate": "20270220", "flightDetailList": [
+                    {"frontBookingClass": "P", "availableSeat": 1},
+                ]},
+                {"departureDate": "20260615", "flightDetailList": [  # 2026 → 기간 외
+                    {"frontBookingClass": "P", "availableSeat": "9"},
+                ]},
+            ]}},
+            {"response": {"arrivalAirport": "ZZZ", "flightList": [  # ROUTES 미포함 폴백
+                {"departureDate": "20270310", "flightDetailList": [
+                    {"frontBookingClass": "P", "availableSeat": "1"},
+                ]},
+            ]}},
+        ]
+
+    import asyncio as _asyncio
+    import types as _types
+    _fakedb = _types.SimpleNamespace(fetch=_fake_fetch)
+    kal_body = _asyncio.run(_enrich_kal(_fakedb))
+    assert kal_body is not None, kal_body
+    # LHR: 202701(1건, "2">0) + 202702(1건) = 2건. city=런던/히스로.
+    assert "• 런던/히스로(LHR): P 잔석 2건" in kal_body, kal_body
+    # ZZZ: ROUTES 미포함 → arr코드만.
+    assert "• ZZZ: P 잔석 1건" in kal_body, kal_body
 
     print("card.py self-check OK")
