@@ -170,6 +170,18 @@ async def _enrich_news(db: "Database", new_ids: list[int]) -> str | None:
 
 # ── weather ───────────────────────────────────────────────────────────
 
+def _num(value: Any) -> str | None:
+    """대기질 수치 정수 반올림 → str. None/변환불가 → None.
+    단위 µg/m³, 문맥상 생략. Open-Meteo float → 깔끔한 정수 표기.
+    """
+    if value is None:
+        return None
+    try:
+        return str(round(float(value)))
+    except (TypeError, ValueError):
+        return None
+
+
 async def _enrich_weather(db: "Database") -> str | None:
     """crawl_data(weather, snapshot) 최신 → 현재날씨+대기질+주간예보."""
     row = await CrawlDataRepo(db).latest(category="weather", purpose="snapshot")
@@ -197,22 +209,39 @@ async def _enrich_weather(db: "Database") -> str | None:
     if parts:
         lines.append(" · ".join(parts))
 
-    # 2줄: 미세먼지 · 초미세먼지 · 자외선
-    pm10 = resp.get("pm10_grade")
-    pm25 = resp.get("pm25_grade")
+    # 2줄: 오늘 최저/최고 (weekly_forecast[0] = 오늘)
+    weekly = resp.get("weekly_forecast") or []
+    today = weekly[0] if weekly else {}
+    today_lo = today.get("mintempC")
+    today_hi = today.get("maxtempC")
+    if today_lo is not None and today_hi is not None:
+        lines.append(
+            f"오늘 최저 {escape_html(today_lo)}°/최고 {escape_html(today_hi)}°"
+        )
+
+    # 3줄: 미세먼지 · 초미세먼지 · 자외선 (등급 + 수치)
+    pm10_grade = resp.get("pm10_grade")
+    pm25_grade = resp.get("pm25_grade")
     uv = resp.get("uv_grade")
     air_parts: list[str] = []
-    if pm10:
-        air_parts.append(f"미세먼지 {escape_html(pm10)}")
-    if pm25:
-        air_parts.append(f"초미세먼지 {escape_html(pm25)}")
+    if pm10_grade:
+        seg = f"미세먼지 {escape_html(pm10_grade)}"
+        n = _num(resp.get("pm10"))
+        if n is not None:
+            seg += f"({n})"
+        air_parts.append(seg)
+    if pm25_grade:
+        seg = f"초미세먼지 {escape_html(pm25_grade)}"
+        n = _num(resp.get("pm25"))
+        if n is not None:
+            seg += f"({n})"
+        air_parts.append(seg)
     if uv:
         air_parts.append(f"자외선 {escape_html(uv)}")
     if air_parts:
         lines.append(" · ".join(air_parts))
 
-    # 3줄: 주간예보 (wttr.in weather[:3])
-    weekly = resp.get("weekly_forecast") or []
+    # 4줄: 주간예보 (wttr.in weather[:3])
     if weekly:
         day_strs: list[str] = []
         for day in weekly:
@@ -561,5 +590,36 @@ if __name__ == "__main__":
     assert "• 런던/히스로(LHR): P 잔석 2건" in kal_body, kal_body
     # ZZZ: ROUTES 미포함 → arr코드만.
     assert "• ZZZ: P 잔석 1건" in kal_body, kal_body
+
+    # _num — 대기질 수치 정수 반올림. None/불가 → None.
+    assert _num(None) is None
+    assert _num(15) == "15"
+    assert _num("15.4") == "15"  # 0.5 미만 버림(round)
+    assert _num("abc") is None
+
+    # _enrich_weather — fake snapshot DB (CrawlDataRepo.latest → db.fetchrow).
+    async def _wfetchrow(*_a, **_kw):
+        return {
+            "id": 1, "key": "seoul", "date_at": None, "updated_at": None,
+            "response": {
+                "temperature": 23, "feels_like": 21, "humidity": 60,
+                "condition": "맑음",
+                "pm10": 15, "pm10_grade": "좋음",
+                "pm25": 18.4, "pm25_grade": "보통",
+                "uv_grade": "보통",
+                "weekly_forecast": [
+                    {"date": "2026-06-21", "mintempC": "18", "maxtempC": "27",
+                     "hourly": [{"chanceofrain": "10"}]},  # <30 → 비 미표기
+                ],
+            },
+        }
+    _wdb = _types.SimpleNamespace(fetchrow=_wfetchrow)
+    w_body = _asyncio.run(_enrich_weather(_wdb))
+    assert w_body is not None, w_body
+    assert "오늘 최저 18°/최고 27°" in w_body, w_body
+    assert "미세먼지 좋음(15)" in w_body, w_body
+    assert "초미세먼지 보통(18)" in w_body, w_body  # 18.4 → 18
+    assert "23°C" in w_body and "습도 60%" in w_body, w_body
+    assert "주간: 일 18/27" in w_body, w_body  # 2026-06-21 = 일요일
 
     print("card.py self-check OK")
