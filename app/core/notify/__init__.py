@@ -11,7 +11,7 @@
     토큰 미설정 / 신규 0건 / enrich None → 조용히 스킵 (크롤 정상 유지).
 
 카테고리 정책:
-    - news   : importance>=3 만 (발신은 summarizer 이후 — news/scheduler)
+    - news   : importance>=4 만 (발신은 summarizer 이후 — news/scheduler)
     - weather: 매일 KST 17시+ 1회 (state: crawl_data weather/notify_sent/<date>)
     - kal    : 2027 Q1 프레스티지(P) 잔석만
     - stock  : 발신 스킵 (별도 티켓)
