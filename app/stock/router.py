@@ -428,7 +428,7 @@ def _watchlist_item_to_out(item) -> WatchlistItemOut:
     description=(
         "watchlist 종목의 기술 분석 수동 실행 + 결과 저장합니다.\n\n"
         "## 자동 스케줄\n"
-        "- Cron: `0 6 * * 2-6` (KST, 화-토 06:00 = 미국 시간 화-토 22:30 UTC)\n"
+        "- Cron: `0 6 * * *` (매일 06:00 UTC = KST 15:00)\n"
         "- 설정: `crawl_schedule` 테이블 (crawler=`stock`) — `PATCH /api/schedules/stock/<job_id>`\n\n"
         "## 수집 범위\n"
         "- `tickers` 생략 시 활성 watchlist 전체 대상\n"
@@ -943,7 +943,7 @@ async def crawling_sigma(db: Database = Depends(_get_db)):
     description=(
         "yfinance 옵션 체인 ATM straddle 기반 sigma 즉시 계산 + 저장합니다.\n\n"
         "## 자동 스케줄\n"
-        "- Cron: `0 6 * * 2-6` (KST, 화-토 06:00 = 미국 시간 화-토 22:30 UTC)\n"
+        "- Cron: `0 6 * * *` (매일 06:00 UTC = KST 15:00)\n"
         "- 설정: `crawl_schedule` 테이블 (crawler=`stock`) — `PATCH /api/schedules/stock/<job_id>`\n\n"
         "## 수집 범위\n"
         "- `tickers` 생략 시 활성 watchlist 전체 대상\n"
