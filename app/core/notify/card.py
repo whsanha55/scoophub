@@ -4,7 +4,7 @@
 dispatch_crawl_notify 가 base 카드(format_card)를 만들면 enrich 가
 카테고리별 본문 데이터를 부착한다. 반환 str|None — None 이면 발신 스킵.
 
-- news   : feed_news 테이블(importance>=3) 탑5 제목+요약+원문
+- news   : feed_news 테이블(importance>=4) 탑5 제목+요약+원문
 - weather: crawl_data(weather, snapshot) 스냅샷 → 온도/대기질/주간예보
 - kal_bonus: crawl_data(kal, bonus_seat) → 2027 Q1 프레스티지(P) 잔석 나라별 집계
 - community/feed: crawl_data batch(updated_at DESC) → 도메인 sort key 탑5
@@ -104,11 +104,11 @@ def _format_default(name: str, detail: str, count: int, body: str) -> str:
 
 
 def _format_news(detail: str, count: int, body: str) -> str:
-    """news 전용 카드 — importance 3+ 표식 헤더 + body."""
+    """news 전용 카드 — importance 4+ 표식 헤더 + body."""
     head = f"{_EMOJI['news']} [news"
     if detail:
         head += f" · {escape_html(detail)}"
-    head += f"] — 중요도 3+ {count}건"
+    head += f"] — 중요도 4+ {count}건"
     return f"{head}\n{body}"
 
 
@@ -140,10 +140,10 @@ def _weekday_ko(date_str: str) -> str:
 # ── news ──────────────────────────────────────────────────────────────
 
 async def _enrich_news(db: "Database", new_ids: list[int]) -> str | None:
-    """feed_news 신규 id → importance>=3 탑5 제목+요약+원문. 0건 → None."""
+    """feed_news 신규 id → importance>=4 탑5 제목+요약+원문. 0건 → None."""
     rows = await db.fetch(
         "SELECT title, summary, url FROM feed_news "
-        "WHERE id = ANY($1::int[]) AND importance >= 3 "
+        "WHERE id = ANY($1::int[]) AND importance >= 4 "
         "  AND summary IS NOT NULL AND summary <> '' "
         "ORDER BY importance DESC NULLS LAST LIMIT 5",
         new_ids,
@@ -451,7 +451,7 @@ async def enrich(
 ) -> str | None:
     """카테고리별 enrich 진입. None 반환 시 발신 스킵.
 
-    - news      : importance>=3 탑5. count = 해당 건수.
+    - news      : importance>=4 탑5. count = 해당 건수.
     - weather   : 스냅샷. count 의미 없음(0).
     - kal_bonus : 2027 Q1 프레스티지(P) 잔석 나라별 집계.
     - community/feed(_NAME_PURPOSE 키): batch 탑5.
@@ -461,7 +461,7 @@ async def enrich(
         body = await _enrich_news(db, new_ids)
         if body is None:
             return None
-        # count = 실제 표시된 importance>=3 라인 수
+        # count = 실제 표시된 importance>=4 라인 수
         return _format_news(detail, body.count("\n• "), body)
 
     if category == "weather":
@@ -516,7 +516,7 @@ if __name__ == "__main__":
 
     # _format_news
     n = _format_news("rss", 4, "\n• <b>t</b>")
-    assert n.startswith("📰 [news · rss] — 중요도 3+ 4건"), f"_format_news 헤더: {n!r}"
+    assert n.startswith("📰 [news · rss] — 중요도 4+ 4건"), f"_format_news 헤더: {n!r}"
 
     # _line_for / _meta_for (DB 없이 포맷터 검증)
     hn_line = _line_for("hacker_news", {"title": "T<x", "url": "http://a", "score": 99})

@@ -55,7 +55,7 @@ async def register_jobs(scheduler: AsyncIOScheduler, db: Database) -> None:
         except Exception as e:
             logger.error("Summarization failed: %s", e)
 
-        # 발신 — summarizer 완료 후 (importance>=3 갱신됨). 크롤 직후가 아님.
+        # 발신 — summarizer 완료 후 (importance>=4 갱신됨). 크롤 직후가 아님.
         # base_crawler.run() 은 news 발신을 스킵하므로 여기서 명시적 dispatch.
         if crawl_result is not None:
             try:
