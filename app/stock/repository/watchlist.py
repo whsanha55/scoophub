@@ -96,7 +96,19 @@ class WatchlistRepo:
 
     async def remove(self, item_id: int) -> bool:
         logger.info("WatchlistRepo.remove() 진입 — item_id=%d", item_id)
-        result = await self._db.execute("DELETE FROM stock_watchlist WHERE id = $1", item_id)
+        existing = await self.find_by_id(item_id)
+        if existing is None:
+            return False
+        # 영구 삭제 시 연관 candle/sigma/analysis도 함께 삭제 (orphan 방지).
+        # 비활성(is_active=false)은 여기 안 거침 — 데이터 보존.
+        ticker = existing.ticker.upper()
+        pool = await self._db.pool
+        async with pool.acquire() as conn:
+            async with conn.transaction():
+                await conn.execute("DELETE FROM stock_candles WHERE ticker = $1", ticker)
+                await conn.execute("DELETE FROM stock_sigma WHERE ticker = $1", ticker)
+                await conn.execute("DELETE FROM stock_analysis_results WHERE ticker = $1", ticker)
+                result = await conn.execute("DELETE FROM stock_watchlist WHERE id = $1", item_id)
         return result == "DELETE 1"
 
     async def seed_defaults(self) -> int:
