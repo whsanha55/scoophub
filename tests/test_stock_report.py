@@ -99,7 +99,13 @@ def _make_row(ticker: str, price: float = 100.0, signal: str = "BUY") -> dict:
         "total_score": 3.5,
         "confidence": 65.0,
         "change_rate": 1.2,
-        "technical_details": {"atr": 4.0, "ema12": 99.0, "macd_histogram": 0.3},
+        "technical_details": {
+            "atr": 4.0,
+            "ema12": 99.0,
+            "macd_histogram": 0.3,
+            # 분석 저장 시 내려온 sigma_data(straddle 일일 fresh) — ReportBuilder 가 이 스냅샷 사용.
+            "sigma_data": {"straddle": {"expected_move": 10.0}},
+        },
     }
 
 
@@ -147,6 +153,40 @@ def test_report_split_long_splits_by_line():
     assert "x" * 300 in rejoined
 
 
+# ── _sigma_range_from_snapshot (straddle 우선, WEM fallback) ────────────────
+
+
+def test_sigma_range_from_snapshot_straddle():
+    """straddle.expected_move → 현재가 기준 ±1σ."""
+    from app.stock.report import _sigma_range_from_snapshot
+
+    sr = _sigma_range_from_snapshot({"straddle": {"expected_move": 10.0}}, price=100.0)
+    assert sr is not None
+    assert sr.upper_1sigma == pytest.approx(110.0)
+    assert sr.lower_1sigma == pytest.approx(90.0)
+
+
+def test_sigma_range_from_snapshot_wem_fallback():
+    """straddle 부재 시 WEM snapshot 의 ±1σ 사용."""
+    from app.stock.report import _sigma_range_from_snapshot
+
+    sr = _sigma_range_from_snapshot(
+        {"weekly_expected_move": {"upper_1sigma": 110.0, "lower_1sigma": 90.0, "center": 100.0}},
+        price=100.0,
+    )
+    assert sr is not None
+    assert sr.upper_1sigma == pytest.approx(110.0)
+    assert sr.lower_1sigma == pytest.approx(90.0)
+
+
+def test_sigma_range_from_snapshot_none_when_empty():
+    """straddle/WEM 모두 없으면 None (levels 산출 스킵)."""
+    from app.stock.report import _sigma_range_from_snapshot
+
+    assert _sigma_range_from_snapshot({}, price=100.0) is None
+    assert _sigma_range_from_snapshot({"straddle": {}}, price=100.0) is None
+
+
 def test_report_header_has_title():
     rb = ReportBuilder(db=object())
     header = rb._header()
@@ -169,13 +209,6 @@ class _FakeRepo:
         for t in tickers:
             out.extend(src.get(t, []))
         return out
-
-
-class _FakeWemRepo:
-    async def find_by_ticker(self, ticker, limit=1):
-        return [WeeklyExpectedMove(
-            ticker=ticker, expected_move_high=110, expected_move_low=90, expected_move_pct=10.0
-        )]
 
 
 class _FakeWlRepo:
@@ -203,11 +236,13 @@ class _DispatchRecorder:
         self.calls.append((category, purpose, payload_key, message.text))
 
 
-async def _run_builder(monkeypatch, groups, rows_1d, aux=None):
-    """ReportBuilder.run 을 의존성 주입으로 실행. dispatch 기록 반환."""
+async def _run_builder(monkeypatch, groups, rows_1d, aux=None, split=None):
+    """ReportBuilder.run 을 의존성 주입으로 실행. dispatch 기록 반환.
+
+    split: _split 오버라이드(분할 테스트용). None 이면 원본 분할 로직.
+    """
     rb = ReportBuilder(db=object())
     fake_ar = _FakeRepo(rows_1d, aux)
-    fake_wem = _FakeWemRepo()
     rec = _DispatchRecorder()
 
     # 원본 _build_group_block 을 미리 저장 (패치 후에도 실제 로직 호출용)
@@ -219,9 +254,12 @@ async def _run_builder(monkeypatch, groups, rows_1d, aux=None):
     monkeypatch.setattr(rb, "_resolve_groups", _resolve)
 
     # _build_group_block: 원본 로직 사용하되 repo 주입 (재귀 방지: orig_build 호출)
-    async def _build(gn, tk, ar, wem, csr):
-        return await orig_build(gn, tk, fake_ar, fake_wem, compute_sigma_range)
+    async def _build(gn, tk, ar):
+        return await orig_build(gn, tk, fake_ar)
     monkeypatch.setattr(rb, "_build_group_block", _build)
+
+    if split is not None:
+        monkeypatch.setattr(rb, "_split", split)
 
     # NotifyRouter 치환 — run() 내에서 from app.core.notify.router import NotifyRouter 로 가져오므로
     # 해당 모듈의 심볼을 패치해야 함.
@@ -245,6 +283,7 @@ async def test_builder_run_dispatches_with_disclaimer(monkeypatch):
     cat, pur, key, txt = rec.calls[0]
     assert cat == "stock" and pur == "daily-report"
     assert key.startswith("stock:daily-report:")
+    assert ":part-" not in key  # 단일 메시지는 suffix 없음
     assert "개별종목" in txt
 
 
@@ -273,6 +312,26 @@ async def test_builder_run_multi_group(monkeypatch):
     assert result is not None
     assert "시장층" in result and "섹터층" in result and "개별종목" in result
     assert "^NDX" in result and "XLK" in result and "AAPL" in result
+
+
+@pytest.mark.asyncio
+async def test_builder_run_split_dispatches_part_keys(monkeypatch):
+    """4000자 초과 분할 시 파트별 payload_key 로 발송 — NotifyRouter dedup 잘림 방지 (#184)."""
+    from app.core.notify import NotifyMessage
+
+    groups = {"individual": ["AAPL"]}
+    rows = {"AAPL": [_make_row("AAPL")]}
+    # _split 을 2개 메시지로 강제 → run() 의 part-suffix 루프 검증
+    def _forced(text):
+        return [NotifyMessage(text="A"), NotifyMessage(text="B")]
+
+    result, rec = await _run_builder(monkeypatch, groups, rows, split=_forced)
+
+    assert len(rec.calls) == 2
+    keys = [c[2] for c in rec.calls]
+    assert all(":part-" in k for k in keys)
+    assert keys[0].endswith(":part-1") and keys[1].endswith(":part-2")
+    assert keys[0] != keys[1]
 
 
 # ── T6(#149): _analysis_row_to_report + _enrich_report_levels ────────────────

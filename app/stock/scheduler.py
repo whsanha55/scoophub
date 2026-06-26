@@ -61,16 +61,16 @@ async def register_jobs(
         if result:
             logger.info("Sigma crawl: %d fetched, %d new", result.items_fetched, result.items_new)
 
-    sigma_trigger, sigma_enabled = await BaseScheduler.resolve_trigger(db, "stock", "stock-sigma-scan")
+    sigma_trigger, sigma_enabled = await BaseScheduler.resolve_trigger(db, "stock", "stock_sigma_scan")
     scheduler.add_job(
         _crawl_sigma,
         trigger=sigma_trigger,
-        id="stock-sigma-scan",
+        id="stock_sigma_scan",
         replace_existing=True,
     )
     if not sigma_enabled:
-        scheduler.pause_job("stock-sigma-scan")
-    logger.info("Scheduled 'stock-sigma-scan' (enabled=%s)", sigma_enabled)
+        scheduler.pause_job("stock_sigma_scan")
+    logger.info("Scheduled 'stock_sigma_scan' (enabled=%s)", sigma_enabled)
 
     async def _compute_daily_sigma() -> None:
         from datetime import datetime, timezone
@@ -103,9 +103,9 @@ async def register_jobs(
 
         # 시그마 계산 완료 직후 분석+발신 — 데이터 의존성(sigma→analyze)을 코드로 보장 (#176).
         # 별도 cron 잡(stock_analyze) 대신 파이프라인으로 순서 확정, race 원천 제거.
-        from app.stock.router import _run_analysis_for_tickers
+        from app.stock.analysis_service import run_analysis_for_tickers
 
-        resp = await _run_analysis_for_tickers(tickers, db)
+        resp = await run_analysis_for_tickers(tickers, db, provider_router)
         logger.info("Stock analyze (after sigma): %d ok, %d errors", resp.ok, resp.errors)
 
     daily_trigger, daily_enabled = await BaseScheduler.resolve_trigger(db, "stock", "stock_daily_sigma")
