@@ -67,7 +67,10 @@ class BaseScheduler:
                 raise ValueError(
                     f"cron schedules empty for (crawler={crawler!r}, job_id={job_id!r})"
                 )
-            triggers = [CronTrigger.from_crontab(e) for e in exprs]  # raises on invalid expr
+            # timezone 명시 — 미지정 시 시스템 tz(컨테이너=UTC)로 풀려 description(=KST 의도)과 어긋남. #174
+            triggers = [
+                CronTrigger.from_crontab(e, timezone="Asia/Seoul") for e in exprs
+            ]  # raises on invalid expr
             trigger: BaseTrigger = triggers[0] if len(triggers) == 1 else OrTrigger(triggers)
         elif schedule_type == "interval":
             minutes = row["schedule_minutes"]

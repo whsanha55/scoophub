@@ -48,11 +48,12 @@ def create_app(db: Database | None = None) -> FastAPI:
     )
     _db = db or Database(settings.database_url)
     scheduler = AsyncIOScheduler(
+        timezone="Asia/Seoul",  # interval 잡 next_run_time/로그 KST — #174
         job_defaults={
             "max_instances": 1,
             "misfire_grace_time": 60,
             "coalesce": True,
-        }
+        },
     )
 
     @asynccontextmanager
