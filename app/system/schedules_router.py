@@ -132,7 +132,8 @@ async def update_schedule(
         # 각 cron expr 검증
         for expr in body.schedules:
             try:
-                CronTrigger.from_crontab(expr)
+                # 등록(base_scheduler)과 동일 KST tz로 검증 — #174
+                CronTrigger.from_crontab(expr, timezone="Asia/Seoul")
             except (ValueError, IndexError) as e:
                 raise HTTPException(
                     status_code=422, detail=f"invalid cron expression {expr!r}: {e}"
