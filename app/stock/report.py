@@ -15,7 +15,8 @@ import html
 import json
 import logging
 from dataclasses import asdict, dataclass
-from datetime import datetime, timezone
+from datetime import datetime
+from zoneinfo import ZoneInfo
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -154,8 +155,8 @@ class ReportBuilder:
         body = "\n\n".join(blocks)
         full = f"{header}\n\n{body}\n\n{REPORT_LINK}"
 
-        # 날짜 기반 dedup 키 (하루 1회 발신).
-        today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        # 날짜 기반 dedup 키 (하루 1회 발신). KST 기준 — 새벽 발신 시 전일 키 충돌 방지.
+        today = datetime.now(ZoneInfo("Asia/Seoul")).strftime("%Y-%m-%d")
         payload_key = f"stock:daily-report:{today}"
 
         # 4096자 초과 시 분할. _split 이 이미 NotifyMessage 리스트 반환.
@@ -259,7 +260,7 @@ class ReportBuilder:
             return None
 
     def _header(self) -> str:
-        now_kst = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+        now_kst = datetime.now(ZoneInfo("Asia/Seoul")).strftime("%Y-%m-%d %H:%M KST")
         return f"<b>📊 주식 일간 분석 리포트</b>\n{now_kst}"
 
     def _format_ticker(
