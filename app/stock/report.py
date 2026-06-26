@@ -109,6 +109,46 @@ def _fmt_price(v: float | None) -> str:
     return f"${v:,.2f}"
 
 
+def _sigma_range_from_snapshot(sigma_data: dict, price: float):
+    """technical_details.sigma_data → SigmaRange. None when 산출 불가.
+
+    straddle(일일 fresh, 06:30 계산) 우선 — expected_move 를 현재가 기준 ±1σ 폭으로 해석.
+    부재 시 WEM snapshot(주간) 의 upper_1sigma/lower_1sigma 로 fallback.
+    DB 재조회 없이 저장된 snapshot 만 사용.
+    """
+    from app.stock.models import SigmaRange
+
+    straddle = (sigma_data.get("straddle") or {}) if sigma_data else {}
+    em = straddle.get("expected_move")
+    if em is not None:
+        try:
+            em = float(em)
+        except (TypeError, ValueError):
+            em = 0.0
+        if em > 0:
+            return SigmaRange(
+                center=price,
+                upper_1sigma=price + em,
+                lower_1sigma=price - em,
+                current_price=price,
+            )
+
+    wem = (sigma_data.get("weekly_expected_move") or {}) if sigma_data else {}
+    upper = wem.get("upper_1sigma")
+    lower = wem.get("lower_1sigma")
+    if upper is not None and lower is not None:
+        try:
+            return SigmaRange(
+                center=float(wem.get("center") or price),
+                upper_1sigma=float(upper),
+                lower_1sigma=float(lower),
+                current_price=price,
+            )
+        except (TypeError, ValueError):
+            return None
+    return None
+
+
 class ReportBuilder:
     """분석 결과 기반 일간 리포트 조립 + 발신 연쇄."""
 
@@ -121,14 +161,11 @@ class ReportBuilder:
         Args:
             tickers: 특정 티커만. None 시 전체 group(market/sector/individual) 대상.
         """
-        from app.core.notify import NotifyMessage
         from app.core.notify.router import NotifyRouter
-        from app.stock.models import compute_sigma_range
-        from app.stock.repository import AnalysisResultRepo, WatchlistRepo, WeeklyExpectedMoveRepo
+        from app.stock.repository import AnalysisResultRepo, WatchlistRepo
 
         ar_repo = AnalysisResultRepo(self.db)
         wl_repo = WatchlistRepo(self.db)
-        wem_repo = WeeklyExpectedMoveRepo(self.db)
 
         # group별 티커 분류. tickers 지정 시 해당 티커들의 group을 watchlist에서 조회.
         groups = await self._resolve_groups(wl_repo, tickers)
@@ -141,9 +178,7 @@ class ReportBuilder:
             group_tickers = groups.get(group_name, [])
             if not group_tickers:
                 continue
-            block = await self._build_group_block(
-                group_name, group_tickers, ar_repo, wem_repo, compute_sigma_range
-            )
+            block = await self._build_group_block(group_name, group_tickers, ar_repo)
             if block:
                 blocks.append(block)
 
@@ -160,12 +195,13 @@ class ReportBuilder:
         payload_key = f"stock:daily-report:{today}"
 
         # 4096자 초과 시 분할. _split 이 이미 NotifyMessage 리스트 반환.
+        # 분할 시 payload_key 에 :part-N suffix — 동일 key면 NotifyRouter dedup 가
+        # 첫 메시지 이후를 스킵해 리포트가 잘리므로 파트별 key 독립 dedup.
         messages = self._split(full)
         router = NotifyRouter(self.db)
-        for message in messages:
-            await router.dispatch(
-                "stock", "daily-report", payload_key, message
-            )
+        for i, message in enumerate(messages):
+            key = payload_key if len(messages) == 1 else f"{payload_key}:part-{i + 1}"
+            await router.dispatch("stock", "daily-report", key, message)
         return full
 
     async def _resolve_groups(
@@ -192,8 +228,6 @@ class ReportBuilder:
         group_name: str,
         tickers: list[str],
         ar_repo,
-        wem_repo,
-        compute_sigma_range,
     ) -> str:
         """단일 group에 대한 1D/1W/1M 분석 블록 조립. 빈 시 빈 문자열."""
         title_map = {
@@ -220,13 +254,13 @@ class ReportBuilder:
             if price <= 0:
                 continue
 
-            # sigma range 산출 (WEM 기반).
-            sigma_range = await self._sigma_range_for(
-                wem_repo, compute_sigma_range, ticker, price
-            )
             tech_details = row.get("technical_details") or {}
             if isinstance(tech_details, str):  # JSONB → asyncpg str
                 tech_details = json.loads(tech_details)
+            # sigma range: 저장된 sigma_data(straddle 일일 fresh 우선, WEM snapshot fallback).
+            sigma_range = _sigma_range_from_snapshot(
+                tech_details.get("sigma_data") or {}, price
+            )
             levels = compute_actionable_levels(price, sigma_range, tech_details)
 
             lines.append(self._format_ticker(
@@ -246,18 +280,6 @@ class ReportBuilder:
         except Exception:
             return {}
         return {r["ticker"]: r.get("signal") for r in rows}
-
-    async def _sigma_range_for(
-        self, wem_repo, compute_sigma_range, ticker: str, price: float
-    ):
-        wem_list = await wem_repo.find_by_ticker(ticker, limit=1)
-        if not wem_list:
-            return None
-        try:
-            return compute_sigma_range(wem_list[0], price)
-        except Exception as e:
-            logger.warning("sigma range compute failed for %s: %s", ticker, e)
-            return None
 
     def _header(self) -> str:
         now_kst = datetime.now(ZoneInfo("Asia/Seoul")).strftime("%Y-%m-%d %H:%M KST")
