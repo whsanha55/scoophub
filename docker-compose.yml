@@ -20,6 +20,9 @@ services:
     environment:
       DB_HOST: postgres
       PORT: "20010"
+      TZ: Asia/Seoul
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
     ports:
       - "127.0.0.1:20010:20010"
     depends_on:
