@@ -37,8 +37,8 @@ _STOP_ATR_MULT = 1.5
 class ActionableLevels:
     """액션러블 거래 레벨. 산출 불가 시 None."""
 
-    target_price: float | None = None      # 목표가 (+1σ)
-    buy_zone: float | None = None          # 매수 구간 (하단: -1σ or BB 하단)
+    target_price: float | None = None      # 목표가 (+1σ or BB 상단)
+    buy_zone: float | None = None          # 매수 구간 (-1σ or BB 하단)
     stop_loss: float | None = None         # 손절가 (진입가 - 1.5×ATR)
     momentum_fire: bool = False            # 불타기 진입 (price>EMA12 & MACD hist>0)
 
@@ -53,50 +53,57 @@ def compute_actionable_levels(
 ) -> ActionableLevels | None:
     """sigma range + 기술 지표로 액션러블 레벨 산출.
 
+    sigma ±1σ 우선, 부재 시 BB 밴드로 목표/진입가 폴백(sigma 없는 종목도 레벨 제공).
+    target·buy 모두 산출 불가 시 None.
+
     Args:
         price: 현재가. 0 이하 → None(산출 불가).
         sigma_range: app.stock.models.SigmaRange (upper_1sigma/lower_1sigma 보유) or None.
-        tech_details: 분석 technical_details dict (atr, ema12, macd_histogram 키 포함) or None.
+        tech_details: 분석 technical_details dict (atr, ema12, macd_histogram, bb_upper, bb_lower) or None.
 
     Returns:
-        ActionableLevels. price==0 / sigma 미존재 → None.
+        ActionableLevels. price==0 / target·buy 모두 None → None.
     """
     if price <= 0:
         return None
-    if sigma_range is None:
-        return None
 
-    upper_1 = getattr(sigma_range, "upper_1sigma", None)
-    lower_1 = getattr(sigma_range, "lower_1sigma", None)
-    if upper_1 is None or lower_1 is None:
-        return None
+    # sigma ±1σ 우선.
+    upper_1 = getattr(sigma_range, "upper_1sigma", None) if sigma_range else None
+    lower_1 = getattr(sigma_range, "lower_1sigma", None) if sigma_range else None
 
-    # 손절가: ATR 기반. tech_details 미제공 시 None.
-    stop_loss = None
-    atr_val = None
-    ema12 = None
-    macd_hist = None
+    # 기술 지표 추출. BB 밴드는 sigma 폴백용.
+    atr_val = 0.0
+    ema12 = 0.0
+    macd_hist = 0.0
+    bb_upper = None
+    bb_lower = None
     if tech_details:
         try:
             atr_val = float(tech_details.get("atr", 0) or 0)
             ema12 = float(tech_details.get("ema12", 0) or 0)
             macd_hist = float(tech_details.get("macd_histogram", 0) or 0)
+            bb_upper = float(tech_details["bb_upper"]) if tech_details.get("bb_upper") else None
+            bb_lower = float(tech_details["bb_lower"]) if tech_details.get("bb_lower") else None
         except (TypeError, ValueError):
-            atr_val = atr_val or 0
-            ema12 = ema12 or 0
-            macd_hist = macd_hist or 0
+            bb_upper = bb_lower = None
 
-    if atr_val and atr_val > 0:
-        # 손절은 진입가(buy_zone=-1σ) 기준 — 현재가 기준이면 진입 직후 손절 도달 가능.
-        # lower_1 은 위 None 체크를 통과했으므로 항상 유효.
-        stop_loss = lower_1 - _STOP_ATR_MULT * atr_val
+    # sigma 부재 시 BB 밴드로 폴백.
+    target = upper_1 if upper_1 is not None else bb_upper
+    buy = lower_1 if lower_1 is not None else bb_lower
+    if target is None and buy is None:
+        return None
+
+    # 손절은 진입가(buy) 기준 — 현재가 기준이면 진입 직후 손절 도달 가능.
+    stop_loss = None
+    if atr_val > 0 and buy is not None:
+        stop_loss = buy - _STOP_ATR_MULT * atr_val
 
     # 불타기 진입: price>EMA12 & MACD hist>0 (상승 모멘텀)
-    fire = bool(ema12 and macd_hist is not None and price > ema12 and macd_hist > 0)
+    fire = bool(ema12 and macd_hist > 0 and price > ema12)
 
     return ActionableLevels(
-        target_price=upper_1,
-        buy_zone=lower_1,
+        target_price=target,
+        buy_zone=buy,
         stop_loss=stop_loss,
         momentum_fire=fire,
     )

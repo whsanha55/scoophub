@@ -78,6 +78,32 @@ def test_actionable_levels_no_sigma_returns_none():
     assert compute_actionable_levels(100, None, {}) is None
 
 
+def test_actionable_levels_bb_fallback_when_no_sigma():
+    """sigma 부재 시 BB 밴드로 목표/진입가 폴백."""
+    levels = compute_actionable_levels(
+        price=100,
+        sigma_range=None,
+        tech_details={"atr": 4.0, "bb_upper": 108.0, "bb_lower": 92.0, "ema12": 99.0, "macd_histogram": 0.5},
+    )
+    assert levels is not None
+    assert levels.target_price == 108.0  # bb_upper 폴백
+    assert levels.buy_zone == 92.0       # bb_lower 폴백
+    assert levels.stop_loss == pytest.approx(92.0 - 1.5 * 4.0)  # 86.0, 진입가(BB) 기준
+    assert levels.momentum_fire is True
+
+
+def test_actionable_levels_sigma_preferred_over_bb():
+    """sigma 있으면 BB 무시하고 sigma ±1σ 사용."""
+    sr = _sigma(110, 90, price=100)
+    levels = compute_actionable_levels(
+        price=100,
+        sigma_range=sr,
+        tech_details={"atr": 4.0, "bb_upper": 108.0, "bb_lower": 92.0, "ema12": 99.0, "macd_histogram": 0.5},
+    )
+    assert levels.target_price == 110  # sigma upper, not bb_upper
+    assert levels.buy_zone == 90       # sigma lower, not bb_lower
+
+
 def test_actionable_levels_to_dict():
     sr = _sigma(110, 90, price=100)
     levels = compute_actionable_levels(
