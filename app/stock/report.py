@@ -93,13 +93,15 @@ def compute_actionable_levels(
     if target is None and buy is None:
         return None
 
-    # 손절은 진입가(buy) 기준 — 현재가 기준이면 진입 직후 손절 도달 가능.
-    stop_loss = None
-    if atr_val > 0 and buy is not None:
-        stop_loss = buy - _STOP_ATR_MULT * atr_val
-
     # 불타기 진입: price>EMA12 & MACD hist>0 (상승 모멘텀)
     fire = bool(ema12 and macd_hist > 0 and price > ema12)
+
+    # 손절 기준 = 진입가. momentum_fire(현재가 추세 진입)면 현재가, 아니면 매수구간(buy).
+    stop_loss = None
+    if atr_val > 0:
+        basis = price if fire else buy
+        if basis is not None:
+            stop_loss = basis - _STOP_ATR_MULT * atr_val
 
     return ActionableLevels(
         target_price=target,
