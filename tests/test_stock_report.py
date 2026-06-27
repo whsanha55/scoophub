@@ -34,7 +34,7 @@ def test_actionable_levels_basic_levels():
     assert levels is not None
     assert levels.target_price == 110  # upper_1sigma
     assert levels.buy_zone == 90       # lower_1sigma
-    assert levels.stop_loss == pytest.approx(90 - 1.5 * 4.0)  # 84.0 (진입가 기준)
+    assert levels.stop_loss == pytest.approx(100 - 1.5 * 4.0)  # 94.0 (현재가 기준, momentum_fire=True)
     assert levels.momentum_fire is True  # price(100) > ema12(99) & macd_hist>0
 
 
@@ -47,6 +47,7 @@ def test_actionable_levels_no_momentum_when_below_ema():
         tech_details={"atr": 3.0, "ema12": 100.0, "macd_histogram": 0.5},
     )
     assert levels.momentum_fire is False
+    assert levels.stop_loss == pytest.approx(90 - 1.5 * 3.0)  # 85.5 (buy_zone 기준, fire False)
 
 
 def test_actionable_levels_no_momentum_when_macd_negative():
@@ -58,6 +59,7 @@ def test_actionable_levels_no_momentum_when_macd_negative():
         tech_details={"atr": 3.0, "ema12": 100.0, "macd_histogram": -0.3},
     )
     assert levels.momentum_fire is False
+    assert levels.stop_loss == pytest.approx(90 - 1.5 * 3.0)  # 85.5 (buy_zone 기준, fire False)
 
 
 def test_actionable_levels_stop_loss_none_without_atr():
@@ -88,7 +90,7 @@ def test_actionable_levels_bb_fallback_when_no_sigma():
     assert levels is not None
     assert levels.target_price == 108.0  # bb_upper 폴백
     assert levels.buy_zone == 92.0       # bb_lower 폴백
-    assert levels.stop_loss == pytest.approx(92.0 - 1.5 * 4.0)  # 86.0, 진입가(BB) 기준
+    assert levels.stop_loss == pytest.approx(100 - 1.5 * 4.0)  # 94.0 (현재가 기준, momentum_fire=True)
     assert levels.momentum_fire is True
 
 
@@ -448,7 +450,7 @@ async def test_enrich_report_levels_populates_actionable_and_group():
     assert report.actionable_levels is not None
     assert report.actionable_levels.target_price == 110.0  # upper_1sigma
     assert report.actionable_levels.buy_zone == 90.0       # lower_1sigma
-    assert report.actionable_levels.stop_loss == pytest.approx(90 - 1.5 * 4.0)  # 84.0 (진입가 기준)
+    assert report.actionable_levels.stop_loss == pytest.approx(100 - 1.5 * 4.0)  # 94.0 (현재가 기준, momentum_fire=True)
     assert report.actionable_levels.momentum_fire is True  # price>ema12 & macd>0
     assert report.group == "individual"
 
