@@ -24,7 +24,7 @@ def _sigma(high: float, low: float, price: float) -> SigmaRange:
 
 
 def test_actionable_levels_basic_levels():
-    """목표가=+1σ, 매수=-1σ, 손절=price-1.5×ATR."""
+    """목표가=+1σ, 매수=-1σ, 손절=진입가(buy_zone)-1.5×ATR."""
     sr = _sigma(110, 90, price=100)
     levels = compute_actionable_levels(
         price=100,
@@ -34,7 +34,7 @@ def test_actionable_levels_basic_levels():
     assert levels is not None
     assert levels.target_price == 110  # upper_1sigma
     assert levels.buy_zone == 90       # lower_1sigma
-    assert levels.stop_loss == pytest.approx(100 - 1.5 * 4.0)  # 94.0
+    assert levels.stop_loss == pytest.approx(90 - 1.5 * 4.0)  # 84.0 (진입가 기준)
     assert levels.momentum_fire is True  # price(100) > ema12(99) & macd_hist>0
 
 
@@ -422,7 +422,7 @@ async def test_enrich_report_levels_populates_actionable_and_group():
     assert report.actionable_levels is not None
     assert report.actionable_levels.target_price == 110.0  # upper_1sigma
     assert report.actionable_levels.buy_zone == 90.0       # lower_1sigma
-    assert report.actionable_levels.stop_loss == pytest.approx(100 - 1.5 * 4.0)  # 94.0
+    assert report.actionable_levels.stop_loss == pytest.approx(90 - 1.5 * 4.0)  # 84.0 (진입가 기준)
     assert report.actionable_levels.momentum_fire is True  # price>ema12 & macd>0
     assert report.group == "individual"
 

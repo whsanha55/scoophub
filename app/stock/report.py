@@ -39,7 +39,7 @@ class ActionableLevels:
 
     target_price: float | None = None      # 목표가 (+1σ)
     buy_zone: float | None = None          # 매수 구간 (하단: -1σ or BB 하단)
-    stop_loss: float | None = None         # 손절가 (price - 1.5×ATR)
+    stop_loss: float | None = None         # 손절가 (진입가 - 1.5×ATR)
     momentum_fire: bool = False            # 불타기 진입 (price>EMA12 & MACD hist>0)
 
     def to_dict(self) -> dict:
@@ -87,7 +87,9 @@ def compute_actionable_levels(
             macd_hist = macd_hist or 0
 
     if atr_val and atr_val > 0:
-        stop_loss = price - _STOP_ATR_MULT * atr_val
+        # 손절은 진입가(buy_zone=-1σ) 기준 — 현재가 기준이면 진입 직후 손절 도달 가능.
+        # lower_1 은 위 None 체크를 통과했으므로 항상 유효.
+        stop_loss = lower_1 - _STOP_ATR_MULT * atr_val
 
     # 불타기 진입: price>EMA12 & MACD hist>0 (상승 모멘텀)
     fire = bool(ema12 and macd_hist is not None and price > ema12 and macd_hist > 0)
