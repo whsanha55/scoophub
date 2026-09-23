@@ -22,7 +22,7 @@ TRUNCATE_SQL = (
     "crawl_sources, notify_routes, notify_log, users RESTART IDENTITY CASCADE"
 )
 
-_MIGRATION_DIR = pathlib.Path(__file__).resolve().parent.parent / "db" / "migration"
+_MIGRATION_DIR = pathlib.Path(__file__).resolve().parents[2] / "backend" / "src" / "main" / "resources" / "db" / "migration"
 _migrated = False
 
 

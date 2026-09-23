@@ -24,7 +24,7 @@ esac
 echo "[run_local] flyway migrate -> ${JDBC_HOST}:${DB_PORT}/${DB_NAME}"
 docker run --rm \
   --add-host=host.docker.internal:host-gateway \
-  -v "$(pwd)/db/migration:/flyway/sql:ro" \
+  -v "$(pwd)/../backend/src/main/resources/db/migration:/flyway/sql:ro" \
   flyway/flyway:11-alpine \
   -url="jdbc:postgresql://${JDBC_HOST}:${DB_PORT}/${DB_NAME}" \
   -user="${DB_USER}" \
