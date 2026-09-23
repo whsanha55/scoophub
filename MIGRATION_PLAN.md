@@ -62,15 +62,16 @@ scoophub/
 Python `app/core`, `app/config.py`, `app/main.py` 대응.
 
 ### 3.1 설정
-- [ ] `application.yml` — 기존 env 이름 그대로 사용 (`DB_HOST`, `JWT_SECRET`, `ENABLE_SCHEDULER` …)
+- [x] `application.yml` — 기존 env 이름 그대로 사용 (`DB_HOST`, `JWT_SECRET`, `ENABLE_SCHEDULER` …) → `scoophub.*` 로 매핑
 - [x] 로컬 `.env` 재사용: `spring.config.import: optional:file:.env[.properties]`
 - [x] datasource (`DB_HOST`/`DB_PORT`/`DB_NAME`/`DB_USER`/`DB_PASSWORD`) — bootRun 으로 V1~V20 적용 확인
-- [ ] `@ConfigurationProperties` 로 앱 설정 클래스 (`ScoophubProperties`)
-- [ ] Jackson 전역 `SNAKE_CASE` (Python 응답 필드명 유지), 날짜 ISO-8601
+- [x] `@ConfigurationProperties` 로 앱 설정 클래스 (`ScoophubProperties`)
+- [x] Jackson 전역 `SNAKE_CASE` (Python 응답 필드명 유지), 날짜 ISO-8601 (Jackson 3 기본), null 필드 유지 — `JacksonConfigTest`
 - [x] JPA: `ddl-auto: none`, `open-in-view: false`
 - [x] Flyway: `baseline-on-migrate: true`, `baseline-version: 0` (기존 flyway 컨테이너 설정과 동일)
-- [ ] springdoc: `/docs`, `/openapi.json` 경로 유지 (frontend rewrite + deploy.sh 헬스체크가 `/docs` 사용)
-- [ ] CORS: `CORS_ORIGINS`
+- [x] springdoc: `/docs`, `/openapi.json` 경로 유지 (frontend rewrite + deploy.sh 헬스체크가 `/docs` 사용)
+  - frontend 는 `/docs/**`, `/openapi.json` 만 프록시 → UI 리소스를 `/docs/swagger-ui/**` 로, swagger-config 를 `/docs/swagger-config` 로 forward. `/docs` 는 302 리다이렉트
+- [x] CORS: `CORS_ORIGINS` (`corsConfigurationSource` 빈 — Security 가 사용)
 
 ### 3.2 공통 응답/에러
 - [ ] `ApiResponse<T>(success, data, error, meta)` / `ErrorDetail` / `ResponseMeta(requested_at, total, returned, months)`
@@ -83,6 +84,7 @@ Python `app/core`, `app/config.py`, `app/main.py` 대응.
 - [ ] JWT HS256 (`sub`, `is_super`, `iat`, `exp`) — Nimbus 사용
 - [ ] Spring Security: 커스텀 Bearer 필터. **토큰이 잘못돼도 공개 GET 은 통과**해야 함 (기본 resource-server 는 만료 토큰에 전부 401 → UI 가 만료 쿠키로 전체 깨짐)
 - [ ] super 전용: `@PreAuthorize` — 비로그인 401, 비-super 403
+- [ ] `/docs/**`, `/openapi.json/**` permitAll (현재 Security 기본 설정 때문에 401)
 - [ ] `AUTH_BYPASS` (로컬 전용, 기동 시 경고 로그)
 - [ ] `users` 엔티티 + native upsert
 
