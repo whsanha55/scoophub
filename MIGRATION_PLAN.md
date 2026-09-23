@@ -16,6 +16,8 @@
 | DB 접근 | **Spring Data JPA** (upsert 등 PG 전용 쿼리는 `@Query(nativeQuery = true)`) |
 | 웹 스택 | Spring MVC + 가상 스레드 (`spring.threads.virtual.enabled=true`) — WebFlux/코루틴 미사용 |
 | 스키마 | Flyway SQL(V1~V20) 그대로 재사용. Spring Boot 가 기동 시 migrate |
+| 로컬 DB | 기존 `gonamu-cineseek-postgres`(postgres 17, :5432) 인스턴스 재사용, database `scoophub` 별도 생성, 계정 `jjong` 공용. 접속정보는 `backend/.env`(gitignore) |
+| legacy 병행 | Kotlin 이관 완료 후 legacy 내림 → 스케줄러 중복 고려 안 함 |
 
 ---
 
@@ -61,11 +63,12 @@ Python `app/core`, `app/config.py`, `app/main.py` 대응.
 
 ### 3.1 설정
 - [ ] `application.yml` — 기존 env 이름 그대로 사용 (`DB_HOST`, `JWT_SECRET`, `ENABLE_SCHEDULER` …)
-- [ ] 로컬 `.env` 재사용: `spring.config.import: optional:file:.env[.properties]`
+- [x] 로컬 `.env` 재사용: `spring.config.import: optional:file:.env[.properties]`
+- [x] datasource (`DB_HOST`/`DB_PORT`/`DB_NAME`/`DB_USER`/`DB_PASSWORD`) — bootRun 으로 V1~V20 적용 확인
 - [ ] `@ConfigurationProperties` 로 앱 설정 클래스 (`ScoophubProperties`)
 - [ ] Jackson 전역 `SNAKE_CASE` (Python 응답 필드명 유지), 날짜 ISO-8601
-- [ ] JPA: `ddl-auto: none`, `open-in-view: false`
-- [ ] Flyway: `baseline-on-migrate: true`, `baseline-version: 0` (기존 flyway 컨테이너 설정과 동일)
+- [x] JPA: `ddl-auto: none`, `open-in-view: false`
+- [x] Flyway: `baseline-on-migrate: true`, `baseline-version: 0` (기존 flyway 컨테이너 설정과 동일)
 - [ ] springdoc: `/docs`, `/openapi.json` 경로 유지 (frontend rewrite + deploy.sh 헬스체크가 `/docs` 사용)
 - [ ] CORS: `CORS_ORIGINS`
 

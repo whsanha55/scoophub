@@ -1,4 +1,20 @@
-# TODO(P1): datasource / flyway / jackson / security / scheduler 설정 — MIGRATION_PLAN.md 참고
+# TODO(P1): jackson / security / scheduler 설정 — MIGRATION_PLAN.md 참고
+server:
+  port: ${PORT:20010}
+
 spring:
   application:
     name: scoophub
+  config:
+    import: optional:file:.env[.properties]
+  datasource:
+    url: jdbc:postgresql://${DB_HOST:127.0.0.1}:${DB_PORT:5432}/${DB_NAME:scoophub}
+    username: ${DB_USER}
+    password: ${DB_PASSWORD}
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: none
+  flyway:
+    baseline-on-migrate: true
+    baseline-version: 0
