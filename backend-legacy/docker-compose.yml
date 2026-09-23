@@ -1,3 +1,5 @@
+name: scoophub
+
 services:
   flyway:
     image: flyway/flyway:11-alpine
