@@ -92,12 +92,14 @@ Python `app/core`, `app/config.py`, `app/main.py` 대응.
 > ⚠️ 주의: Nimbus 는 HS256 시크릿 **32바이트 이상** 강제 → 짧으면 기동 실패(`JwtService`). 로컬 기본값도 32바이트 이상으로 변경. 운영 `JWT_SECRET` 이 짧으면 교체 필요(교체 시 기존 로그인 1회 만료될 뿐 영향 없음).
 
 ### 3.4 크롤 공통 (`base_crawler.py`, `crawl_data/repo.py`)
-- [ ] `CrawlResult(itemsFetched, itemsNew, errors, newArticleIds)`
-- [ ] `BaseCrawler.run()` — fetch → `crawl_logs` 기록(success / partial / error) → notify hook (news 제외)
-- [ ] `CrawlLog` 엔티티
-- [ ] `CrawlData` 엔티티 + `CrawlDataRepository` (native upsert `ON CONFLICT (category, purpose, key)`, latest, get, query_path)
-- [ ] JSONB 매핑 방식 결정: Hibernate 7.4 가 Jackson 2 를, Spring Boot 4 가 Jackson 3 을 씀 → `@JdbcTypeCode(SqlTypes.JSON)` 동작 검증, 안 되면 `String` 컬럼 + 직접 파싱
-- [ ] 수동 크롤 트리거 응답 공통 헬퍼 (`POST /api/crawling/{domain}` → crawler, crawler_detail, items_fetched, items_new, errors)
+- [x] `CrawlResult(itemsFetched, itemsNew, errors, newArticleIds)`
+- [x] `BaseCrawler.run()` — fetch → `crawl_logs` 기록(success / partial / error) → notify hook (news 제외)
+  - 상속 대신 조합: 도메인은 `Crawler`(name, detail, fetch) bean 만 구현, `CrawlRunner.run()` 이 로그·이벤트 담당
+  - notify hook = `CrawlCompletedEvent` 발행 → 3.6 에서 `@Async @EventListener` 로 구독 (크롤 블록 X)
+- [x] `CrawlLog` 엔티티
+- [x] `CrawlData` 엔티티 + `CrawlDataRepository` (native upsert `ON CONFLICT (category, purpose, key)`, latest, get, query_path) + `CrawlDataStore.upsert(Any)`
+- [x] JSONB 매핑 방식 결정 → `@JdbcTypeCode(SqlTypes.JSON)` + Jackson 3 `JsonNode`. Hibernate 기본은 Jackson 2 를 골라 실패하므로 `JpaConfig` 에서 `Jackson3JsonFormatMapper(앱 JsonMapper)` 지정 → DB 저장도 전역 snake_case
+- [x] 수동 크롤 트리거 응답 공통 헬퍼 (`POST /api/crawling/{domain}` → crawler, crawler_detail, items_fetched, items_new, errors) — `CrawlRunner.trigger()`, 실패 시 200 + success=false (legacy 동일)
 
 ### 3.5 스케줄러 (`base_scheduler.py`)
 - [ ] `ScheduledJob` 인터페이스 (crawler, jobId, run) — 크롤러 외 stock 분석 잡도 수용
@@ -173,6 +175,6 @@ Python 줄 수 기준. 각 도메인 공통 체크리스트:
 
 1. 배포 agent 의 deploy.sh 호출 경로 (2장)
 2. 전환 방식 A / B (5장)
-3. JSONB 매핑 방식 — 3.4 검증 결과 보고 결정
+3. ~~JSONB 매핑 방식~~ → JsonNode + Jackson3JsonFormatMapper (3.4)
 4. 운영 `JWT_SECRET` 길이 32바이트 이상인지
 5. ~~frontend 에 커밋된 `.idea/`, `.claude/skills/**/__pycache__` 정리 여부~~ → 정리함

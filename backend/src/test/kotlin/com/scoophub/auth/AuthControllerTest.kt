@@ -33,6 +33,7 @@ import kotlin.test.assertTrue
         "scoophub.auth.allowed-emails=alice@example.com,bob@example.com",
         "scoophub.auth.super-emails=alice@example.com",
         "scoophub.auth.bypass=false",
+        "scoophub.auth.redirect-url=http://localhost:3000/auth/callback",
     ],
 )
 @AutoConfigureMockMvc
