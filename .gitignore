@@ -1,0 +1,11 @@
+# OS
+.DS_Store
+
+# IDE
+.idea/
+*.iml
+.vscode/
+
+# Python bytecode (frontend/.claude/skills 등)
+__pycache__/
+*.py[cod]
