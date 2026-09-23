@@ -74,21 +74,22 @@ Python `app/core`, `app/config.py`, `app/main.py` 대응.
 - [x] CORS: `CORS_ORIGINS` (`corsConfigurationSource` 빈 — Security 가 사용)
 
 ### 3.2 공통 응답/에러
-- [ ] `ApiResponse<T>(success, data, error, meta)` / `ErrorDetail` / `ResponseMeta(requested_at, total, returned, months)`
-- [ ] HTTP 에러 바디 `{"detail": "..."}` (FastAPI `HTTPException` 호환)
+- [x] `ApiResponse<T>(success, data, error, meta)` / `ErrorDetail` / `ResponseMeta(requested_at, total, returned, months)` — `core/api`
+- [x] HTTP 에러 바디 `{"detail": "..."}` (FastAPI `HTTPException` 호환) — 핸들러는 `ResponseStatusException` 을 던짐
+  - 차이: 필수 파라미터 누락은 FastAPI 422 → Spring 400
 
 ### 3.3 인증 (`app/core/auth.py`, `app/auth`)
-- [ ] `GET /api/auth/login` — Google 동의화면 redirect + `oauth_state` HttpOnly 쿠키
-- [ ] `GET /api/auth/callback` — state 검증 → code 교환(RestClient) → `ALLOWED_EMAILS` 체크 → users upsert → JWT 발급 → `AUTH_REDIRECT_URL?token=` redirect
-- [ ] `GET /api/auth/me` — 401(비로그인) / 200
-- [ ] JWT HS256 (`sub`, `is_super`, `iat`, `exp`) — Nimbus 사용
-- [ ] Spring Security: 커스텀 Bearer 필터. **토큰이 잘못돼도 공개 GET 은 통과**해야 함 (기본 resource-server 는 만료 토큰에 전부 401 → UI 가 만료 쿠키로 전체 깨짐)
-- [ ] super 전용: `@PreAuthorize` — 비로그인 401, 비-super 403
-- [ ] `/docs/**`, `/openapi.json/**` permitAll (현재 Security 기본 설정 때문에 401)
-- [ ] `AUTH_BYPASS` (로컬 전용, 기동 시 경고 로그)
-- [ ] `users` 엔티티 + native upsert
+- [x] `GET /api/auth/login` — Google 동의화면 redirect + `oauth_state` HttpOnly 쿠키
+- [x] `GET /api/auth/callback` — state 검증 → code 교환(RestClient) → `ALLOWED_EMAILS` 체크 → users upsert → JWT 발급 → `AUTH_REDIRECT_URL?token=` redirect
+- [x] `GET /api/auth/me` — 401(비로그인) / 200
+- [x] JWT HS256 (`sub`, `is_super`, `iat`, `exp`) — Nimbus 사용. legacy(python-jose) 발급 토큰 호환 확인 → 전환 시 재로그인 불필요
+- [x] Spring Security: 커스텀 Bearer 필터. **토큰이 잘못돼도 공개 GET 은 통과**해야 함 (기본 resource-server 는 만료 토큰에 전부 401 → UI 가 만료 쿠키로 전체 깨짐)
+- [x] super 전용: `@SuperOnly` / 로그인 필요: `@LoginRequired` — 비로그인 401, 잘못된 토큰 401, 비-super 403 (detail 문구 legacy 동일)
+- [x] `/docs/**`, `/openapi.json/**` 공개 (URL 은 전부 permitAll, 권한은 메서드 보안)
+- [x] `AUTH_BYPASS` (로컬 전용, 기동 시 경고 로그)
+- [x] `users` 엔티티 + native upsert
 
-> ⚠️ 주의: Nimbus 는 HS256 시크릿 **32바이트 이상** 강제. 운영 `JWT_SECRET` 이 짧으면 교체 필요(교체 시 기존 로그인 1회 만료될 뿐 영향 없음).
+> ⚠️ 주의: Nimbus 는 HS256 시크릿 **32바이트 이상** 강제 → 짧으면 기동 실패(`JwtService`). 로컬 기본값도 32바이트 이상으로 변경. 운영 `JWT_SECRET` 이 짧으면 교체 필요(교체 시 기존 로그인 1회 만료될 뿐 영향 없음).
 
 ### 3.4 크롤 공통 (`base_crawler.py`, `crawl_data/repo.py`)
 - [ ] `CrawlResult(itemsFetched, itemsNew, errors, newArticleIds)`
@@ -120,8 +121,8 @@ Python `app/core`, `app/config.py`, `app/main.py` 대응.
 - [ ] OpenRouter 호환 chat 호출 (RestClient)
 
 ### 3.8 테스트 기반
-- [ ] Testcontainers PostgreSQL + `@ServiceConnection` — 전체 마이그레이션 적용 검증
-- [ ] 외부 HTTP 는 `MockRestServiceServer`
+- [x] Testcontainers PostgreSQL + `@ServiceConnection` — 전체 마이그레이션 적용 검증 (`TestcontainersConfiguration`)
+- [x] 외부 HTTP 는 `MockRestServiceServer` (`@RestClientTest` — `GoogleOAuthClientTest`)
 
 ---
 
