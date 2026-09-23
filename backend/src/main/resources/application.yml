@@ -1,0 +1,61 @@
+# TODO(P1): security / scheduler 설정 — MIGRATION_PLAN.md 참고
+server:
+  port: ${PORT:20010}
+
+logging:
+  level:
+    root: ${LOG_LEVEL:info}
+
+spring:
+  application:
+    name: scoophub
+  config:
+    import: optional:file:.env[.properties]
+  datasource:
+    url: jdbc:postgresql://${DB_HOST:127.0.0.1}:${DB_PORT:5432}/${DB_NAME:scoophub}
+    username: ${DB_USER}
+    password: ${DB_PASSWORD}
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: none
+  flyway:
+    baseline-on-migrate: true
+    baseline-version: 0
+  jackson:
+    # legacy(Pydantic) 응답 필드명 유지
+    property-naming-strategy: SNAKE_CASE
+
+# FastAPI 경로 유지 — frontend 는 /docs/** 와 /openapi.json 만 프록시, deploy.sh 헬스체크가 /docs 사용.
+# UI 리소스·설정이 모두 /docs/ 아래에 오도록 경로 지정 (/docs 리다이렉트, swagger-config forward 는 WebConfig)
+springdoc:
+  api-docs:
+    path: /openapi.json
+  swagger-ui:
+    path: /docs/swagger-ui.html
+    config-url: /docs/swagger-config
+    url: /openapi.json  # config-url 지정 시 자동 채워지지 않음
+
+# legacy env 이름 그대로 매핑 (app/config.py 기본값 동일)
+scoophub:
+  enable-scheduler: ${ENABLE_SCHEDULER:true}
+  cors-origins: ${CORS_ORIGINS:http://localhost:3000,http://localhost:8000}
+  producthunt-token: ${PRODUCTHUNT_TOKEN:}
+  youtube-api-key: ${YOUTUBE_API_KEY:}
+  llm:
+    api-url: ${LLM_API_URL:https://openrouter.ai/api/v1}
+    api-key: ${LLM_API_KEY:}
+    model: ${LLM_MODEL:google/gemini-2.0-flash-001}
+  auth:
+    allowed-emails: ${ALLOWED_EMAILS:}
+    super-emails: ${SUPER_EMAILS:}
+    google-client-id: ${GOOGLE_CLIENT_ID:}
+    google-client-secret: ${GOOGLE_CLIENT_SECRET:}
+    jwt-secret: ${JWT_SECRET:dev-secret-change-me-dev-secret-change-me}  # HS256 은 32바이트 이상 필요
+    jwt-expire-hours: ${JWT_EXPIRE_HOURS:24}
+    bypass: ${AUTH_BYPASS:false}
+    redirect-url: ${AUTH_REDIRECT_URL:http://localhost:3000/auth/callback}
+    oauth-redirect-uri: ${OAUTH_REDIRECT_URI:http://localhost:8000/api/auth/callback}
+  telegram:
+    bot-token: ${TELEGRAM_BOT_TOKEN:}
+    default-chat-id: ${TELEGRAM_DEFAULT_CHAT_ID:}
