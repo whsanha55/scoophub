@@ -1,0 +1,4 @@
+# TODO(P1): datasource / flyway / jackson / security / scheduler 설정 — MIGRATION_PLAN.md 참고
+spring:
+  application:
+    name: scoophub
