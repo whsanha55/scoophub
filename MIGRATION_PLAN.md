@@ -166,18 +166,16 @@ Python 줄 수 기준. 각 도메인 공통 체크리스트:
 - [x] `backend/Dockerfile` — 멀티스테이지(Gradle 빌드 → JRE 25) + Playwright chromium + Xvfb headful
 - [x] `backend/docker-compose.yml` — 포트 20010 유지, flyway 컨테이너 제거(앱이 migrate)
 - [x] `backend/deploy.sh` — /docs 헬스체크 (legacy 와 동일 구조)
-- [ ] 전환 방식 결정:
-  - A. 전 도메인 이관 완료 후 한 번에 교체 (단순, 권장)
-  - B. 도메인 단위 점진 교체 (legacy 와 동시 기동 → **스케줄 중복 실행** 위험 → 한쪽 `ENABLE_SCHEDULER=false` / 잡 단위 비활성 필요, 라우팅 분기 필요)
-- [ ] 운영 DB 로 staging 기동 → Flyway validate 통과 확인 (체크섬 동일해야 함)
-- [ ] 교체 후 `backend-legacy/` 삭제
+- [x] 전환 방식 결정: **A — 전 도메인 이관 완료 후 한 번에 교체** (12/12 이관 완료로 성립)
+- [ ] 운영 DB 로 staging 기동 → Flyway validate 통과 확인 (체크섬 동일해야 함) ← 서버 작업
+- [ ] 교체 후 `backend-legacy/` 삭제 ← 전환 검증 후
 
 ---
 
 ## 6. 결정 필요 항목 (작업 전 확인)
 
-1. 배포 agent 의 deploy.sh 호출 경로 (2장)
-2. 전환 방식 A / B (5장)
+1. 배포 agent 의 deploy.sh 호출 경로 (2장) ← 사용자 진행 예정
+2. ~~전환 방식 A / B (5장)~~ → A 확정
 3. ~~JSONB 매핑 방식~~ → JsonNode + Jackson3JsonFormatMapper (3.4)
 4. 운영 `JWT_SECRET` 길이 32바이트 이상인지
 5. ~~frontend 에 커밋된 `.idea/`, `.claude/skills/**/__pycache__` 정리 여부~~ → 정리함
