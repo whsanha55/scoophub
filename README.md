@@ -56,3 +56,9 @@ npm run dev            # :20020, /api/* 는 API_URL 로 프록시
 - `frontend/deploy.sh` — `:20020` 응답 확인
 
 백엔드 `.env` 는 `backend-legacy/.env` 에 둔다.
+
+<!-- convention:start -->
+## Convention
+
+이 프로젝트는 [whsanha55/conventions](https://github.com/whsanha55/conventions) (`1a6d031`)를 따른다. 문서는 `docs/convention/`에 있고, 프로젝트 예외는 `docs/convention/LOCAL.md`에 적는다.
+<!-- convention:end -->
