@@ -141,7 +141,7 @@ Python 줄 수 기준. 각 도메인 공통 체크리스트:
 | - [x] 2 | hacker_news | 300 | 완료 — Firebase API + `LatestBatchQuery` 공통 (배치 도메인 조회 템플릿 확립) |
 | - [x] 3 | github_trending | 249 | 완료 — Jsoup 스크래핑(`external/github`) |
 | - [x] 4 | arxiv | 269 | 완료 — Atom API 직접 호출(Jsoup XML), `LatestBatchQuery` ILIKE 확장 |
-| - [ ] 5 | devto_hashnode | 266 | REST/GraphQL |
+| - [x] 5 | devto_hashnode | 266 | 완료 — Dev.to REST (hashnode 미사용, legacy 와 동일) |
 | - [ ] 6 | tech_newsletter | 272 | `feedparser` 대체 → Rome |
 | - [ ] 7 | product_hunt | 311 | GraphQL |
 | - [ ] 8 | youtube_trending | 295 | YouTube Data API (REST 직접) |

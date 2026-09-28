@@ -25,6 +25,9 @@ class LatestBatchQuery(private val jdbcClient: JdbcClient, private val jsonMappe
     /** ILIKE — value 에 와일드카드 포함(예: %kw%) */
     data class TextLike(val field: String, override val value: String) : Filter
 
+    /** JSONB 배열 포함 — value 는 배열 엘리먼트 하나(예: tags @> '"["python"]"'::jsonb') */
+    data class JsonArrayContains(val field: String, override val value: String) : Filter
+
     data class IntGte(val field: String, override val value: Int) : Filter
 
     data class TimestamptzGte(val field: String, override val value: Instant) : Filter
@@ -48,6 +51,7 @@ class LatestBatchQuery(private val jdbcClient: JdbcClient, private val jsonMappe
             sql += when (f) {
                 is TextEq -> " AND response ->> '${f.field}' = :f$i"
                 is TextLike -> " AND response ->> '${f.field}' ILIKE :f$i"
+                is JsonArrayContains -> " AND response -> '${f.field}' @> :f$i::jsonb"
                 is IntGte -> " AND (response ->> '${f.field}')::int >= :f$i"
                 is TimestamptzGte -> " AND (response ->> '${f.field}')::timestamptz >= :f$i"
             }
@@ -83,6 +87,7 @@ class LatestBatchQuery(private val jdbcClient: JdbcClient, private val jsonMappe
             sql += when (f) {
                 is TextEq -> " AND response ->> '${f.field}' = :f$i"
                 is TextLike -> " AND response ->> '${f.field}' ILIKE :f$i"
+                is JsonArrayContains -> " AND response -> '${f.field}' @> :f$i::jsonb"
                 is IntGte -> " AND (response ->> '${f.field}')::int >= :f$i"
                 is TimestamptzGte -> " AND (response ->> '${f.field}')::timestamptz >= :f$i"
             }
