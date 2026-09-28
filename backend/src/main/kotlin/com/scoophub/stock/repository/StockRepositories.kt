@@ -22,6 +22,8 @@ interface StockWatchlistRepository : JpaRepository<StockWatchlistEntity, Int> {
 
     fun findByTickerAndIsActive(ticker: String, isActive: Boolean = true): StockWatchlistEntity?
 
+    fun findByIsActiveAndGroupOrderByAddedAt(isActive: Boolean, group: String): List<StockWatchlistEntity>
+
     /** 관심종목 제거 — 관련 캔들/sigma/분석 결과까지 함께 (legacy remove 와 동일) */
     @Modifying
     @Query(
