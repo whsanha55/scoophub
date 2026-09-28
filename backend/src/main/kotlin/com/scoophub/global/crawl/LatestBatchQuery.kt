@@ -22,6 +22,9 @@ class LatestBatchQuery(private val jdbcClient: JdbcClient, private val jsonMappe
 
     data class TextEq(val field: String, override val value: String) : Filter
 
+    /** ILIKE — value 에 와일드카드 포함(예: %kw%) */
+    data class TextLike(val field: String, override val value: String) : Filter
+
     data class IntGte(val field: String, override val value: Int) : Filter
 
     data class TimestamptzGte(val field: String, override val value: Instant) : Filter
@@ -44,6 +47,7 @@ class LatestBatchQuery(private val jdbcClient: JdbcClient, private val jsonMappe
             params.addValue("f$i", f.value)
             sql += when (f) {
                 is TextEq -> " AND response ->> '${f.field}' = :f$i"
+                is TextLike -> " AND response ->> '${f.field}' ILIKE :f$i"
                 is IntGte -> " AND (response ->> '${f.field}')::int >= :f$i"
                 is TimestamptzGte -> " AND (response ->> '${f.field}')::timestamptz >= :f$i"
             }
@@ -78,6 +82,7 @@ class LatestBatchQuery(private val jdbcClient: JdbcClient, private val jsonMappe
             params.addValue("f$i", f.value)
             sql += when (f) {
                 is TextEq -> " AND response ->> '${f.field}' = :f$i"
+                is TextLike -> " AND response ->> '${f.field}' ILIKE :f$i"
                 is IntGte -> " AND (response ->> '${f.field}')::int >= :f$i"
                 is TimestamptzGte -> " AND (response ->> '${f.field}')::timestamptz >= :f$i"
             }

@@ -140,7 +140,7 @@ Python 줄 수 기준. 각 도메인 공통 체크리스트:
 | - [x] 1 | weather | 396 | **템플릿 도메인** 완료 — `external/wttr`, `external/openmeteo` 클라이언트 + `WeatherCrawler` + `WeatherController` + 스케줄 자동 등록(CrawlerScheduledJob) |
 | - [x] 2 | hacker_news | 300 | 완료 — Firebase API + `LatestBatchQuery` 공통 (배치 도메인 조회 템플릿 확립) |
 | - [x] 3 | github_trending | 249 | 완료 — Jsoup 스크래핑(`external/github`) |
-| - [ ] 4 | arxiv | 269 | `arxiv` 대체 → Atom API 직접 호출 |
+| - [x] 4 | arxiv | 269 | 완료 — Atom API 직접 호출(Jsoup XML), `LatestBatchQuery` ILIKE 확장 |
 | - [ ] 5 | devto_hashnode | 266 | REST/GraphQL |
 | - [ ] 6 | tech_newsletter | 272 | `feedparser` 대체 → Rome |
 | - [ ] 7 | product_hunt | 311 | GraphQL |
