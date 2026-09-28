@@ -31,6 +31,13 @@ interface CrawlDataRepository : JpaRepository<CrawlDataEntity, Long> {
     /** 자연키 직접 조회 */
     fun findByCategoryAndPurposeAndKey(category: String, purpose: String, key: String): CrawlDataEntity?
 
+    /** 신규 산정용 — 존재하는 key 들만 조회 */
+    fun findByCategoryAndPurposeAndKeyIn(
+        category: String,
+        purpose: String,
+        keys: Collection<String>,
+    ): List<CrawlDataEntity>
+
     /** 자연키 최신 (weather 조회 — 시간 필터 없음) */
     fun findFirstByCategoryAndPurposeAndKeyOrderByDateAtDesc(
         category: String,
