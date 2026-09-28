@@ -142,7 +142,7 @@ Python 줄 수 기준. 각 도메인 공통 체크리스트:
 | - [x] 3 | github_trending | 249 | 완료 — Jsoup 스크래핑(`external/github`) |
 | - [x] 4 | arxiv | 269 | 완료 — Atom API 직접 호출(Jsoup XML), `LatestBatchQuery` ILIKE 확장 |
 | - [x] 5 | devto_hashnode | 266 | 완료 — Dev.to REST (hashnode 미사용, legacy 와 동일) |
-| - [ ] 6 | tech_newsletter | 272 | `feedparser` 대체 → Rome |
+| - [x] 6 | tech_newsletter | 272 | 완료 — Rome RSS 파싱(`external/rss`) |
 | - [ ] 7 | product_hunt | 311 | GraphQL |
 | - [ ] 8 | youtube_trending | 295 | YouTube Data API (REST 직접) |
 | - [ ] 9 | system | 745 | health, crawl logs, 스케줄/설정 관리, notify 라우트 관리 API |

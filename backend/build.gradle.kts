@@ -36,6 +36,7 @@ dependencies {
     implementation("tools.jackson.module:jackson-module-kotlin")
     implementation("io.github.oshai:kotlin-logging-jvm:8.0.4")
     implementation("org.jsoup:jsoup:1.18.3") // github_trending HTML 스크래핑 (legacy gtrending 대체)
+    implementation("com.rometools:rome:2.1.0") // tech_newsletter RSS 파싱 (legacy feedparser 대체)
     runtimeOnly("org.postgresql:postgresql")
 
     testImplementation("org.springframework.boot:spring-boot-starter-webmvc-test") {
