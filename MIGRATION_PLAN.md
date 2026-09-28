@@ -114,15 +114,15 @@ Python `app/core`, `app/config.py`, `app/main.py` 대응.
 - [x] 런타임 재스케줄 (system 스케줄 PATCH 에서 사용) — `CrawlScheduler.apply()`, ScheduledFuture 보관
   - Spring 7 API 차이 반영: `Trigger.nextExecution`(구 `nextExecutionTime`), `scheduleWithFixedDelay`(구 `scheduleAtFixedDelay`), `ThreadPoolTaskScheduler` setter-only 프로퍼티
 
-### 3.6 알림 (`core/notify`, 약 1,100줄)
-- [ ] Telegram 발신 클라이언트
-- [ ] NotifyRouter (라우트 테이블, payload_key dedup, 발신 로그)
-- [ ] AutoTopicProvisioner
-- [ ] card 포맷 + 카테고리별 enrich (news importance≥4, weather 하루 1회 KST 7시+, kal 조건, 그 외 top5)
-- [ ] 비동기 발신 (크롤 블록 X)
+### 3.6 알림 (`core/notify`, 약 1,100줄) — `global/notify`
+- [x] Telegram 발신 클라이언트 — `TelegramNotifier` (4096 분할)
+- [x] NotifyRouter (라우트 테이블, payload_key dedup, 발신 로그) — wildcard 폴백, notify_log upsert
+- [x] AutoTopicProvisioner — LLM 이름 생성 + raw 폴백, 폭증 가드
+- [x] card 포맷 + 카테고리별 enrich — `NotifyCard` (news importance≥4 → JdbcClient, weather/kal/batch top5). feed_news 조회는 news 도메인 이관 시 엔티티 전환 예정
+- [x] 비동기 발신 (크롤 블록 X) — `CrawlNotifyDispatcher` 가 `CrawlCompletedEvent` 를 `@Async @EventListener` 구독. 가상 스레드 설정(`spring.threads.virtual.enabled`) 추가
 
 ### 3.7 LLM 클라이언트 (`core/llm`)
-- [ ] OpenRouter 호환 chat 호출 (RestClient)
+- [x] OpenRouter 호환 chat 호출 — `external/llm/LlmClient` (전용 600s read timeout)
 
 ### 3.8 테스트 기반
 - [x] Testcontainers PostgreSQL + `@ServiceConnection` — 전체 마이그레이션 적용 검증 (`TestcontainersConfiguration`)

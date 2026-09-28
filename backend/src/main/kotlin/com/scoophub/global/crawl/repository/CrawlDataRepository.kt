@@ -25,6 +25,9 @@ interface CrawlDataRepository : JpaRepository<CrawlDataEntity, Long> {
     /** 특정 category/purpose 의 최신 1건 */
     fun findFirstByCategoryAndPurposeOrderByDateAtDesc(category: String, purpose: String): CrawlDataEntity?
 
+    /** notify enrich 용 — 최근 갱신순 배치 */
+    fun findFirst50ByCategoryAndPurposeOrderByUpdatedAtDesc(category: String, purpose: String): List<CrawlDataEntity>
+
     /** 자연키 직접 조회 */
     fun findByCategoryAndPurposeAndKey(category: String, purpose: String, key: String): CrawlDataEntity?
 
