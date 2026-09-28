@@ -114,15 +114,15 @@ Python `app/core`, `app/config.py`, `app/main.py` 대응.
 - [x] 런타임 재스케줄 (system 스케줄 PATCH 에서 사용) — `CrawlScheduler.apply()`, ScheduledFuture 보관
   - Spring 7 API 차이 반영: `Trigger.nextExecution`(구 `nextExecutionTime`), `scheduleWithFixedDelay`(구 `scheduleAtFixedDelay`), `ThreadPoolTaskScheduler` setter-only 프로퍼티
 
-### 3.6 알림 (`core/notify`, 약 1,100줄)
-- [ ] Telegram 발신 클라이언트
-- [ ] NotifyRouter (라우트 테이블, payload_key dedup, 발신 로그)
-- [ ] AutoTopicProvisioner
-- [ ] card 포맷 + 카테고리별 enrich (news importance≥4, weather 하루 1회 KST 7시+, kal 조건, 그 외 top5)
-- [ ] 비동기 발신 (크롤 블록 X)
+### 3.6 알림 (`core/notify`, 약 1,100줄) — `global/notify`
+- [x] Telegram 발신 클라이언트 — `TelegramNotifier` (4096 분할)
+- [x] NotifyRouter (라우트 테이블, payload_key dedup, 발신 로그) — wildcard 폴백, notify_log upsert
+- [x] AutoTopicProvisioner — LLM 이름 생성 + raw 폴백, 폭증 가드
+- [x] card 포맷 + 카테고리별 enrich — `NotifyCard` (news importance≥4 → JdbcClient, weather/kal/batch top5). feed_news 조회는 news 도메인 이관 시 엔티티 전환 예정
+- [x] 비동기 발신 (크롤 블록 X) — `CrawlNotifyDispatcher` 가 `CrawlCompletedEvent` 를 `@Async @EventListener` 구독. 가상 스레드 설정(`spring.threads.virtual.enabled`) 추가
 
 ### 3.7 LLM 클라이언트 (`core/llm`)
-- [ ] OpenRouter 호환 chat 호출 (RestClient)
+- [x] OpenRouter 호환 chat 호출 — `external/llm/LlmClient` (전용 600s read timeout)
 
 ### 3.8 테스트 기반
 - [x] Testcontainers PostgreSQL + `@ServiceConnection` — 전체 마이그레이션 적용 검증 (`TestcontainersConfiguration`)
@@ -137,17 +137,17 @@ Python 줄 수 기준. 각 도메인 공통 체크리스트:
 
 | 순서 | 도메인 | Python 줄 | 비고 |
 |---|---|---|---|
-| - [ ] 1 | weather | 396 | **템플릿 도메인**. wttr.in + Open-Meteo, crawl_data snapshot |
-| - [ ] 2 | hacker_news | 300 | Firebase API |
-| - [ ] 3 | github_trending | 249 | `gtrending` 대체 → HTML 스크래핑(Jsoup) |
-| - [ ] 4 | arxiv | 269 | `arxiv` 대체 → Atom API 직접 호출 |
-| - [ ] 5 | devto_hashnode | 266 | REST/GraphQL |
-| - [ ] 6 | tech_newsletter | 272 | `feedparser` 대체 → Rome |
-| - [ ] 7 | product_hunt | 311 | GraphQL |
-| - [ ] 8 | youtube_trending | 295 | YouTube Data API (REST 직접) |
-| - [ ] 9 | system | 745 | health, crawl logs, 스케줄/설정 관리, notify 라우트 관리 API |
-| - [ ] 10 | news | 1,117 | RSS + dedup + LLM summarizer + 필터 룰 + sources 관리 |
-| - [ ] 11 | kal_bonus | 556 | **Playwright(Java)** + Xvfb headful (Akamai 우회) |
+| - [x] 1 | weather | 396 | **템플릿 도메인** 완료 — `external/wttr`, `external/openmeteo` 클라이언트 + `WeatherCrawler` + `WeatherController` + 스케줄 자동 등록(CrawlerScheduledJob) |
+| - [x] 2 | hacker_news | 300 | 완료 — Firebase API + `LatestBatchQuery` 공통 (배치 도메인 조회 템플릿 확립) |
+| - [x] 3 | github_trending | 249 | 완료 — Jsoup 스크래핑(`external/github`) |
+| - [x] 4 | arxiv | 269 | 완료 — Atom API 직접 호출(Jsoup XML), `LatestBatchQuery` ILIKE 확장 |
+| - [x] 5 | devto_hashnode | 266 | 완료 — Dev.to REST (hashnode 미사용, legacy 와 동일) |
+| - [x] 6 | tech_newsletter | 272 | 완료 — Rome RSS 파싱(`external/rss`) |
+| - [x] 7 | product_hunt | 311 | 완료 — GraphQL v2 (`external/producthunt`) |
+| - [x] 8 | youtube_trending | 295 | 완료 — Data API v3 REST 직접, view_count bigint 정렬 |
+| - [x] 9 | system | 745 | 완료 — health/llm-test/crawl-logs, config CRUD(키 화이트리스트), schedules CRUD(런타임 apply), notify routes CRUD/발신 테스트/이력 |
+| - [x] 10 | news | 1,117 | 완료 — RSS 크롤(normalized_url dedup, cutoff), LLM dedup, LLM 요약(청크/번역), 목록·단건 API, 소스 CRUD, 파이프라인 ScheduledJob |
+| - [x] 11 | kal_bonus | 556 | 완료 — Playwright Java(번들 chromium, --disable-http2) in-page fetch. 브라우저 실행 환경(Xvfb)은 배포 시 구성 |
 | - [ ] 12 | stock | 4,162 | 가장 큼, 아래 별도 |
 
 ### stock 세부 (위험도 높음)
@@ -162,9 +162,9 @@ Python 줄 수 기준. 각 도메인 공통 체크리스트:
 
 ## 5. 배포/전환 (P3)
 
-- [ ] `backend/Dockerfile` (멀티스테이지: Gradle 빌드 → JRE 25). kal_bonus 이관 시 Playwright chromium + Xvfb 추가
-- [ ] `backend/docker-compose.yml` — 포트 20010 유지, flyway 컨테이너 제거(앱이 migrate)
-- [ ] `backend/deploy.sh`
+- [x] `backend/Dockerfile` — 멀티스테이지(Gradle 빌드 → JRE 25) + Playwright chromium + Xvfb headful
+- [x] `backend/docker-compose.yml` — 포트 20010 유지, flyway 컨테이너 제거(앱이 migrate)
+- [x] `backend/deploy.sh` — /docs 헬스체크 (legacy 와 동일 구조)
 - [ ] 전환 방식 결정:
   - A. 전 도메인 이관 완료 후 한 번에 교체 (단순, 권장)
   - B. 도메인 단위 점진 교체 (legacy 와 동시 기동 → **스케줄 중복 실행** 위험 → 한쪽 `ENABLE_SCHEDULER=false` / 잡 단위 비활성 필요, 라우팅 분기 필요)

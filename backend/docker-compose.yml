@@ -1,0 +1,22 @@
+name: scoophub
+
+services:
+  app:
+    build: .
+    init: true
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      DB_HOST: postgres
+      PORT: "20010"
+      TZ: Asia/Seoul
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+    ports:
+      - "127.0.0.1:20010:20010"
+    networks:
+      - infra
+
+networks:
+  infra:
+    external: true

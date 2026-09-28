@@ -9,6 +9,9 @@ logging:
 spring:
   application:
     name: scoophub
+  threads:
+    virtual:
+      enabled: true
   config:
     import: optional:file:.env[.properties]
   datasource:
