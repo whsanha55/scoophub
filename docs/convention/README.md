@@ -7,7 +7,8 @@
 ```text
 conventions/
 ├── common/
-│   └── git-pr.md          # 티켓, 브랜치, 커밋, 머지 전 체크리스트 (모든 프로젝트)
+│   ├── git-pr.md          # 티켓, 브랜치, 커밋, push, PR (모든 프로젝트)
+│   └── tooling/           # PR 본문 템플릿
 ├── backend/
 │   ├── common/
 │   │   └── api.md         # URL, 인증, 응답, 에러, Request ID, Swagger

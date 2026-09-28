@@ -60,5 +60,5 @@ npm run dev            # :20020, /api/* 는 API_URL 로 프록시
 <!-- convention:start -->
 ## Convention
 
-이 프로젝트는 [whsanha55/conventions](https://github.com/whsanha55/conventions) (`5dcb059`)를 따른다. 문서는 `docs/convention/`에 있고, 프로젝트 예외는 `docs/convention/LOCAL.md`에 적는다.
+이 프로젝트는 [whsanha55/conventions](https://github.com/whsanha55/conventions) (`04a627c`)를 따른다. 문서는 `docs/convention/`에 있고, 프로젝트 예외는 `docs/convention/LOCAL.md`에 적는다.
 <!-- convention:end -->
