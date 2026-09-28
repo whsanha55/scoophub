@@ -79,6 +79,11 @@ dependencies {
     }
 }
 
+tasks.jar {
+    // bootJar 만 생성 — Docker 이미지 COPY 단순화
+    enabled = false
+}
+
 tasks.withType<Test> {
     useJUnitPlatform()
 }
