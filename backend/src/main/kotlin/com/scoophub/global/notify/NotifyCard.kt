@@ -1,6 +1,8 @@
 package com.scoophub.global.notify
 
 import com.scoophub.global.crawl.repository.CrawlDataRepository
+import com.scoophub.global.jackson.elements
+import com.scoophub.global.jackson.scalar
 import org.springframework.jdbc.core.simple.JdbcClient
 import org.springframework.stereotype.Component
 import tools.jackson.databind.JsonNode

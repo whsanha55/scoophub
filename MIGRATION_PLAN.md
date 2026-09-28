@@ -137,7 +137,7 @@ Python 줄 수 기준. 각 도메인 공통 체크리스트:
 
 | 순서 | 도메인 | Python 줄 | 비고 |
 |---|---|---|---|
-| - [ ] 1 | weather | 396 | **템플릿 도메인**. wttr.in + Open-Meteo, crawl_data snapshot |
+| - [x] 1 | weather | 396 | **템플릿 도메인** 완료 — `external/wttr`, `external/openmeteo` 클라이언트 + `WeatherCrawler` + `WeatherController` + 스케줄 자동 등록(CrawlerScheduledJob) |
 | - [ ] 2 | hacker_news | 300 | Firebase API |
 | - [ ] 3 | github_trending | 249 | `gtrending` 대체 → HTML 스크래핑(Jsoup) |
 | - [ ] 4 | arxiv | 269 | `arxiv` 대체 → Atom API 직접 호출 |
