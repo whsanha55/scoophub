@@ -1,0 +1,38 @@
+name: scoophub
+
+services:
+  flyway:
+    image: flyway/flyway:11-alpine
+    command: -connectRetries=10 -baselineOnMigrate=true -baselineVersion=0 migrate
+    env_file: .env
+    environment:
+      FLYWAY_URL: jdbc:postgresql://postgres:5432/${DB_NAME:-scoophub}
+      FLYWAY_USER: ${DB_USER:-scoophub}
+      FLYWAY_PASSWORD: ${DB_PASSWORD:-changeme}
+    volumes:
+      - ../backend/src/main/resources/db/migration:/flyway/sql:ro
+    networks:
+      - infra
+
+  app:
+    build: .
+    init: true
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      DB_HOST: postgres
+      PORT: "20010"
+      TZ: Asia/Seoul
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+    ports:
+      - "127.0.0.1:20010:20010"
+    depends_on:
+      flyway:
+        condition: service_completed_successfully
+    networks:
+      - infra
+
+networks:
+  infra:
+    external: true

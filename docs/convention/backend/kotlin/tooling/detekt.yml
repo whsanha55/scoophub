@@ -1,0 +1,36 @@
+# buildUponDefaultConfig = true 기준. 기본 설정에서 바꾸는 항목만 적는다.
+
+potential-bugs:
+  # !! 금지 (운영 코드)
+  UnsafeCallOnNullableType:
+    active: true
+    excludes: ['**/test/**']
+
+style:
+  # 인자 없는 now(), 시스템 기본 타임존, println 금지. 타입 해석이 필요하므로 detektMain/detektTest로 실행한다.
+  ForbiddenMethodCall:
+    active: true
+    methods:
+      - reason: 'Clock을 주입받아 Instant.now(clock)을 쓴다.'
+        value: 'java.time.Instant.now()'
+      - reason: 'Instant로 시점을 다룬다.'
+        value: 'java.time.LocalDateTime.now()'
+      - reason: 'Clock을 주입받아 쓴다.'
+        value: 'java.time.LocalDate.now()'
+      - reason: 'Clock을 주입받아 쓴다.'
+        value: 'java.time.ZonedDateTime.now()'
+      - reason: 'JVM 기본 타임존에 의존하지 않는다.'
+        value: 'java.time.ZoneId.systemDefault()'
+      - reason: 'JVM 기본 타임존에 의존하지 않는다.'
+        value: 'java.util.TimeZone.setDefault'
+      - reason: 'KotlinLogging을 쓴다.'
+        value: 'kotlin.io.println'
+      - reason: 'KotlinLogging을 쓴다.'
+        value: 'kotlin.io.print'
+  MaxLineLength:
+    maxLineLength: 120
+
+naming:
+  # 테스트 메서드의 백틱 한글 이름 허용
+  FunctionNaming:
+    excludes: ['**/test/**']

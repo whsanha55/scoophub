@@ -1,0 +1,17 @@
+name: scoophub-ui
+
+services:
+  ui:
+    build: .
+    environment:
+      # proxy(/api/* rewrite) 대상 백엔드. infra 네트워크 내 컨테이너명으로 도달.
+      - API_URL=http://scoophub-app-1:20010
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:20020:20020"
+    networks:
+      - infra
+
+networks:
+  infra:
+    external: true
