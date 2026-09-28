@@ -48,10 +48,10 @@ scoophub/
 - [x] 루트 `.gitignore` 정리 — frontend `.idea/`, `*.iml`, `__pycache__` 추적 해제
 - [x] 미커밋 변경(마이그레이션 이동 + backend 뼈대) 커밋
 - [x] compose 프로젝트명 고정 — `backend-legacy`: `name: scoophub`, `frontend`: `name: scoophub-ui` (디렉터리명 변경으로 컨테이너명 `scoophub-app-1` 이 바뀌어 frontend `API_URL` 이 깨지는 것 방지)
-- [ ] 서버 백엔드 `.env` 를 레포 루트 → `backend-legacy/.env` 로 이동
-- [ ] `chore/monorepo` push → PR → main 머지
-- [ ] 배포 스크립트 경로 확인: reins 보드 agent 가 `deploy.sh` 를 어디서 호출하는지 → `backend-legacy/deploy.sh`, `frontend/deploy.sh` 로 경로 변경 필요
-- [ ] `scoophub-ui` 레포 archive (README 에 이전 안내)
+- [ ] 서버 백엔드 `.env` 를 레포 루트 → `backend-legacy/.env` 로 이동 ← **사용자 직접 진행** (완료 전 legacy 배포 금지)
+- [x] `chore/monorepo` push → PR → main 머지 — PR #193, merge commit `bb14578` (히스토리 보존)
+- [ ] 배포 스크립트 경로 확인: reins 보드 agent 가 `deploy.sh` 를 어디서 호출하는지 → `backend-legacy/deploy.sh`, `frontend/deploy.sh` 로 경로 변경 필요 ← **사용자 직접 진행**
+- [x] `scoophub-ui` 레포 archive (README 에 이전 안내) — 2026-09-28
 
 > ⚠️ 결정 필요: 배포 agent 가 레포 루트의 `deploy.sh` 를 고정 호출한다면 루트에 서브 디렉터리로 위임하는 `deploy.sh` 를 둬야 함.
 
@@ -102,15 +102,17 @@ Python `app/core`, `app/config.py`, `app/main.py` 대응.
 - [x] 수동 크롤 트리거 응답 공통 헬퍼 (`POST /api/crawling/{domain}` → crawler, crawler_detail, items_fetched, items_new, errors) — `CrawlRunner.trigger()`, 실패 시 200 + success=false (legacy 동일)
 
 ### 3.5 스케줄러 (`base_scheduler.py`)
-- [ ] `ScheduledJob` 인터페이스 (crawler, jobId, run) — 크롤러 외 stock 분석 잡도 수용
-- [ ] 기동 시 `crawl_schedule` 조회 → Spring `TaskScheduler` 등록
-  - cron: 5필드 crontab → Spring 6필드(`"0 " + expr`), `Asia/Seoul`, 다중 expr 은 OR 트리거
-  - interval: `schedule_minutes`, 첫 실행은 interval 후 (APScheduler 동일)
-  - `enabled=false` → 미등록
-- [ ] 동시 실행 방지 (APScheduler `max_instances=1`, `coalesce`)
-- [ ] `crawl_config.params` 로딩
-- [ ] `ENABLE_SCHEDULER=false` 지원
-- [ ] 런타임 재스케줄 (system 스케줄 PATCH 에서 사용) — ScheduledFuture 보관
+- [x] `ScheduledJob` 인터페이스 (crawler, jobId, run) — 크롤러 외 stock 분석 잡도 수용
+  - `Crawler` 빈은 `CrawlerScheduledJob` 어댑터가 `{name}_crawler` job_id 로 자동 등록. params 소비 필요 도메인은 직접 구현
+- [x] 기동 시 `crawl_schedule` 조회 → Spring `TaskScheduler` 등록 — `global/schedule`
+  - cron: 5필드 crontab → Spring 6필드(`"0 " + expr`), `Asia/Seoul`, 다중 expr 은 `OrCronTrigger` (min next)
+  - interval: `schedule_minutes`, 첫 실행은 interval 후 (`scheduleWithFixedDelay` — Spring 7 메서드명)
+  - `enabled=false` → 등록만 하고 paused (future=null, legacy `pause_job` 대응)
+- [x] 동시 실행 방지 — Trigger/fixed-delay 구조가 잡마다 완료 후 재예약 (APScheduler `max_instances=1`, `coalesce` 동일 효과)
+- [x] `crawl_config.params` 로딩 — `ScheduleResolver.resolveParams`
+- [x] `ENABLE_SCHEDULER=false` 지원 — `SchedulerStartupRunner` 에서 미등록 + 로그
+- [x] 런타임 재스케줄 (system 스케줄 PATCH 에서 사용) — `CrawlScheduler.apply()`, ScheduledFuture 보관
+  - Spring 7 API 차이 반영: `Trigger.nextExecution`(구 `nextExecutionTime`), `scheduleWithFixedDelay`(구 `scheduleAtFixedDelay`), `ThreadPoolTaskScheduler` setter-only 프로퍼티
 
 ### 3.6 알림 (`core/notify`, 약 1,100줄)
 - [ ] Telegram 발신 클라이언트
