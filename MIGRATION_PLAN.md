@@ -147,7 +147,7 @@ Python 줄 수 기준. 각 도메인 공통 체크리스트:
 | - [x] 8 | youtube_trending | 295 | 완료 — Data API v3 REST 직접, view_count bigint 정렬 |
 | - [x] 9 | system | 745 | 완료 — health/llm-test/crawl-logs, config CRUD(키 화이트리스트), schedules CRUD(런타임 apply), notify routes CRUD/발신 테스트/이력 |
 | - [x] 10 | news | 1,117 | 완료 — RSS 크롤(normalized_url dedup, cutoff), LLM dedup, LLM 요약(청크/번역), 목록·단건 API, 소스 CRUD, 파이프라인 ScheduledJob |
-| - [ ] 11 | kal_bonus | 556 | **Playwright(Java)** + Xvfb headful (Akamai 우회) |
+| - [x] 11 | kal_bonus | 556 | 완료 — Playwright Java(번들 chromium, --disable-http2) in-page fetch. 브라우저 실행 환경(Xvfb)은 배포 시 구성 |
 | - [ ] 12 | stock | 4,162 | 가장 큼, 아래 별도 |
 
 ### stock 세부 (위험도 높음)
