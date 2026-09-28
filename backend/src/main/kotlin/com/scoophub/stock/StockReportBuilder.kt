@@ -106,7 +106,17 @@ class StockReportBuilder(
             val sigmaRange = sigmaRangeFromSnapshot(row.technicalDetails.get("sigma_data"), price)
             val levels = computeActionableLevels(price, sigmaRange, row.technicalDetails)
             lines +=
-                formatTicker(row.ticker, row.signal, row.totalScore, row.confidence, row.changeRate, price, auxW[row.ticker], auxM[row.ticker], levels)
+                formatTicker(
+                    row.ticker,
+                    row.signal,
+                    row.totalScore,
+                    row.confidence,
+                    row.changeRate,
+                    price,
+                    auxW[row.ticker],
+                    auxM[row.ticker],
+                    levels,
+                )
         }
         if (lines.size <= 1) { // 제목만
             return null

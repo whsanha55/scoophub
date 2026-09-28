@@ -148,16 +148,16 @@ Python 줄 수 기준. 각 도메인 공통 체크리스트:
 | - [x] 9 | system | 745 | 완료 — health/llm-test/crawl-logs, config CRUD(키 화이트리스트), schedules CRUD(런타임 apply), notify routes CRUD/발신 테스트/이력 |
 | - [x] 10 | news | 1,117 | 완료 — RSS 크롤(normalized_url dedup, cutoff), LLM dedup, LLM 요약(청크/번역), 목록·단건 API, 소스 CRUD, 파이프라인 ScheduledJob |
 | - [x] 11 | kal_bonus | 556 | 완료 — Playwright Java(번들 chromium, --disable-http2) in-page fetch. 브라우저 실행 환경(Xvfb)은 배포 시 구성 |
-| - [ ] 12 | stock | 4,162 | 가장 큼, 아래 별도 |
+| - [x] 12 | stock | 4,162 | 완료 — 위 세부 참조 |
 
-### stock 세부 (위험도 높음) — feat/backend-stock 브랜치 진행 중
+### stock 세부 — 완료
 - [x] `yfinance` 대체: Yahoo chart/quote/options HTTP 직접 호출 + 3초 throttle + cookie/crumb (`external/yahoo`)
-- [x] `technical.py`(535줄) 지표 계산 포팅 — `StockTechnical` (수치 비교 테스트는 아래 테스트 항목에서)
+- [x] `technical.py`(535줄) 지표 계산 포팅 — `StockTechnical`
 - [x] resample, sigma, signal, report, analysis_service — `StockResample`/`StockSigma`/`StockSignal`/`StockReportBuilder`/`StockAnalysisService`
 - [x] repository 6종 → JPA + native upsert (`StockRepositories.kt`)
 - [x] 스케줄 3종 ScheduledJob (stock_sync, stock_sigma_scan, stock_daily_sigma=시그마→분석 파이프라인) + `SigmaCrawler`
-- [ ] **router 875줄 포팅** (analyze/report/detail/report-all/sigma/market-status/watchlist CRUD/수동 트리거 4종) — 다음 단계
-- [ ] stock 테스트 (test_stock_sigma/report/resample/watchlist_group 포팅 + 수치 비교)
+- [x] router 875줄 포팅 — `StockController` 13 엔드포인트 (분석/리포트/상세/sigma/market-status/watchlist CRUD/수동 트리거)
+- [x] stock 테스트 — 38케이스. **legacy Python 함수 실행 기대값과 전 지표 1e-9 parity 검증** 완료 (watchlist_group DB 통합 테스트는 제외 — 전환 후 운영 검증으로 대체)
 
 ---
 

@@ -122,6 +122,12 @@ interface StockAnalysisResultRepository : JpaRepository<StockAnalysisResultEntit
         timeframe: String,
     ): List<StockAnalysisResultEntity>
 
+    /** legacy `find_by_tickers` — ORDER BY analyzed_at DESC */
+    fun findByTickerInAndTimeframeOrderByAnalyzedAtDesc(
+        tickers: Collection<String>,
+        timeframe: String,
+    ): List<StockAnalysisResultEntity>
+
     fun findByTimeframeOrderByAnalyzedAtDesc(timeframe: String): List<StockAnalysisResultEntity>
 }
 
@@ -167,6 +173,9 @@ interface StockSigmaRepository : JpaRepository<StockSigmaEntity, Long> {
     )
 
     fun findFirstByTickerOrderBySnapshotDateDescSnapshotAtDesc(ticker: String): StockSigmaEntity?
+
+    /** legacy `get_latest` — ORDER BY snapshot_date DESC, expiry_date ASC */
+    fun findFirstByTickerOrderBySnapshotDateDescExpiryDateAsc(ticker: String): StockSigmaEntity?
 
     fun findByTickerOrderBySnapshotDateDesc(ticker: String, limit: Limit): List<StockSigmaEntity>
 }
