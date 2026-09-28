@@ -32,17 +32,28 @@ class LatestBatchQuery(private val jdbcClient: JdbcClient, private val jsonMappe
         data object DateAtDesc : SortKey
     }
 
-    fun latestFetchedAt(category: String, purpose: String): Instant? = jdbcClient.sql(
-        """
+    fun latestFetchedAt(category: String, purpose: String, baseFilters: List<Filter> = emptyList()): Instant? {
+        val params = MapSqlParameterSource()
+            .addValue("category", category)
+            .addValue("purpose", purpose)
+        var sql = """
             SELECT MAX((response ->> 'fetched_at')::timestamptz) FROM crawl_data
             WHERE category = :category AND purpose = :purpose
-            """,
-    )
-        .param("category", category)
-        .param("purpose", purpose)
-        .query { rs, _ -> rs.getTimestamp(1)?.toInstant() }
-        .optional()
-        .orElse(null)
+        """
+        baseFilters.forEachIndexed { i, f ->
+            params.addValue("f$i", f.value)
+            sql += when (f) {
+                is TextEq -> " AND response ->> '${f.field}' = :f$i"
+                is IntGte -> " AND (response ->> '${f.field}')::int >= :f$i"
+                is TimestamptzGte -> " AND (response ->> '${f.field}')::timestamptz >= :f$i"
+            }
+        }
+        return jdbcClient.sql(sql)
+            .paramSource(params)
+            .query { rs, _ -> rs.getTimestamp(1)?.toInstant() }
+            .optional()
+            .orElse(null)
+    }
 
     fun fetch(
         category: String,
