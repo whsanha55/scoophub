@@ -144,7 +144,7 @@ Python 줄 수 기준. 각 도메인 공통 체크리스트:
 | - [x] 5 | devto_hashnode | 266 | 완료 — Dev.to REST (hashnode 미사용, legacy 와 동일) |
 | - [x] 6 | tech_newsletter | 272 | 완료 — Rome RSS 파싱(`external/rss`) |
 | - [x] 7 | product_hunt | 311 | 완료 — GraphQL v2 (`external/producthunt`) |
-| - [ ] 8 | youtube_trending | 295 | YouTube Data API (REST 직접) |
+| - [x] 8 | youtube_trending | 295 | 완료 — Data API v3 REST 직접, view_count bigint 정렬 |
 | - [ ] 9 | system | 745 | health, crawl logs, 스케줄/설정 관리, notify 라우트 관리 API |
 | - [ ] 10 | news | 1,117 | RSS + dedup + LLM summarizer + 필터 룰 + sources 관리 |
 | - [ ] 11 | kal_bonus | 556 | **Playwright(Java)** + Xvfb headful (Akamai 우회) |

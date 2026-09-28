@@ -35,6 +35,9 @@ class LatestBatchQuery(private val jdbcClient: JdbcClient, private val jsonMappe
     sealed interface SortKey {
         data class IntDesc(val field: String) : SortKey
 
+        /** 조회수 등 int 범위 초과 가능 필드 */
+        data class LongDesc(val field: String) : SortKey
+
         data object DateAtDesc : SortKey
     }
 
@@ -94,6 +97,7 @@ class LatestBatchQuery(private val jdbcClient: JdbcClient, private val jsonMappe
         }
         sql += when (sortKey) {
             is SortKey.IntDesc -> " ORDER BY (response ->> '${sortKey.field}')::int DESC NULLS LAST"
+            is SortKey.LongDesc -> " ORDER BY (response ->> '${sortKey.field}')::bigint DESC NULLS LAST"
             SortKey.DateAtDesc -> " ORDER BY date_at DESC NULLS LAST"
         }
         sql += " LIMIT :limit"
