@@ -52,3 +52,12 @@ ln -s ~/temp/personal/conventions/skills/convention-sync ~/.claude/skills/conven
 - 다시 실행하면 원본의 최신 커밋과 비교해 바뀐 내용을 갱신한다.
 
 `docs/convention/`의 파일은 직접 수정하지 않는다. 프로젝트 예외는 `docs/convention/LOCAL.md`에 적는다.
+
+## 컨벤션 수정하기
+
+`main`에는 직접 push할 수 없다 (브랜치 보호). 변경은 PR로 올리고 검토 후 병합한다.
+
+- 다른 프로젝트에서 작업하다 수정이 필요하면: `/convention-sync propose`
+- 이 저장소에서 직접 수정할 때: `docs/{설명}` 브랜치 → PR → 병합
+
+병합 후 각 프로젝트에서 `/convention-sync`를 실행하면 반영된다.
