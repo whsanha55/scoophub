@@ -9,7 +9,7 @@
 - [x] reins 보드 배포 agent 의 호출 경로를 `backend/deploy.sh`, `frontend/deploy.sh` 로 변경
   - agent 가 루트 `deploy.sh` 를 고정 호출한다면 하위 디렉터리로 위임하는 루트 `deploy.sh` 추가
 - [x] 운영 DB 로 staging 기동 → Flyway validate 통과 확인 (V1~V20 체크섬 동일해야 함)
-- [ ] 교체 배포 (`backend/deploy.sh`) — compose 프로젝트명 `scoophub`·서비스 `app` 동일하므로 `scoophub-app-1` 컨테이너명 유지
+- [x] 교체 배포 (`backend/deploy.sh`) — compose 프로젝트명 `scoophub`·서비스 `app` 동일하므로 `scoophub-app-1` 컨테이너명 유지
   - legacy compose 의 flyway 컨테이너가 orphan 으로 남으면 `docker compose up -d --remove-orphans` 로 정리
 - [ ] kal_bonus: Playwright chromium + Xvfb 가 컨테이너에서 정상 동작하는지 확인
 - [ ] stock watchlist_group 운영 검증 (DB 통합 테스트 대신)
