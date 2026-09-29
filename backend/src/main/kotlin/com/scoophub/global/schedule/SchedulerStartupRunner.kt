@@ -22,11 +22,11 @@ class SchedulerStartupRunner(
 
     override fun run(args: ApplicationArguments) {
         val direct = jobs.orderedStream().toList()
-        // 직접 구현한 ScheduledJob(news 처럼 후처리 파이프라인이 있는 도메인)이
-        // 같은 "{name}_crawler" jobId 를 쓰면 어댑터가 덮어쓰지 않도록 제외
-        val directJobIds = direct.map { it.jobId }.toSet()
+        // 직접 구현한 ScheduledJob 이 있는 crawler(news 후처리, stock 분석 잡)는 어댑터 제외.
+        // stock 은 stock_crawler 스케줄 row 가 없어 어댑터를 만들면 기동 실패한다.
+        val directCrawlers = direct.map { it.crawler }.toSet()
         val adapters = crawlers.orderedStream()
-            .filter { "${it.name}_crawler" !in directJobIds }
+            .filter { it.name !in directCrawlers }
             .map { CrawlerScheduledJob(crawlRunner, it) }
             .toList()
         crawlScheduler.start(direct + adapters)

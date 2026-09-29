@@ -86,4 +86,6 @@ tasks.jar {
 
 tasks.withType<Test> {
     useJUnitPlatform()
+    // 테스트 컨텍스트에서 실제 크롤 잡이 돌지 않도록 (테스트는 잡 미등록 전제)
+    environment("ENABLE_SCHEDULER", "false")
 }

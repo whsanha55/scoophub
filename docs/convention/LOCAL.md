@@ -4,7 +4,7 @@
 
 ## 백엔드 — Python(FastAPI) 이관 특례
 
-`MIGRATION_PLAN.md` 원칙: **API 경로·응답 JSON·DB 스키마를 legacy와 1:1 유지** (UI 무수정, 기존 DB 그대로).
+이관 원칙: **API 경로·응답 JSON·DB 스키마를 legacy와 1:1 유지** (UI 무수정, 기존 DB 그대로).
 다음 항목은 이 원칙이 `backend/common/api.md`, `backend/kotlin/spring.md`보다 우선한다.
 
 - 성공 응답은 legacy 래핑 `ApiResponse(success, data, error, meta)` 를 유지한다. → api.md §3(래핑 금지, 목록 페이지 객체) 미적용.
