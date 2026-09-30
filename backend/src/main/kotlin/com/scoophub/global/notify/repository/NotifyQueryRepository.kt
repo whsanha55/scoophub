@@ -27,13 +27,17 @@ class NotifyQueryRepository(private val jdbcClient: JdbcClient) {
     }
 
     fun findAllRoutes(): List<NotifyRouteRow> = jdbcClient.sql(
-        "SELECT id, category, purpose, channel, chat_id, topic_id, topic_name, enabled, created_at, updated_at " +
-            "FROM notify_routes ORDER BY id",
+        """
+        SELECT id, category, purpose, channel, chat_id, topic_id, topic_name, enabled, created_at, updated_at
+        FROM notify_routes ORDER BY id
+        """.trimIndent(),
     ).query(routeMapper).list()
 
     fun findRoute(id: Long): NotifyRouteRow? = jdbcClient.sql(
-        "SELECT id, category, purpose, channel, chat_id, topic_id, topic_name, enabled, created_at, updated_at " +
-            "FROM notify_routes WHERE id = :id",
+        """
+        SELECT id, category, purpose, channel, chat_id, topic_id, topic_name, enabled, created_at, updated_at
+        FROM notify_routes WHERE id = :id
+        """.trimIndent(),
     )
         .param("id", id)
         .query(routeMapper)

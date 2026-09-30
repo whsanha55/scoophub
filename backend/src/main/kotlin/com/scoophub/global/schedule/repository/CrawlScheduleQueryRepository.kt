@@ -32,8 +32,10 @@ class CrawlScheduleQueryRepository(private val jdbcClient: JdbcClient) {
             return false
         }
         jdbcClient.sql(
-            "UPDATE crawl_schedule SET ${sets.joinToString(", ")}, updated_at = now() " +
-                "WHERE crawler = :crawler AND job_id = :jobId",
+            """
+            UPDATE crawl_schedule SET ${sets.joinToString(", ")}, updated_at = now()
+            WHERE crawler = :crawler AND job_id = :jobId
+            """.trimIndent(),
         )
             .param("crawler", crawler)
             .param("jobId", jobId)

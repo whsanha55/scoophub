@@ -25,8 +25,10 @@ class NewsSourceQueryRepository(private val jdbcClient: JdbcClient, private val 
     fun findAll(activeOnly: Boolean): List<NewsSourceRow> {
         val where = if (activeOnly) "AND active = true" else ""
         return jdbcClient.sql(
-            "SELECT id, crawler, name, url, active, config, created_at, updated_at " +
-                "FROM crawl_sources WHERE crawler = 'news' $where ORDER BY id",
+            """
+            SELECT id, crawler, name, url, active, config, created_at, updated_at
+            FROM crawl_sources WHERE crawler = 'news' $where ORDER BY id
+            """.trimIndent(),
         )
             .query(rowMapper)
             .list()
@@ -42,8 +44,10 @@ class NewsSourceQueryRepository(private val jdbcClient: JdbcClient, private val 
 
     /** URL 중복 시 DuplicateKeyException */
     fun insert(name: String, url: String, active: Boolean): Int = jdbcClient.sql(
-        "INSERT INTO crawl_sources (crawler, name, url, active, config) " +
-            "VALUES ('news', :name, :url, :active, '{}'::jsonb) RETURNING id",
+        """
+        INSERT INTO crawl_sources (crawler, name, url, active, config)
+        VALUES ('news', :name, :url, :active, '{}'::jsonb) RETURNING id
+        """.trimIndent(),
     )
         .param("name", name)
         .param("url", url)

@@ -57,8 +57,9 @@ class AutoTopicProvisioner(
 
     companion object {
         private const val RAW_EMOJI = "📢"
-        private const val SYSTEM_PROMPT =
-            "크롤 카테고리명을 한국어 토픽 이름(명사구, 10자 이내)과 이모지 1개로 변환한다. " +
-                "JSON {\"name\": \"...\", \"emoji\": \"...\"} 형태로만 출력한다."
+        private val SYSTEM_PROMPT = """
+            크롤 카테고리명을 한국어 토픽 이름(명사구, 10자 이내)과 이모지 1개로 변환한다.
+            JSON {"name": "...", "emoji": "..."} 형태로만 출력한다.
+        """.trimIndent()
     }
 }

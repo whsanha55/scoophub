@@ -77,8 +77,10 @@ class NewsDedup(private val llm: LlmClient, private val jdbcClient: JdbcClient, 
             val duplicateIds = idsInGroup.filter { it != representative }
             if (duplicateIds.isNotEmpty()) {
                 jdbcClient.sql(
-                    "UPDATE feed_news SET duplicated = true, duplicated_news_id = :rep, updated_at = now() " +
-                        "WHERE id IN (:ids)",
+                    """
+                    UPDATE feed_news SET duplicated = true, duplicated_news_id = :rep, updated_at = now()
+                    WHERE id IN (:ids)
+                    """.trimIndent(),
                 )
                     .param("rep", representative)
                     .param("ids", duplicateIds)
