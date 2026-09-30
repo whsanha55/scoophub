@@ -1,6 +1,5 @@
 #!/usr/bin/env bash
-# scoophub backend (Kotlin) deploy. reins 보드 배포 host agent 가 git 동기화(fetch/reset) 후 호출.
-# model 2 deploy-as-code: 본 스크립트=프로젝트별 빌드. agent=공통 git 동기화.
+# scoophub backend (Kotlin) deploy.
 # legacy 와 달리 flyway 컨테이너 없음 — 앱이 기동 시 migrate 한다.
 set -uo pipefail
 cd "$(dirname "$0")"

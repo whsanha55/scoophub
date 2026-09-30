@@ -17,20 +17,16 @@
 
 ```
 src/
-├── app/                # Next.js App Router 페이지
-│   ├── page.tsx        # 대시보드
-│   ├── news/           # 뉴스 페이지
-│   ├── weather/        # 날씨 페이지
-│   ├── stock/          # 주식 페이지
-│   └── ...             # 기타 도메인 페이지
-├── domains/            # 도메인별 컴포넌트/타입/훅
-│   ├── news/
-│   ├── weather/
-│   ├── stock/
-│   └── ...             # 기타 도메인
+├── app/
+│   ├── (app)/          # 로그인 후 페이지 (news, stock, weather, ... 도메인별)
+│   ├── login/          # 로그인
+│   └── api/auth/       # 인증 route handler
+├── domains/            # 도메인별 컴포넌트/타입/API
 ├── shared/             # 공통 컴포넌트/라이브러리/타입
 ├── components/ui/      # shadcn UI 컴포넌트
-└── lib/                # 유틸리티
+├── hooks/              # 공통 훅
+├── lib/                # 유틸리티
+└── proxy.ts            # 인증 쿠키 검사
 ```
 
 ## 환경 변수
@@ -59,18 +55,10 @@ npm run build
 npm start
 ```
 
-## 배포 (Docker Compose)
+## 배포
+
+`deploy.sh` 가 `docker compose up -d --build` 후 `:20020` 헬스체크를 한다. 전체 배포 흐름은 [루트 README](../README.md#배포)를 참고한다.
 
 ```bash
-# 빌드 및 실행
-docker compose up -d --build
-
-# 업데이트
-docker compose up -d --build
-
-# 로그
-docker compose logs -f ui
-
-# 중지
-docker compose down
+docker compose logs -f ui   # 로그
 ```

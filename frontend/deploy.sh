@@ -1,6 +1,5 @@
 #!/usr/bin/env bash
-# scoophub-ui deploy. reins 보드 배포 host agent 가 git 동기화(fetch/reset) 후 호출.
-# model 2 deploy-as-code: 본 스크립트=프로젝트별 빌드. agent=공통 git 동기화.
+# scoophub-ui deploy.
 set -uo pipefail
 cd "$(dirname "$0")"
 
