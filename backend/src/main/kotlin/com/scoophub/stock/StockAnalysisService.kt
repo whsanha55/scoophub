@@ -65,8 +65,6 @@ class StockAnalysisService(
                 val report = StockSignal.generateReport(
                     upper,
                     price,
-                    change,
-                    changeRate,
                     candles,
                     clock.instant().atZone(java.time.ZoneOffset.UTC).toLocalDate(),
                 )
@@ -190,8 +188,6 @@ class StockAnalysisService(
                 val report = StockSignal.generateReport(
                     ticker,
                     price,
-                    change,
-                    changeRate,
                     resampled,
                     clock.instant().atZone(java.time.ZoneOffset.UTC).toLocalDate(),
                 )

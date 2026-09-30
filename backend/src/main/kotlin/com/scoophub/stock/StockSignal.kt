@@ -17,13 +17,8 @@ data class AnalysisReport(
     val signal: Signal,
     val totalScore: Double,
     val confidence: Double,
-    val signalQuality: String, // strong / moderate / weak
     val marketRegime: MarketRegime,
     val technicalScores: Map<String, Int>,
-    val technicalWeights: Map<String, Double>,
-    val price: Double,
-    val change: Double,
-    val changeRate: Double,
     val technicalDetails: TechnicalResult,
 )
 
@@ -138,8 +133,6 @@ object StockSignal {
     fun generateReport(
         ticker: String,
         price: Double,
-        change: Double,
-        changeRate: Double,
         dailyCandles: List<Candle>,
         today: LocalDate = LocalDate.now(),
     ): AnalysisReport {
@@ -192,64 +185,11 @@ object StockSignal {
             signal = signal,
             totalScore = round1(techTotal),
             confidence = confidence,
-            signalQuality = quality,
             marketRegime = regime,
             technicalScores = techScores,
-            technicalWeights = weights,
-            price = price,
-            change = change,
-            changeRate = changeRate,
             technicalDetails = techResult,
         )
     }
 
-    /** 리포트 → 사람이 읽는 문자열 (legacy format_report) */
-    fun formatReport(report: AnalysisReport): String = buildString {
-        val d = report.technicalDetails
-        appendLine("=".repeat(60))
-        appendLine("  ${report.ticker} Analysis Report")
-        appendLine("=".repeat(60))
-        appendLine()
-        appendLine("  Price: $${report.price}  (Change: ${fmtSign(report.change)} / ${fmtSign(report.changeRate)}%)")
-        appendLine(
-            "  Signal: ${report.signal}  (Confidence: ${report.confidence.toInt()}%)  Quality: ${report.signalQuality}",
-        )
-        appendLine("  Market Regime: ${report.marketRegime}")
-        appendLine("  Total Score: ${fmtSign(report.totalScore)}")
-        appendLine()
-        appendLine("  --- Moving Averages ---")
-        appendLine("  SMA5:  $${d.ma5}")
-        appendLine("  SMA20: $${d.ma20}")
-        appendLine("  EMA12: $${d.ema12}")
-        appendLine("  EMA26: $${d.ema26}")
-        appendLine("  VWAP:  $${d.vwap}")
-        appendLine()
-        appendLine("  --- Oscillators ---")
-        appendLine("  RSI(14): ${d.rsi14}")
-        appendLine("  Stochastic: K=${d.stochasticK}% / D=${d.stochasticD}%")
-        appendLine()
-        appendLine("  --- Trend & Volatility ---")
-        appendLine("  MACD: ${d.macdLine} / Signal: ${d.macdSignal} / Hist: ${d.macdHistogram}")
-        appendLine("  ADX: ${d.adx}")
-        appendLine("  ATR: ${d.atr}")
-        appendLine()
-        appendLine("  --- Bands ---")
-        appendLine("  BB: Upper $${d.bbUpper} / Mid $${d.bbMiddle} / Lower $${d.bbLower}")
-        appendLine()
-        appendLine("  --- Volume ---")
-        appendLine("  OBV: ${d.obv.toInt()}")
-        appendLine()
-        appendLine("  --- Technical Scores ---")
-        report.technicalScores.forEach { (indicator, score) ->
-            val arrow = if (score > 0) "+" else ""
-            val w = report.technicalWeights[indicator] ?: 1.0
-            appendLine("  ${indicator.uppercase().padEnd(12)}: $arrow$score  (weight: $w)")
-        }
-        appendLine()
-        appendLine("=".repeat(60))
-    }.trimEnd()
-
     private fun round1(v: Double): Double = (v * 10).roundToInt() / 10.0
-
-    private fun fmtSign(v: Double): String = (if (v >= 0) "+" else "") + String.format("%.2f", v)
 }

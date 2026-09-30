@@ -98,29 +98,6 @@ class StockAnalysisResultEntity(
         protected set
 }
 
-/** V4 stock_ticker_params — 티커별 최적화 파라미터 */
-@Entity
-@Table(name = "stock_ticker_params")
-class StockTickerParamsEntity(
-    val ticker: String,
-    @JdbcTypeCode(SqlTypes.JSON)
-    var weights: JsonNode,
-    var entryThreshold: Double? = null,
-    var exitThreshold: Double? = null,
-    var positionSizePct: Double? = null,
-    var inSampleSharpe: Double? = null,
-    var inSampleSortino: Double? = null,
-    var outSampleSharpe: Double? = null,
-    var outSampleSortino: Double? = null,
-    var isAdopted: Boolean = false,
-    var tunedAt: Instant? = null,
-) {
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    var id: Int? = null
-        protected set
-}
-
 /** V4 stock_sigma — ATM 스트래들 스냅샷 */
 @Entity
 @Table(name = "stock_sigma")
