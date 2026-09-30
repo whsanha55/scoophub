@@ -44,6 +44,14 @@ scoophub:
   cors-origins: ${CORS_ORIGINS:http://localhost:3000,http://localhost:8000}
   producthunt-token: ${PRODUCTHUNT_TOKEN:}
   youtube-api-key: ${YOUTUBE_API_KEY:}
+  alpaca:
+    api-key: ${ALPACA_API_KEY:}
+    api-secret: ${ALPACA_API_SECRET:}
+    stream-url: ${ALPACA_STREAM_URL:wss://stream.data.alpaca.markets/v1beta1/news}
+    stream-enabled: ${ALPACA_STREAM_ENABLED:false}
+    worker-enabled: ${ALPACA_WORKER_ENABLED:${ALPACA_STREAM_ENABLED:false}}
+    burst-threshold: ${ALPACA_BURST_THRESHOLD:3}
+    burst-excluded-symbols: ${ALPACA_BURST_EXCLUDED_SYMBOLS:SPY,BTCUSD}
   llm:
     api-url: ${LLM_API_URL:https://openrouter.ai/api/v1}
     api-key: ${LLM_API_KEY:}

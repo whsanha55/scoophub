@@ -19,20 +19,37 @@ class NotifyRouter(
     private val logRepository: NotifyLogRepository,
     private val notifiers: List<Notifier>,
 ) {
-    fun dispatch(category: String, purpose: String, payloadKey: String, message: NotifyMessage) {
-        for (route in routeRepository.lookup(category, purpose)) {
-            sendOne(route, payloadKey, message)
-        }
+    private val newsSendSlots = java.util.concurrent.ConcurrentHashMap<String, Long>()
+
+    private fun paceNews(chatId: String) {
+        val now = System.nanoTime()
+        val reserved = newsSendSlots.compute(chatId) { _, previous -> maxOf(now, previous ?: now) + 3_100_000_000L }
+        val delay = requireNotNull(reserved) - 3_100_000_000L - now
+        if (delay > 0) Thread.sleep(java.time.Duration.ofNanos(delay))
     }
 
-    private fun sendOne(route: NotifyRouteEntity, payloadKey: String, message: NotifyMessage) {
-        // 중복: 직전 success 있으면 스킵 (error 는 재시도 허용)
-        if (payloadKey.isNotEmpty() && logRepository.existsSuccess(route.id, payloadKey)) {
-            return
+    fun dispatch(category: String, purpose: String, payloadKey: String, message: NotifyMessage) {
+        dispatchConfirmed(category, purpose, payloadKey, message)
+    }
+
+    fun dispatchConfirmed(category: String, purpose: String, payloadKey: String, message: NotifyMessage): Boolean =
+        dispatchBatch(category, purpose, listOf(payloadKey to message))
+
+    /** One message per route, but an independent success key for each article. */
+    fun dispatchBatch(category: String, purpose: String, messages: List<Pair<String, NotifyMessage>>): Boolean {
+        val routes = routeRepository.lookup(category, purpose)
+        if (routes.isEmpty()) return false
+        var success = true
+        for (route in routes) {
+            val pending = messages.filter { (key, _) -> key.isEmpty() || !logRepository.existsSuccess(route.id, key) }
+            if (pending.isEmpty()) continue
+            if (!sendOne(route, pending)) success = false
         }
+        return success
+    }
 
+    private fun sendOne(route: NotifyRouteEntity, messages: List<Pair<String, NotifyMessage>>): Boolean {
         val notifier = notifierFor(route.channel)
-
         var topicId = route.topicId
         if (topicId == null && route.topicName.isNotEmpty()) {
             topicId = try {
@@ -41,29 +58,46 @@ class NotifyRouter(
                 created
             } catch (e: Exception) {
                 log.warn { "create_topic failed (route ${route.id}): ${e.message}" }
-                writeLog(route.id, payloadKey, "error", "create_topic: ${e.message}")
-                return
+                messages.forEach { (key, _) -> writeLog(route.id, key, "error", "create_topic: ${e.message}") }
+                return false
             }
         }
-
-        try {
-            notifier.send(route.chatId, topicId, message)
-            writeLog(route.id, payloadKey, "success", null)
-        } catch (e: Exception) {
-            log.warn { "notify send failed (route ${route.id}): ${e.message}" }
-            writeLog(route.id, payloadKey, "error", e.message)
+        // Preserve article keys even when the Telegram message contains multiple cards.
+        val chunks = mutableListOf<MutableList<Pair<String, NotifyMessage>>>()
+        for (message in messages) {
+            val current = chunks.lastOrNull()
+            if (current == null || current.sumOf { it.second.text.length + 2 } + message.second.text.length > 3500) {
+                chunks += mutableListOf(message)
+            } else {
+                current += message
+            }
         }
+        var success = true
+        for (chunk in chunks) {
+            try {
+                if (route.channel == "telegram" && chunk.any { it.first.startsWith("news:") }) paceNews(route.chatId)
+                notifier.send(route.chatId, topicId, NotifyMessage(chunk.joinToString("\n\n") { it.second.text }))
+                chunk.forEach { (key, _) -> if (!writeLog(route.id, key, "success", null)) success = false }
+            } catch (e: Exception) {
+                log.warn { "notify send failed (route ${route.id}): ${e.message}" }
+                chunk.forEach { (key, _) -> writeLog(route.id, key, "error", e.message) }
+                success = false
+            }
+        }
+        return success
     }
 
     /** 발신 시점에 채널 해석 — 빈 생성 시점 프로퍼티 읽기(@MockkBean 호환) 회피 */
     private fun notifierFor(channel: String): Notifier = notifiers.firstOrNull { it.channel == channel }
         ?: throw IllegalArgumentException("unsupported notify channel: '$channel'")
 
-    private fun writeLog(routeId: Long, payloadKey: String, status: String, error: String?) {
+    private fun writeLog(routeId: Long, payloadKey: String, status: String, error: String?): Boolean {
         try {
             logRepository.upsertLog(routeId, payloadKey, status, error)
+            return true
         } catch (e: Exception) {
             log.error { "notify_log write failed: ${e.message}" }
+            return false
         }
     }
 }

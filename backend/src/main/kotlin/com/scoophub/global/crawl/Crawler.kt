@@ -1,12 +1,7 @@
 package com.scoophub.global.crawl
 
 /** legacy `CrawlResult` */
-data class CrawlResult(
-    val itemsFetched: Int = 0,
-    val itemsNew: Int = 0,
-    val errors: List<String> = emptyList(),
-    val newArticleIds: List<Long> = emptyList(),
-)
+data class CrawlResult(val itemsFetched: Int = 0, val itemsNew: Int = 0, val errors: List<String> = emptyList())
 
 /**
  * legacy `BaseCrawler` 의 fetch 부분. 도메인은 이것만 구현하고,
@@ -22,5 +17,5 @@ interface Crawler {
     fun fetch(): CrawlResult
 }
 
-/** 크롤 성공(success/partial) 후 발행. news 는 요약 후 자체 발신하므로 제외. notify 가 구독한다. */
+/** 크롤 성공(success/partial) 후 발행. notify 가 구독한다. */
 data class CrawlCompletedEvent(val crawler: String, val detail: String, val result: CrawlResult)

@@ -31,9 +31,7 @@ class CrawlRunner(
             val result = crawler.fetch()
             val status = if (result.errors.isEmpty()) CrawlStatusEnum.SUCCESS else CrawlStatusEnum.PARTIAL
             saveLog(crawler, status, result, startedAt)
-            if (crawler.name != NEWS) {
-                eventPublisher.publishEvent(CrawlCompletedEvent(crawler.name, crawler.detail, result))
-            }
+            eventPublisher.publishEvent(CrawlCompletedEvent(crawler.name, crawler.detail, result))
             log.info {
                 "crawl done - crawler=${crawler.name} detail=${crawler.detail}, " +
                     "status=$status, fetched=${result.itemsFetched}, new=${result.itemsNew}"
@@ -83,9 +81,5 @@ class CrawlRunner(
                 finishedAt = clock.instant(),
             ),
         )
-    }
-
-    companion object {
-        private const val NEWS = "news"
     }
 }

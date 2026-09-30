@@ -3,7 +3,6 @@ package com.scoophub.global.notify
 import com.scoophub.global.crawl.repository.CrawlDataRepository
 import com.scoophub.global.jackson.elements
 import com.scoophub.global.jackson.scalar
-import org.springframework.jdbc.core.simple.JdbcClient
 import org.springframework.stereotype.Component
 import tools.jackson.databind.JsonNode
 import java.time.LocalDate
@@ -13,20 +12,14 @@ import java.time.format.DateTimeFormatter
  * legacy `core/notify/card.py` — 발신 카드 포맷팅 + 카테고리별 enrich.
  * enrich 반환 null 이면 발신 스킵.
  *
- * - news        : feed_news(importance>=4) 탑5 제목+요약+원문 — news 도메인 이관 시 엔티티로 전환 예정
  * - weather     : crawl_data(weather, snapshot) → 온도/대기질/주간예보
  * - kal_bonus   : crawl_data(kal, bonus_seat) → 2027 Q1 프레스티지(P) 잔석 나라별 집계
  * - community/feed: crawl_data batch(updated_at DESC) → 도메인 sort key 탑5
  */
 @Component
-class NotifyCard(private val crawlDataRepository: CrawlDataRepository, private val jdbcClient: JdbcClient) {
+class NotifyCard(private val crawlDataRepository: CrawlDataRepository) {
     /** 카테고리별 enrich 진입. null 반환 시 발신 스킵 */
-    fun enrich(category: String, detail: String, text: String, newIds: List<Long>): String? {
-        if (category == "news") {
-            val body = enrichNews(newIds) ?: return null
-            // count = 실제 표시된 importance>=4 라인 수
-            return formatNews(detail, countLines(body), body)
-        }
+    fun enrich(category: String, detail: String, text: String): String? {
         if (category == "weather") {
             val body = enrichWeather() ?: return null
             return formatDefault("weather", detail, 0, body)
@@ -41,48 +34,6 @@ class NotifyCard(private val crawlDataRepository: CrawlDataRepository, private v
         }
         // 미정의 카테고리 — base 카드 그대로(degrade)
         return text
-    }
-
-    // ── news ──────────────────────────────────────────────────────────
-
-    private data class NewsRow(val title: String?, val summary: String?, val url: String?)
-
-    /** feed_news 신규 id → importance>=4 탑5 제목+요약+원문. 0건 → null */
-    private fun enrichNews(newIds: List<Long>): String? {
-        if (newIds.isEmpty()) {
-            return null
-        }
-        val rows = jdbcClient.sql(
-            """
-            SELECT title, summary, url FROM feed_news
-            WHERE id IN (:ids) AND importance >= 4 AND summary IS NOT NULL AND summary <> ''
-            ORDER BY importance DESC NULLS LAST LIMIT 5
-            """,
-        )
-            .param("ids", newIds)
-            .query { rs, _ -> NewsRow(rs.getString("title"), rs.getString("summary"), rs.getString("url")) }
-            .list()
-
-        val lines = rows.mapNotNull { row ->
-            val title = row.title?.trim().orEmpty()
-            if (title.isEmpty()) {
-                return@mapNotNull null
-            }
-            var line = "\n• <b>${escapeHtml(title)}</b>"
-            val summary = row.summary?.trim().orEmpty()
-            if (summary.isNotEmpty()) {
-                line += "\n  ${escapeHtml(summary.take(150))}"
-            }
-            val url = row.url?.trim().orEmpty()
-            if (url.isNotEmpty()) {
-                line += """ <a href="${escapeHtml(url)}">원문</a>"""
-            }
-            line
-        }
-        if (lines.isEmpty()) {
-            return null
-        }
-        return lines.joinToString("")
     }
 
     // ── weather ───────────────────────────────────────────────────────
@@ -318,16 +269,6 @@ class NotifyCard(private val crawlDataRepository: CrawlDataRepository, private v
             head += "]"
             val countPart = if (count != 0) "신규 ${count}건\n" else ""
             return "$head\n$countPart$body"
-        }
-
-        /** news 전용 카드 — importance 4+ 표식 헤더 + body */
-        fun formatNews(detail: String, count: Int, body: String): String {
-            var head = "${EMOJI.getValue("news")} [news"
-            if (detail.isNotEmpty()) {
-                head += " · ${escapeHtml(detail)}"
-            }
-            head += "] — 중요도 4+ ${count}건"
-            return "$head\n$body"
         }
 
         /** 'YYYY-MM-DD' → 한국 요일. 파싱 실패 시 빈 문자열 */

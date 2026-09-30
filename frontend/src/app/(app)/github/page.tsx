@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import { useGitHubTrending, useGitHubTrendingCrawl } from "@/domains/github/hooks/use-github-trending";
 import { GitHubTrendingCard } from "@/domains/github/components/github-trending-card";
-import { CrawlTriggerButton } from "@/domains/news/components/crawl-trigger-button";
+import { CrawlTriggerButton } from "@/shared/components/crawl-trigger-button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";

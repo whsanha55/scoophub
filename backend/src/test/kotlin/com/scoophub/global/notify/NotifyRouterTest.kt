@@ -157,4 +157,21 @@ class NotifyRouterTest @Autowired constructor(private val router: NotifyRouter, 
         verify(exactly = 0) { telegram.send(any(), any(), any()) }
         org.assertj.core.api.Assertions.assertThat(lastLogStatus(routeId)).isEqualTo("error")
     }
+
+    @Test
+    fun `묶음 발송은 한 메시지를 보내고 기사별 성공 키로 중복을 막는다`() {
+        // given
+        val routeId = insertRoute("news", "alpaca")
+        val cards = listOf("news:alpaca:1" to NotifyMessage("기사 1"), "news:alpaca:2" to NotifyMessage("기사 2"))
+        // when
+        val first = router.dispatchBatch("news", "alpaca", cards)
+        val second = router.dispatchBatch("news", "alpaca", cards)
+        // then
+        org.assertj.core.api.Assertions.assertThat(first).isTrue()
+        org.assertj.core.api.Assertions.assertThat(second).isTrue()
+        verify(exactly = 1) { telegram.send(any(), any(), NotifyMessage("기사 1\n\n기사 2")) }
+        val count = jdbcClient.sql("SELECT COUNT(*) FROM notify_log WHERE route_id = :route AND status = 'success'")
+            .param("route", routeId).query(Int::class.java).single()
+        org.assertj.core.api.Assertions.assertThat(count).isEqualTo(2)
+    }
 }

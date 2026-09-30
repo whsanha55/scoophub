@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useHackerNews, useHackerNewsCrawl } from "@/domains/hacker-news/hooks/use-hacker-news";
 import { HackerNewsCard } from "@/domains/hacker-news/components/hacker-news-card";
-import { CrawlTriggerButton } from "@/domains/news/components/crawl-trigger-button";
+import { CrawlTriggerButton } from "@/shared/components/crawl-trigger-button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 

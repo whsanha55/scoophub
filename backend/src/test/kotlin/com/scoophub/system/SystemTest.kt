@@ -105,7 +105,7 @@ class SystemTest @Autowired constructor(
     @Test
     fun `크롤 로그 필터와 snake_case 응답`() {
         // given
-        log("news", "rss")
+        log("news", "alpaca")
         log("weather", "forecast")
         log("news", "other")
 
@@ -124,7 +124,7 @@ class SystemTest @Autowired constructor(
         // crawler + detail 필터
         mockMvc.get("/api/crawl-logs") {
             param("crawler", "news")
-            param("crawler_detail", "rss")
+            param("crawler_detail", "alpaca")
         }.andExpect {
             jsonPath("$.data.length()") { value(1) }
         }

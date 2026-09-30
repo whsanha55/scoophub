@@ -1,13 +1,13 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { useNews, useNewsArticle, useNewsCrawl } from "@/domains/news/hooks/use-news";
-import { useNewsSummarizeRetry } from "@/domains/news/hooks/use-news-summarize-retry";
+import { useNews, useNewsArticle } from "@/domains/news/hooks/use-news";
 import { NewsCard } from "@/domains/news/components/news-card";
 import { NewsDetail } from "@/domains/news/components/news-detail";
 import { NewsFilters } from "@/domains/news/components/news-filters";
 import { NewsPagination } from "@/domains/news/components/news-pagination";
-import { CrawlTriggerButton } from "@/domains/news/components/crawl-trigger-button";
+import { Button } from "@/components/ui/button";
+import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { NewsArticle } from "@/domains/news/types";
 
@@ -19,11 +19,11 @@ function today(): string {
 }
 
 export default function NewsPage() {
-  const { articles, loading, total, fetchNews } = useNews();
+  const { articles, loading, error, total, fetchNews } = useNews();
   const { article: selectedArticle, fetchArticle, resetArticle } = useNewsArticle();
-  const { loading: crawlLoading, triggerCrawl } = useNewsCrawl();
-  const { loading: retryLoading, triggerRetry } = useNewsSummarizeRetry();
   const [selectedId, setSelectedId] = useState<number | null>(null);
+  const [symbol, setSymbol] = useState("");
+  const debouncedSymbol = useDebouncedValue(symbol, 300);
   const [category, setCategory] = useState<string | null>(null);
   const [minImportance, setMinImportance] = useState<number | null>(null);
   const [page, setPage] = useState(1);
@@ -42,15 +42,17 @@ export default function NewsPage() {
   );
 
   const loadNews = useCallback(() => {
-    fetchNews({
-      from: `${dateFrom}T00:00:00`,
-      to: `${dateTo}T23:59:59`,
+    if (!dateFrom || !dateTo) return;
+    return fetchNews({
+      from: new Date(`${dateFrom}T00:00:00`).toISOString(),
+      to: new Date(`${dateTo}T23:59:59.999`).toISOString(),
+      symbol: debouncedSymbol || undefined,
       category: category ?? undefined,
       min_importance: minImportance ?? undefined,
       limit: PAGE_SIZE,
       page,
     });
-  }, [fetchNews, dateFrom, dateTo, category, minImportance, page]);
+  }, [fetchNews, dateFrom, dateTo, category, minImportance, page, debouncedSymbol]);
 
   useEffect(() => {
     loadNews();
@@ -61,16 +63,6 @@ export default function NewsPage() {
       fetchArticle(selectedId);
     }
   }, [selectedId, fetchArticle]);
-
-  const handleCrawl = async () => {
-    await triggerCrawl();
-    await loadNews();
-  };
-
-  const handleRetry = async () => {
-    await triggerRetry();
-    await loadNews();
-  };
 
   const handlePageChange = (newPage: number) => {
     setPage(newPage);
@@ -93,21 +85,12 @@ export default function NewsPage() {
     <div className="space-y-4">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <h1 className="text-2xl font-bold">뉴스</h1>
-        <div className="flex items-center gap-2">
-          <CrawlTriggerButton
-            onClick={handleRetry}
-            loading={retryLoading}
-            label="요약 재시도"
-          />
-          <CrawlTriggerButton
-            onClick={handleCrawl}
-            loading={crawlLoading}
-            label="뉴스 수집 실행"
-          />
-        </div>
+        <Button variant="outline" onClick={() => loadNews()} disabled={loading}>새로고침</Button>
       </div>
 
       <NewsFilters
+        symbol={symbol}
+        onSelectSymbol={(value) => { setSymbol(value); setPage(1); }}
         selectedCategory={category}
         minImportance={minImportance}
         dateFrom={dateFrom}
@@ -117,6 +100,8 @@ export default function NewsPage() {
         onSelectDateFrom={(d) => { setDateFrom(d); setPage(1); }}
         onSelectDateTo={(d) => { setDateTo(d); setPage(1); }}
       />
+
+      {error && <p role="alert" className="text-sm text-destructive">뉴스를 불러오지 못했습니다: {error}</p>}
 
       {loading ? (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">

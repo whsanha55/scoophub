@@ -12,7 +12,7 @@ import {
   useStockReportSend,
 } from "@/domains/stock/hooks/use-stock";
 import { StockReportCard } from "@/domains/stock/components/stock-report-card";
-import { CrawlTriggerButton } from "@/domains/news/components/crawl-trigger-button";
+import { CrawlTriggerButton } from "@/shared/components/crawl-trigger-button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 

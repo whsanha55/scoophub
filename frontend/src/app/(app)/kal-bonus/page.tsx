@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
-import { CrawlTriggerButton } from "@/domains/news/components/crawl-trigger-button";
+import { CrawlTriggerButton } from "@/shared/components/crawl-trigger-button";
 import { useKalBonus, useKalBonusCrawl } from "@/domains/kal-bonus/hooks/use-kal-bonus";
 import { KalBonusRouteCard } from "@/domains/kal-bonus/components/kal-bonus-card";
 

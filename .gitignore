@@ -9,3 +9,8 @@
 # Python bytecode (frontend/.claude/skills 등)
 __pycache__/
 *.py[cod]
+
+# env (backend/.env 등 전 디렉터리)
+.env
+.env.*
+!.env.example

@@ -37,6 +37,12 @@ npm install
 npm run dev            # :20020, /api/* 는 API_URL 로 프록시
 ```
 
+## 증시 속보 뉴스
+
+Alpaca WebSocket → `news_article` → 5초 DB 워커 → GLM 한국어 요약 → 텔레그램으로 처리한다.
+로컬 연결은 기본 비활성이다. 운영 환경변수, 지표 쿼리, RSS 병행 운영 종료 절차는
+[뉴스 운영 안내](backend/NEWS.md)를 참고한다.
+
 ## 배포
 
 서버에서 각 디렉터리의 `deploy.sh` 가 `docker compose up -d --build` 후 헬스체크한다.

@@ -56,10 +56,10 @@ class CrawlNotifyDispatcherTest {
         )
     }
 
-    private val result = CrawlResult(itemsFetched = 10, itemsNew = 3, newArticleIds = listOf(7L, 9L, 42L))
+    private val result = CrawlResult(itemsFetched = 10, itemsNew = 3)
 
     private fun stubCard() {
-        every { card.enrich(any(), any(), any(), any()) } returns "enriched"
+        every { card.enrich(any(), any(), any()) } returns "enriched"
     }
 
     @Test
@@ -101,7 +101,7 @@ class CrawlNotifyDispatcherTest {
     @Test
     fun `enrich null 이면 발신 스킵`() {
         // given
-        every { card.enrich(any(), any(), any(), any()) } returns null
+        every { card.enrich(any(), any(), any()) } returns null
 
         // when
         dispatcher().dispatch("hacker_news", "", result)
@@ -111,12 +111,12 @@ class CrawlNotifyDispatcherTest {
     }
 
     @Test
-    fun `payloadKey 미지정시 newIds 최댓값으로 dedup 키`() {
+    fun `명시한 payloadKey를 발신 라우터에 전달한다`() {
         // given
         stubCard()
 
         // when
-        dispatcher().dispatch("hacker_news", "detail", result)
+        dispatcher().dispatch("hacker_news", "detail", result, "hacker_news:detail:42")
 
         // then
         verify {
@@ -125,7 +125,7 @@ class CrawlNotifyDispatcherTest {
     }
 
     @Test
-    fun `newIds 없으면 빈 키로 매 run 발신`() {
+    fun `payloadKey가 없으면 빈 키로 매 run 발신`() {
         // given
         stubCard()
         every { crawlDataRepository.findByCategoryAndPurposeAndKey("weather", "notify_sent", any()) } returns null

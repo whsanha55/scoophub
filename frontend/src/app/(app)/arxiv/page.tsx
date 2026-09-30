@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import { useArxiv, useArxivCrawl } from "@/domains/arxiv/hooks/use-arxiv";
 import { ArxivCard } from "@/domains/arxiv/components/arxiv-card";
-import { CrawlTriggerButton } from "@/domains/news/components/crawl-trigger-button";
+import { CrawlTriggerButton } from "@/shared/components/crawl-trigger-button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";

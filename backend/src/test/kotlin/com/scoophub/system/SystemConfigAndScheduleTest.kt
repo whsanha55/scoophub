@@ -27,9 +27,9 @@ class SystemConfigAndScheduleTest @Autowired constructor(
     // ── config ─────────────────────────────────────────────────────────
 
     @Test
-    fun `전체 config 조회 — seed 9종`() {
+    fun `전체 config 조회 — seed 8종`() {
         mockMvc.get("/api/config").andExpect {
-            jsonPath("$.data.length()") { value(9) }
+            jsonPath("$.data.length()") { value(8) }
             jsonPath("$.data[0].crawler") { exists() }
             jsonPath("$.data[0].params") { exists() }
         }
@@ -86,7 +86,7 @@ class SystemConfigAndScheduleTest @Autowired constructor(
     @Test
     fun `전체 스케줄 조회 — seed 14종(V19 로 1행 정리), 미등록 잡은 paused=null`() {
         mockMvc.get("/api/schedules").andExpect {
-            jsonPath("$.data.length()") { value(14) }
+            jsonPath("$.data.length()") { value(13) }
             jsonPath("$.data[0].job_id") { exists() }
             jsonPath("$.data[0].schedule_type") { exists() }
             jsonPath("$.data[0].next_run_time") { doesNotExist() } // null
@@ -147,14 +147,14 @@ class SystemConfigAndScheduleTest @Autowired constructor(
         }.andExpect { status { isUnprocessableEntity() } }
 
         // interval 타입에 schedules → 422
-        mockMvc.patch("/api/schedules/news/news_crawler") {
+        mockMvc.patch("/api/schedules/weather/weather_crawler") {
             header("Authorization", bearer)
             contentType = MediaType.APPLICATION_JSON
             content = """{"schedules": ["0 9 * * *"]}"""
         }.andExpect { status { isUnprocessableEntity() } }
 
         // 빈 body → 422
-        mockMvc.patch("/api/schedules/news/news_crawler") {
+        mockMvc.patch("/api/schedules/weather/weather_crawler") {
             header("Authorization", bearer)
             contentType = MediaType.APPLICATION_JSON
             content = """{}"""

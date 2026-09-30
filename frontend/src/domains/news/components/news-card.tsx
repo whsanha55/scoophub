@@ -36,21 +36,21 @@ export function NewsCard({
       <CardHeader className="pb-2">
         <div className="flex items-start justify-between gap-2">
           <a
-            href={article.url}
+            href={article.url?.match(/^https?:\/\//) ? article.url : undefined}
             target="_blank"
             rel="noopener noreferrer"
-            onClick={(e) => e.stopPropagation()}
+            onClick={(e) => { if (article.url?.match(/^https?:\/\//)) e.stopPropagation(); }}
             className="min-w-0 cursor-pointer"
           >
             <CardTitle className="text-base font-semibold leading-snug line-clamp-2 transition-colors duration-200 hover:text-primary hover:underline decoration-primary underline-offset-2">
-              {article.title}
+              {article.headline}
             </CardTitle>
           </a>
           <a
-            href={article.url}
+            href={article.url?.match(/^https?:\/\//) ? article.url : undefined}
             target="_blank"
             rel="noopener noreferrer"
-            onClick={(e) => e.stopPropagation()}
+            onClick={(e) => { if (article.url?.match(/^https?:\/\//)) e.stopPropagation(); }}
             className="shrink-0 cursor-pointer rounded-md p-1.5 text-muted-foreground transition-colors duration-200 hover:text-primary hover:bg-accent"
             title="새창으로 보기"
           >
@@ -60,18 +60,19 @@ export function NewsCard({
       </CardHeader>
       <CardContent className="space-y-3">
         <p className="text-sm text-muted-foreground line-clamp-3">
-          {article.summary}
+          {article.summary_ko ?? article.summary ?? "요약 대기 중"}
         </p>
         <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+          {article.symbols.map((symbol) => <Badge key={symbol} variant="outline">{symbol}</Badge>)}
           <Badge variant="secondary" className="text-xs">
-            {article.category}
+            {article.category ?? "미분류"}
           </Badge>
           <Badge variant="outline" className="text-xs">
             {article.source}
           </Badge>
-          <Badge variant="outline" className={`text-xs ${importanceColor(article.importance)}`}>
+          <Badge variant="outline" className={`text-xs ${importanceColor(article.importance ?? 1)}`}>
             <Flame className="mr-1 h-3 w-3" />
-            {article.importance}
+            {article.importance ?? "대기"}
           </Badge>
           <span className="flex items-center gap-1">
             <Clock className="h-3 w-3" />

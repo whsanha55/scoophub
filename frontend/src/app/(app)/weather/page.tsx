@@ -3,7 +3,7 @@
 import { useEffect } from "react";
 import { useWeather, useWeatherCrawl } from "@/domains/weather/hooks/use-weather";
 import { WeatherWidget } from "@/domains/weather/components/weather-widget";
-import { CrawlTriggerButton } from "@/domains/news/components/crawl-trigger-button";
+import { CrawlTriggerButton } from "@/shared/components/crawl-trigger-button";
 import { Skeleton } from "@/components/ui/skeleton";
 
 export default function WeatherPage() {
