@@ -20,7 +20,7 @@
   - 단순 조회: Spring Data JPA 메서드 이름 쿼리나 `@Query`.
   - 동적 조건, JSONB, 집계, 부분 수정: `XxxQueryRepository`(`@Repository`)에서 `JdbcClient`를 쓴다. 값은 반드시 파라미터로 바인딩하고, 컬럼명·필드명은 코드 상수만 문자열에 넣는다.
 - `JdbcClient` 조회 결과는 `{domain}/vo/`의 `XxxRow` 프로젝션으로 받는다. 응답 DTO는 `from(row)`로 변환하고, `ResultSet`을 DTO에 넘기지 않는다.
-- 기존 예외: 크롤러, 배치 컴포넌트 내부 쿼리(`KalRoutesLoader`, `NewsCrawler`, `NewsDedup`, `NewsSummarizer`, `NotifyCard`)는 아직 `JdbcClient`를 직접 쓴다. 수정할 때 `repository/`로 옮긴다.
+- 기존 예외: 크롤러, 배치 컴포넌트 내부 쿼리(`KalRoutesLoader`)는 아직 `JdbcClient`를 직접 쓴다. 수정할 때 `repository/`로 옮긴다.
 
 ## 백엔드 — Tooling 예외
 

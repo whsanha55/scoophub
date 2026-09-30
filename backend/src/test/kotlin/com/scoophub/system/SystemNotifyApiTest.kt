@@ -41,7 +41,7 @@ class SystemNotifyApiTest @Autowired constructor(
         every { telegram.send(any(), any(), any()) } returns Unit
     }
 
-    private fun createRoute(category: String = "news", purpose: String = "rss"): Long = jdbcClient.sql(
+    private fun createRoute(category: String = "news", purpose: String = "alpaca"): Long = jdbcClient.sql(
         "INSERT INTO notify_routes (category, purpose, channel, chat_id, topic_id, topic_name, enabled) " +
             "VALUES (:c, :p, 'telegram', 'chat', NULL, '', true) RETURNING id",
     )

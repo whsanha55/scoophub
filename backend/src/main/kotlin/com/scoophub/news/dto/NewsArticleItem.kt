@@ -1,41 +1,32 @@
 package com.scoophub.news.dto
 
-import com.scoophub.news.vo.NewsArticleRow
+import com.scoophub.news.vo.AlpacaArticleRow
 import java.time.Instant
 
-/** legacy feed_news row → dict (snake_case 직렬화) */
 data class NewsArticleItem(
-    val id: Int,
+    val id: Long,
     val source: String,
-    val category: String?,
-    val title: String,
+    val headline: String,
     val summary: String?,
-    val url: String,
-    val normalizedUrl: String?,
-    val publishedAt: Instant?,
-    val importance: Int,
-    val summaryStatus: String,
-    val duplicated: Boolean,
-    val duplicatedNewsId: Int?,
-    val createdAt: Instant,
-    val updatedAt: Instant,
+    val author: String?,
+    val url: String?,
+    val symbols: List<String>,
+    val publishedAt: Instant,
+    val sourceUpdatedAt: Instant,
+    val importance: Int?,
+    val category: String?,
+    val summaryKo: String?,
+    val status: String,
+    val decisionReason: String?,
+    val createdAt: Instant?,
+    val updatedAt: Instant?,
 ) {
     companion object {
-        fun from(row: NewsArticleRow) = NewsArticleItem(
-            id = row.id,
-            source = row.source,
-            category = row.category,
-            title = row.title,
-            summary = row.summary,
-            url = row.url,
-            normalizedUrl = row.normalizedUrl,
-            publishedAt = row.publishedAt,
-            importance = row.importance,
-            summaryStatus = row.summaryStatus,
-            duplicated = row.duplicated,
-            duplicatedNewsId = row.duplicatedNewsId,
-            createdAt = row.createdAt,
-            updatedAt = row.updatedAt,
+        fun from(row: AlpacaArticleRow): NewsArticleItem = NewsArticleItem(
+            id = row.id, source = row.source, headline = row.headline, summary = row.summary, author = row.author,
+            url = row.url, symbols = row.symbols, publishedAt = row.publishedAt, sourceUpdatedAt = row.sourceUpdatedAt,
+            importance = row.importance, category = row.category, summaryKo = row.summaryKo, status = row.status,
+            decisionReason = row.decisionReason, createdAt = row.createdAt, updatedAt = row.updatedAt,
         )
     }
 }

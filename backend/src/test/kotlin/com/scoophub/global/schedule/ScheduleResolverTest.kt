@@ -25,10 +25,10 @@ class ScheduleResolverTest @Autowired constructor(private val resolver: Schedule
     @Test
     fun `interval 행을 해석한다`() {
         // when
-        val resolved = resolver.resolveTrigger("news", "news_crawler")
+        val resolved = resolver.resolveTrigger("weather", "weather_crawler")
 
         // then
-        assertThat(resolved.trigger).isEqualTo(ScheduleTrigger.Interval(15))
+        assertThat(resolved.trigger).isEqualTo(ScheduleTrigger.Interval(30))
         assertThat(resolved.enabled).isTrue()
     }
 

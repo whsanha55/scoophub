@@ -14,7 +14,7 @@ class NotifyLogEntity(
     @Id
     val id: Long,
     val routeId: Long,
-    /** 발신 단위 논리키 (예: 'news:rss:42') */
+    /** 발신 단위 논리키 (예: 'news:alpaca:42') */
     val payloadKey: String,
     val status: String,
     val error: String?,

@@ -78,13 +78,6 @@ class CrawlRunnerTest @Autowired constructor(
     }
 
     @Test
-    fun `news 크롤러는 완료 이벤트 없음 - 요약 후 자체 발신`() {
-        runner.run(crawler("news") { CrawlResult(itemsNew = 1) })
-
-        assertThat(events.stream(CrawlCompletedEvent::class.java).count()).isEqualTo(0)
-    }
-
-    @Test
     fun `수동 트리거 - 성공 응답`() {
         val resp = runner.trigger(
             crawler("hacker_news") {

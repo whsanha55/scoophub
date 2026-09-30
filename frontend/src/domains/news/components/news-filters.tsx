@@ -6,6 +6,8 @@ import { NEWS_CATEGORIES } from "../types";
 
 interface NewsFiltersProps {
   selectedCategory: string | null;
+  symbol: string;
+  onSelectSymbol: (symbol: string) => void;
   minImportance: number | null;
   dateFrom: string;
   dateTo: string;
@@ -17,6 +19,8 @@ interface NewsFiltersProps {
 
 export function NewsFilters({
   selectedCategory,
+  symbol,
+  onSelectSymbol,
   minImportance,
   dateFrom,
   dateTo,
@@ -64,6 +68,8 @@ export function NewsFilters({
       </div>
 
       <div className="flex flex-wrap items-center gap-2">
+        <label htmlFor="news-symbol" className="text-sm font-medium text-muted-foreground">종목:</label>
+        <Input id="news-symbol" placeholder="예: NVDA" value={symbol} onChange={(e) => onSelectSymbol(e.target.value.toUpperCase())} className="w-36" />
         <span className="text-sm font-medium text-muted-foreground">기간:</span>
         <Input
           type="date"

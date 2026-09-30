@@ -12,7 +12,18 @@ data class ScoophubProperties(
     val telegram: Telegram,
     val producthuntToken: String,
     val youtubeApiKey: String,
+    val alpaca: Alpaca = Alpaca(),
 ) {
+    data class Alpaca(
+        val apiKey: String = "",
+        val apiSecret: String = "",
+        val streamUrl: String = "wss://stream.data.alpaca.markets/v1beta1/news",
+        val streamEnabled: Boolean = false,
+        val workerEnabled: Boolean = false,
+        val burstThreshold: Int = 3,
+        val burstExcludedSymbols: Set<String> = setOf("SPY", "BTCUSD"),
+    )
+
     data class Llm(val apiUrl: String, val apiKey: String, val model: String)
 
     data class Auth(

@@ -39,20 +39,21 @@ export function NewsDetail({
             </Button>
           )}
         </div>
-        <CardTitle className="text-xl font-bold">{article.title}</CardTitle>
+        <CardTitle className="text-xl font-bold">{article.headline}</CardTitle>
         <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
-          <Badge variant="secondary">{article.category}</Badge>
+          {article.symbols.map((symbol) => <Badge key={symbol} variant="outline">{symbol}</Badge>)}
+          <Badge variant="secondary">{article.category ?? "미분류"}</Badge>
           <Badge variant="outline">{article.source}</Badge>
           <span className="flex items-center gap-1">
             <Flame className="h-3.5 w-3.5" />
-            중요도 {article.importance}/5
+            중요도 {article.importance ?? "대기"}/5
           </span>
           <span className="flex items-center gap-1">
             <Clock className="h-3.5 w-3.5" />
             {timeAgo(article.published_at)}
           </span>
           <a
-            href={article.url}
+            href={article.url?.match(/^https?:\/\//) ? article.url : undefined}
             target="_blank"
             rel="noopener noreferrer"
             className="ml-auto inline-flex items-center gap-1 rounded-md border px-3 py-1.5 text-sm font-medium cursor-pointer transition-colors duration-200 hover:bg-accent hover:text-accent-foreground"
@@ -63,7 +64,7 @@ export function NewsDetail({
       </CardHeader>
       <CardContent>
         <div className="prose prose-sm dark:prose-invert max-w-none whitespace-pre-wrap">
-          {article.summary}
+          {article.summary_ko ?? article.summary ?? "요약 대기 중"}
         </div>
       </CardContent>
     </Card>

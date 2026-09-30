@@ -24,9 +24,25 @@ class LlmClient(private val props: ScoophubProperties) {
         )
         .build()
 
-    fun chat(systemPrompt: String, userPrompt: String): String {
+    private val newsRestClient = RestClient.builder()
+        .requestFactory(
+            JdkClientHttpRequestFactory(HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(5)).build())
+                .apply { setReadTimeout(Duration.ofSeconds(20)) },
+        ).build()
+
+    fun chatNews(systemPrompt: String, userPrompt: String): String =
+        chatWith(newsRestClient, systemPrompt, userPrompt, true)
+
+    fun chat(systemPrompt: String, userPrompt: String): String = chatWith(restClient, systemPrompt, userPrompt, false)
+
+    private fun chatWith(
+        client: RestClient,
+        systemPrompt: String,
+        userPrompt: String,
+        disableThinking: Boolean,
+    ): String {
         log.info { "LlmClient.chat 시작 - model=${props.llm.model}" }
-        val response = restClient.post()
+        val response = client.post()
             .uri(props.llm.apiUrl)
             .contentType(MediaType.APPLICATION_JSON)
             .headers { headers ->
@@ -35,14 +51,19 @@ class LlmClient(private val props: ScoophubProperties) {
                 }
             }
             .body(
-                mapOf(
-                    "model" to props.llm.model,
-                    "messages" to listOf(
-                        mapOf("role" to "system", "content" to systemPrompt),
-                        mapOf("role" to "user", "content" to userPrompt),
-                    ),
-                    "temperature" to 0.3,
-                ),
+                buildMap<String, Any> {
+                    putAll(
+                        mapOf(
+                            "model" to props.llm.model,
+                            "messages" to listOf(
+                                mapOf("role" to "system", "content" to systemPrompt),
+                                mapOf("role" to "user", "content" to userPrompt),
+                            ),
+                            "temperature" to 0.3,
+                        ),
+                    )
+                    if (disableThinking) put("thinking", mapOf("type" to "disabled"))
+                },
             )
             .retrieve()
             .body(JsonNode::class.java)

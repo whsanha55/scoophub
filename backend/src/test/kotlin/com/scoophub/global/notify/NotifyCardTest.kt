@@ -13,7 +13,7 @@ import java.time.Instant
 class NotifyCardTest {
     private val jsonMapper = JsonMapper.builder().build()
     private val repository = mockk<CrawlDataRepository>()
-    private val card = NotifyCard(repository, mockk())
+    private val card = NotifyCard(repository)
 
     private fun row(response: String): CrawlDataEntity =
         CrawlDataEntity(1, "c", "p", "k", Instant.EPOCH, jsonMapper.readTree(response), Instant.EPOCH)
@@ -27,8 +27,8 @@ class NotifyCardTest {
 
     @Test
     fun `formatCard 헤더와 본문`() {
-        val cardText = NotifyCard.formatCard("news", "rss", 5, 12)
-        assertThat(cardText).startsWith("📰 [news · rss]")
+        val cardText = NotifyCard.formatCard("stock", "daily-report", 5, 12)
+        assertThat(cardText).startsWith("📈 [stock · daily-report]")
         assertThat(cardText).contains("신규 5건", "총 12건")
 
         assertThat(NotifyCard.formatCard("weather", "", 1)).isEqualTo("🌤 [weather]\n신규 1건")
@@ -41,14 +41,11 @@ class NotifyCardTest {
     }
 
     @Test
-    fun `formatDefault 와 formatNews`() {
+    fun `formatDefault 헤더와 본문`() {
         val d = NotifyCard.formatDefault("hacker_news", "top_stories", 3, "\n• <b>x</b>")
         assertThat(d).startsWith("👥 [hacker_news · top_stories]").contains("신규 3건")
 
         assertThat(NotifyCard.formatDefault("weather", "forecast", 0, "23°C")).doesNotContain("신규")
-
-        val n = NotifyCard.formatNews("rss", 4, "\n• <b>t</b>")
-        assertThat(n).startsWith("📰 [news · rss] — 중요도 4+ 4건")
     }
 
     @Test
@@ -118,7 +115,7 @@ class NotifyCardTest {
         )
 
         // when
-        val body = card.enrich("weather", "", "base", emptyList())
+        val body = card.enrich("weather", "", "base")
 
         // then
         assertThat(body).isNotNull
@@ -163,7 +160,7 @@ class NotifyCardTest {
         )
 
         // when
-        val body = card.enrich("kal_bonus", "", "base", emptyList())
+        val body = card.enrich("kal_bonus", "", "base")
 
         // then
         assertThat(body).isNotNull
@@ -181,7 +178,7 @@ class NotifyCardTest {
         } returns items
 
         // when
-        val body = card.enrich("hacker_news", "", "base", emptyList())
+        val body = card.enrich("hacker_news", "", "base")
 
         // then — score 내림차순 탑5
         assertThat(body).isNotNull
@@ -192,6 +189,6 @@ class NotifyCardTest {
 
     @Test
     fun `미정의 카테고리는 base 카드 그대로`() {
-        assertThat(card.enrich("unknown", "", "base-text", emptyList())).isEqualTo("base-text")
+        assertThat(card.enrich("unknown", "", "base-text")).isEqualTo("base-text")
     }
 }
