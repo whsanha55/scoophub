@@ -1,6 +1,6 @@
 package com.scoophub.technewsletter.dto
 
-import com.scoophub.global.crawl.LatestBatchQuery
+import com.scoophub.global.crawl.vo.BatchRow
 import com.scoophub.global.jackson.scalar
 
 /** legacy `_newsletter_item` — crawl_data row → newsletter 응답 필드로 재구성 (url = row.key) */
@@ -16,7 +16,7 @@ data class NewsletterItem(
     val fetchedAt: String?,
 ) {
     companion object {
-        fun from(row: LatestBatchQuery.BatchRow) = with(row.response) {
+        fun from(row: BatchRow) = with(row.response) {
             NewsletterItem(
                 id = row.id,
                 url = row.key,

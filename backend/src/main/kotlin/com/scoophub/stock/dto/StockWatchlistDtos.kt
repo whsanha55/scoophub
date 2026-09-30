@@ -1,7 +1,7 @@
 package com.scoophub.stock.dto
 
 import com.scoophub.stock.entity.StockWatchlistEntity
-import java.sql.ResultSet
+import com.scoophub.stock.vo.WatchlistRow
 import java.time.ZoneOffset
 
 /** legacy `schemas.py` WatchlistItemIn */
@@ -46,15 +46,15 @@ data class WatchlistItemOut(
             group = entity.group,
         )
 
-        fun of(rs: ResultSet) = WatchlistItemOut(
-            id = rs.getInt("id").toString(),
-            ticker = rs.getString("ticker"),
-            exchange = rs.getString("exchange"),
-            name = rs.getString("name"),
-            memo = rs.getString("memo"),
-            addedAt = rs.getTimestamp("added_at").toInstant().atZone(ZoneOffset.UTC).toLocalDate().toString(),
-            isActive = rs.getBoolean("is_active"),
-            group = rs.getString("group") ?: "individual",
+        fun from(row: WatchlistRow) = WatchlistItemOut(
+            id = row.id.toString(),
+            ticker = row.ticker,
+            exchange = row.exchange,
+            name = row.name,
+            memo = row.memo,
+            addedAt = row.addedAt.atZone(ZoneOffset.UTC).toLocalDate().toString(),
+            isActive = row.isActive,
+            group = row.group ?: "individual",
         )
     }
 }

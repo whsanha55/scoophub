@@ -1,6 +1,6 @@
 package com.scoophub.system.dto
 
-import java.sql.ResultSet
+import com.scoophub.global.notify.vo.NotifyLogRow
 import java.time.Instant
 
 /** legacy notify_log + routes 조인 row */
@@ -15,15 +15,15 @@ data class NotifyLogItem(
     val purpose: String?,
 ) {
     companion object {
-        fun of(rs: ResultSet): NotifyLogItem = NotifyLogItem(
-            id = rs.getLong("id"),
-            routeId = rs.getLong("route_id"),
-            payloadKey = rs.getString("payload_key"),
-            status = rs.getString("status"),
-            error = rs.getString("error"),
-            sentAt = rs.getTimestamp("sent_at").toInstant(),
-            category = rs.getString("category"),
-            purpose = rs.getString("purpose"),
+        fun from(row: NotifyLogRow) = NotifyLogItem(
+            id = row.id,
+            routeId = row.routeId,
+            payloadKey = row.payloadKey,
+            status = row.status,
+            error = row.error,
+            sentAt = row.sentAt,
+            category = row.category,
+            purpose = row.purpose,
         )
     }
 }

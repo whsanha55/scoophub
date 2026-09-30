@@ -1,9 +1,16 @@
-package com.scoophub.global.crawl
+package com.scoophub.global.crawl.repository
 
+import com.scoophub.global.crawl.vo.BatchFilter
+import com.scoophub.global.crawl.vo.BatchFilter.IntGte
+import com.scoophub.global.crawl.vo.BatchFilter.JsonArrayContains
+import com.scoophub.global.crawl.vo.BatchFilter.TextEq
+import com.scoophub.global.crawl.vo.BatchFilter.TextLike
+import com.scoophub.global.crawl.vo.BatchFilter.TimestamptzGte
+import com.scoophub.global.crawl.vo.BatchRow
+import com.scoophub.global.crawl.vo.BatchSortKey
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource
 import org.springframework.jdbc.core.simple.JdbcClient
-import org.springframework.stereotype.Component
-import tools.jackson.databind.JsonNode
+import org.springframework.stereotype.Repository
 import tools.jackson.databind.json.JsonMapper
 import java.sql.Timestamp
 import java.time.Instant
@@ -12,36 +19,9 @@ import java.time.Instant
  * legacy batch 도메인 router 의 최신 배치 조회 공통 (hacker_news 등).
  * 최신 `fetched_at` 배치만 필터·정렬해 반환한다. 필드명은 코드 상수만 허용(사용자 입력은 파라미터로만).
  */
-@Component
-class LatestBatchQuery(private val jdbcClient: JdbcClient, private val jsonMapper: JsonMapper) {
-    data class BatchRow(val id: Long, val key: String, val dateAt: Instant, val response: JsonNode)
-
-    sealed interface Filter {
-        val value: Any
-    }
-
-    data class TextEq(val field: String, override val value: String) : Filter
-
-    /** ILIKE — value 에 와일드카드 포함(예: %kw%) */
-    data class TextLike(val field: String, override val value: String) : Filter
-
-    /** JSONB 배열 포함 — value 는 배열 엘리먼트 하나(예: tags @> '"["python"]"'::jsonb') */
-    data class JsonArrayContains(val field: String, override val value: String) : Filter
-
-    data class IntGte(val field: String, override val value: Int) : Filter
-
-    data class TimestamptzGte(val field: String, override val value: Instant) : Filter
-
-    sealed interface SortKey {
-        data class IntDesc(val field: String) : SortKey
-
-        /** 조회수 등 int 범위 초과 가능 필드 */
-        data class LongDesc(val field: String) : SortKey
-
-        data object DateAtDesc : SortKey
-    }
-
-    fun latestFetchedAt(category: String, purpose: String, baseFilters: List<Filter> = emptyList()): Instant? {
+@Repository
+class LatestBatchQueryRepository(private val jdbcClient: JdbcClient, private val jsonMapper: JsonMapper) {
+    fun latestFetchedAt(category: String, purpose: String, baseFilters: List<BatchFilter> = emptyList()): Instant? {
         val params = MapSqlParameterSource()
             .addValue("category", category)
             .addValue("purpose", purpose)
@@ -70,8 +50,8 @@ class LatestBatchQuery(private val jdbcClient: JdbcClient, private val jsonMappe
         category: String,
         purpose: String,
         latest: Instant,
-        filters: List<Filter> = emptyList(),
-        sortKey: SortKey = SortKey.IntDesc("score"),
+        filters: List<BatchFilter> = emptyList(),
+        sortKey: BatchSortKey = BatchSortKey.IntDesc("score"),
         limit: Int,
     ): List<BatchRow> {
         val params = MapSqlParameterSource()
@@ -96,9 +76,9 @@ class LatestBatchQuery(private val jdbcClient: JdbcClient, private val jsonMappe
             }
         }
         sql += when (sortKey) {
-            is SortKey.IntDesc -> " ORDER BY (response ->> '${sortKey.field}')::int DESC NULLS LAST"
-            is SortKey.LongDesc -> " ORDER BY (response ->> '${sortKey.field}')::bigint DESC NULLS LAST"
-            SortKey.DateAtDesc -> " ORDER BY date_at DESC NULLS LAST"
+            is BatchSortKey.IntDesc -> " ORDER BY (response ->> '${sortKey.field}')::int DESC NULLS LAST"
+            is BatchSortKey.LongDesc -> " ORDER BY (response ->> '${sortKey.field}')::bigint DESC NULLS LAST"
+            BatchSortKey.DateAtDesc -> " ORDER BY date_at DESC NULLS LAST"
         }
         sql += " LIMIT :limit"
 

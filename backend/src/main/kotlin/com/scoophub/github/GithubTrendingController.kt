@@ -5,8 +5,10 @@ import com.scoophub.global.api.ApiResponse
 import com.scoophub.global.api.ResponseMeta
 import com.scoophub.global.auth.SuperOnly
 import com.scoophub.global.crawl.CrawlRunner
-import com.scoophub.global.crawl.LatestBatchQuery
 import com.scoophub.global.crawl.dto.CrawlTriggerData
+import com.scoophub.global.crawl.service.LatestBatchService
+import com.scoophub.global.crawl.vo.BatchFilter
+import com.scoophub.global.crawl.vo.BatchSortKey
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.tags.Tag
@@ -20,7 +22,7 @@ private val log = KotlinLogging.logger {}
 
 @RestController
 class GithubTrendingController(
-    private val batchQuery: LatestBatchQuery,
+    private val batchService: LatestBatchService,
     private val crawlRunner: CrawlRunner,
     private val crawler: GithubTrendingCrawler,
     private val clock: Clock,
@@ -35,22 +37,17 @@ class GithubTrendingController(
     ): ApiResponse<List<GithubTrendingItem>> {
         log.info { "get_github_trending requested: period=$period language=$language limit=$limit" }
         // crawl_data(category=community, purpose=github). period별 최신 배치
-        val latest = batchQuery.latestFetchedAt(
-            "community",
-            "github",
-            baseFilters = listOf(LatestBatchQuery.TextEq("period", period)),
-        ) ?: return empty()
         val filters = buildList {
-            add(LatestBatchQuery.TextEq("period", period))
-            language?.let { add(LatestBatchQuery.TextEq("language", it)) }
+            add(BatchFilter.TextEq("period", period))
+            language?.let { add(BatchFilter.TextEq("language", it)) }
         }
-        val items = batchQuery.fetch(
+        val items = batchService.findLatest(
             "community",
             "github",
-            latest,
             filters,
-            LatestBatchQuery.SortKey.IntDesc("current_period_stars"),
+            BatchSortKey.IntDesc("current_period_stars"),
             limit,
+            baseFilters = listOf(BatchFilter.TextEq("period", period)),
         ).map { GithubTrendingItem.from(it) }
         return ApiResponse.ok(items, ResponseMeta(clock.instant(), total = items.size, returned = items.size))
     }
@@ -60,9 +57,4 @@ class GithubTrendingController(
     @SuperOnly
     @PostMapping("/api/crawling/github-trending")
     fun triggerCrawl(): ApiResponse<CrawlTriggerData> = crawlRunner.trigger(crawler, "GitHub Trending")
-
-    private fun empty() = ApiResponse.ok(
-        emptyList<GithubTrendingItem>(),
-        ResponseMeta(clock.instant(), total = 0, returned = 0),
-    )
 }

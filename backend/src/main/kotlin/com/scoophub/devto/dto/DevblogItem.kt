@@ -1,6 +1,6 @@
 package com.scoophub.devto.dto
 
-import com.scoophub.global.crawl.LatestBatchQuery
+import com.scoophub.global.crawl.vo.BatchRow
 import com.scoophub.global.jackson.scalar
 import tools.jackson.databind.JsonNode
 
@@ -21,7 +21,7 @@ data class DevblogItem(
     val fetchedAt: String?,
 ) {
     companion object {
-        fun from(row: LatestBatchQuery.BatchRow) = with(row.response) {
+        fun from(row: BatchRow) = with(row.response) {
             DevblogItem(
                 id = row.id,
                 articleId = this["article_id"]?.takeIf { !it.isNull }?.asLong(),

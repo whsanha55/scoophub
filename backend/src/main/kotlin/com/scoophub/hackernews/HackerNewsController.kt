@@ -4,8 +4,10 @@ import com.scoophub.global.api.ApiResponse
 import com.scoophub.global.api.ResponseMeta
 import com.scoophub.global.auth.SuperOnly
 import com.scoophub.global.crawl.CrawlRunner
-import com.scoophub.global.crawl.LatestBatchQuery
 import com.scoophub.global.crawl.dto.CrawlTriggerData
+import com.scoophub.global.crawl.service.LatestBatchService
+import com.scoophub.global.crawl.vo.BatchFilter
+import com.scoophub.global.crawl.vo.BatchSortKey
 import com.scoophub.hackernews.dto.HackerNewsItem
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.swagger.v3.oas.annotations.Operation
@@ -21,7 +23,7 @@ private val log = KotlinLogging.logger {}
 
 @RestController
 class HackerNewsController(
-    private val batchQuery: LatestBatchQuery,
+    private val batchService: LatestBatchService,
     private val crawlRunner: CrawlRunner,
     private val crawler: HackerNewsCrawler,
     private val clock: Clock,
@@ -37,19 +39,16 @@ class HackerNewsController(
     ): ApiResponse<List<HackerNewsItem>> {
         log.info { "get_hacker_news requested: limit=$limit min_score=$minScore item_type=$itemType since=$since" }
         // crawl_data(category=community, purpose=hackernews) 최신 배치
-        val latest = batchQuery.latestFetchedAt("community", "hackernews")
-            ?: return empty()
         val filters = buildList {
-            add(LatestBatchQuery.TextEq("item_type", itemType))
-            minScore?.let { add(LatestBatchQuery.IntGte("score", it)) }
-            since?.let { add(LatestBatchQuery.TimestamptzGte("posted_at", it)) }
+            add(BatchFilter.TextEq("item_type", itemType))
+            minScore?.let { add(BatchFilter.IntGte("score", it)) }
+            since?.let { add(BatchFilter.TimestamptzGte("posted_at", it)) }
         }
-        val items = batchQuery.fetch(
+        val items = batchService.findLatest(
             "community",
             "hackernews",
-            latest,
             filters,
-            LatestBatchQuery.SortKey.IntDesc("score"),
+            BatchSortKey.IntDesc("score"),
             limit,
         )
             .map { HackerNewsItem.from(it) }
@@ -61,9 +60,4 @@ class HackerNewsController(
     @SuperOnly
     @PostMapping("/api/crawling/hacker-news")
     fun triggerCrawl(): ApiResponse<CrawlTriggerData> = crawlRunner.trigger(crawler, "Hacker News")
-
-    private fun empty() = ApiResponse.ok(
-        emptyList<HackerNewsItem>(),
-        ResponseMeta(clock.instant(), total = 0, returned = 0),
-    )
 }

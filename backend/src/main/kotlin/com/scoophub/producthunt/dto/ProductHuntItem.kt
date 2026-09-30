@@ -1,6 +1,6 @@
 package com.scoophub.producthunt.dto
 
-import com.scoophub.global.crawl.LatestBatchQuery
+import com.scoophub.global.crawl.vo.BatchRow
 import com.scoophub.global.jackson.scalar
 
 /** legacy `_ph_item` — crawl_data row → product hunt 응답 필드로 재구성 */
@@ -20,7 +20,7 @@ data class ProductHuntItem(
     val fetchedAt: String?,
 ) {
     companion object {
-        fun from(row: LatestBatchQuery.BatchRow) = with(row.response) {
+        fun from(row: BatchRow) = with(row.response) {
             ProductHuntItem(
                 id = row.id,
                 phId = scalar("ph_id"),

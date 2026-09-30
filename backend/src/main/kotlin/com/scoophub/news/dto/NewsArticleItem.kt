@@ -1,6 +1,6 @@
 package com.scoophub.news.dto
 
-import com.scoophub.news.NewsQueryService
+import com.scoophub.news.vo.NewsArticleRow
 import java.time.Instant
 
 /** legacy feed_news row → dict (snake_case 직렬화) */
@@ -21,7 +21,7 @@ data class NewsArticleItem(
     val updatedAt: Instant,
 ) {
     companion object {
-        fun from(row: NewsQueryService.ArticleRow) = NewsArticleItem(
+        fun from(row: NewsArticleRow) = NewsArticleItem(
             id = row.id,
             source = row.source,
             category = row.category,

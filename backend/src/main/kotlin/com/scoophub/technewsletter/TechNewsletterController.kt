@@ -4,8 +4,10 @@ import com.scoophub.global.api.ApiResponse
 import com.scoophub.global.api.ResponseMeta
 import com.scoophub.global.auth.SuperOnly
 import com.scoophub.global.crawl.CrawlRunner
-import com.scoophub.global.crawl.LatestBatchQuery
 import com.scoophub.global.crawl.dto.CrawlTriggerData
+import com.scoophub.global.crawl.service.LatestBatchService
+import com.scoophub.global.crawl.vo.BatchFilter
+import com.scoophub.global.crawl.vo.BatchSortKey
 import com.scoophub.technewsletter.dto.NewsletterItem
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.swagger.v3.oas.annotations.Operation
@@ -21,7 +23,7 @@ private val log = KotlinLogging.logger {}
 
 @RestController
 class TechNewsletterController(
-    private val batchQuery: LatestBatchQuery,
+    private val batchService: LatestBatchService,
     private val crawlRunner: CrawlRunner,
     private val crawler: TechNewsletterCrawler,
     private val clock: Clock,
@@ -36,12 +38,17 @@ class TechNewsletterController(
     ): ApiResponse<List<NewsletterItem>> {
         log.info { "get_tech_newsletter requested: limit=$limit source=$source since=$since" }
         // crawl_data(category=feed, purpose=newsletter) 최신 배치
-        val latest = batchQuery.latestFetchedAt("feed", "newsletter") ?: return empty()
         val filters = buildList {
-            source?.let { add(LatestBatchQuery.TextEq("source", it)) }
-            since?.let { add(LatestBatchQuery.TimestamptzGte("published_at", it)) }
+            source?.let { add(BatchFilter.TextEq("source", it)) }
+            since?.let { add(BatchFilter.TimestamptzGte("published_at", it)) }
         }
-        val items = batchQuery.fetch("feed", "newsletter", latest, filters, LatestBatchQuery.SortKey.DateAtDesc, limit)
+        val items = batchService.findLatest(
+            "feed",
+            "newsletter",
+            filters,
+            BatchSortKey.DateAtDesc,
+            limit,
+        )
             .map { NewsletterItem.from(it) }
         return ApiResponse.ok(items, ResponseMeta(clock.instant(), total = items.size, returned = items.size))
     }
@@ -51,9 +58,4 @@ class TechNewsletterController(
     @SuperOnly
     @PostMapping("/api/crawling/tech-newsletter")
     fun triggerCrawl(): ApiResponse<CrawlTriggerData> = crawlRunner.trigger(crawler, "Tech Newsletter")
-
-    private fun empty() = ApiResponse.ok(
-        emptyList<NewsletterItem>(),
-        ResponseMeta(clock.instant(), total = 0, returned = 0),
-    )
 }
