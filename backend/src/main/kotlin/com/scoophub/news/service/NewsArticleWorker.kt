@@ -184,7 +184,7 @@ class NewsArticleWorker(
             }
             val articles = repository.findBurstArticles(symbol, since, now)
             val count = if (articles.size == 10) "10건 이상" else "${articles.size}건"
-            val body = articles.joinToString("\n") { "• ${boundedHtml(it.headline, 280)}" }
+            val body = articles.joinToString("\n") { "• ${boundedHtml(it.summaryKo ?: it.headline, 280)}" }
             router.dispatchConfirmed(
                 "news",
                 "alpaca",

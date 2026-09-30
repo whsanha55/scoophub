@@ -235,17 +235,24 @@ class AlpacaNewsTest @Autowired constructor(
         // given
         service.receive(article(1))
         service.receive(article(2))
-        every { llm.chatNews(any(), any()) } returns response(listOf(1, 2), 2)
+        every { llm.chatNews(any(), any()) } returns response(listOf(1, 2), 3)
         worker.processPending()
         service.receive(article(2).copy(sourceUpdatedAt = clock.instant().plusSeconds(1)))
         worker.processPending()
         verify(exactly = 0) { router.dispatchConfirmed(any(), any(), any(), any()) }
         // when
         service.receive(article(3))
-        every { llm.chatNews(any(), any()) } returns response(listOf(3), 2)
+        every { llm.chatNews(any(), any()) } returns response(listOf(3), 3)
         worker.processPending()
         // then — mocked delivery writes no log, so verify the threshold card rather than cooldown here.
-        verify { router.dispatchConfirmed("news", "alpaca", match { it.startsWith("news:burst:NVDA:") }, any()) }
+        verify {
+            router.dispatchConfirmed(
+                "news",
+                "alpaca",
+                match { it.startsWith("news:burst:NVDA:") },
+                match { it.text.contains("• 한국어 요약 3") && !it.text.contains("Company event") },
+            )
+        }
         assertThat(repository.findBurstSymbols(clock.instant().minusSeconds(1800), clock.instant(), 3)).contains("NVDA")
     }
 
@@ -254,7 +261,7 @@ class AlpacaNewsTest @Autowired constructor(
         // given
         val now = clock.instant()
         (1L..3L).forEach { service.receive(article(it)) }
-        every { llm.chatNews(any(), any()) } returns response(listOf(1, 2, 3), 2)
+        every { llm.chatNews(any(), any()) } returns response(listOf(1, 2, 3), 3)
         jdbc.sql(
             "INSERT INTO notify_routes (category, purpose, channel, chat_id) VALUES ('burst-test', '', 'telegram', 'test') ON CONFLICT DO NOTHING",
         ).update()
@@ -276,5 +283,16 @@ class AlpacaNewsTest @Autowired constructor(
         worker.processPending()
         // then
         verify { router.dispatchConfirmed("news", "alpaca", match { it.startsWith("news:burst:NVDA:") }, any()) }
+    }
+
+    @Test
+    fun `급증은 중요도 낮은 기사를 세지 않는다`() {
+        // given
+        (1L..3L).forEach { service.receive(article(it)) }
+        every { llm.chatNews(any(), any()) } returns response(listOf(1, 2, 3), 2)
+        // when
+        worker.processPending()
+        // then
+        verify(exactly = 0) { router.dispatchConfirmed(any(), any(), any(), any()) }
     }
 }
