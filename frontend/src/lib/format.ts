@@ -3,16 +3,17 @@
 // 백엔드가 배열을 JSON 문자열로 주거나 이미 배열로 줄 수 있음.
 // unknown 입력을 안전하게 string[]로 변환.
 export function parseJsonArray(field: unknown): string[] {
-  if (Array.isArray(field)) return field as string[];
+  let parsed: unknown = field;
   if (typeof field === "string") {
     try {
-      const parsed = JSON.parse(field);
-      return Array.isArray(parsed) ? parsed : [];
+      parsed = JSON.parse(field);
     } catch {
       return [];
     }
   }
-  return [];
+  return Array.isArray(parsed)
+    ? parsed.filter((item): item is string => typeof item === "string")
+    : [];
 }
 
 // 상대 시간 포맷("오늘"/"N일 전"/...).
@@ -22,7 +23,7 @@ export function formatRelativeDate(dateStr: string): string {
   const time = date.getTime();
   if (Number.isNaN(time)) return "";
   const diffMs = Date.now() - time;
-  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+  const diffDays = Math.max(0, Math.floor(diffMs / (1000 * 60 * 60 * 24)));
 
   if (diffDays === 0) return "오늘";
   if (diffDays === 1) return "어제";

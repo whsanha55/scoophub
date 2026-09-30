@@ -8,6 +8,8 @@ const nextConfig: NextConfig = {
     return [
       // Dashboard 제거 — 루트는 News로.
       { source: "/", destination: "/news", permanent: false },
+      // 제거된 보너스 좌석 페이지의 기존 북마크도 뉴스로 이동.
+      { source: "/kal-bonus", destination: "/news", permanent: true },
     ];
   },
   async rewrites() {

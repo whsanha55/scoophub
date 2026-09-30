@@ -8,10 +8,6 @@ export const API_URL = process.env.API_URL || "http://localhost:20010";
 export const AUTH_COOKIE_NAME =
   process.env.AUTH_COOKIE_NAME || "access_token";
 
-// 인증 없이 접근 가능한 페이지 경로.
-// /auth/callback: 백엔드 OAuth callback이 ?token= 으로 redirect — 아직 access_token 쿠키 심기 전.
-export const PUBLIC_PAGES = ["/login", "/forbidden", "/auth/callback"];
-
 // 프론트 route handler가 소유한 /api 경로 — proxy rewrite 대상에서 제외.
 // (proxy는 filesystem route보다 먼저 실행되므로, 제외하지 않으면 백엔드로 rewrite되어 도달 불가)
 export const API_REWRITE_EXCLUDE = ["/api/auth/logout"];

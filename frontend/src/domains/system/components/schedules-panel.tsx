@@ -43,8 +43,8 @@ export function SchedulesPanel() {
     const raw = editing[key(crawler, jobId)];
     if (!raw) return;
     const n = Number(raw);
-    if (Number.isNaN(n) || n <= 0) {
-      setActionError("주기는 양수(초)여야 합니다");
+    if (!Number.isSafeInteger(n) || n <= 0) {
+      setActionError("주기는 양의 정수(초)여야 합니다");
       return;
     }
     setSaving(key(crawler, jobId));

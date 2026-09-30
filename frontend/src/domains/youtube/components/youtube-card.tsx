@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Eye, ThumbsUp, MessageSquare, ExternalLink } from "lucide-react";
 import type { YouTubeVideo } from "../types";
@@ -24,7 +25,10 @@ export function YouTubeCard({ video }: YouTubeCardProps) {
     >
       <Card className="cursor-pointer transition-all duration-200 hover:shadow-md">
         {video.thumbnail_url && (
-          <img
+          <Image
+            unoptimized
+            width={480}
+            height={270}
             src={video.thumbnail_url}
             alt={video.title}
             className="aspect-video w-full object-cover rounded-t-lg"
