@@ -24,4 +24,3 @@ CREATE TABLE news_article (
 CREATE INDEX idx_news_article_pending ON news_article(published_at, id) WHERE status = 'pending';
 CREATE INDEX idx_news_article_published ON news_article(published_at DESC, id DESC);
 CREATE INDEX idx_news_article_symbols ON news_article USING GIN (symbols);
-
