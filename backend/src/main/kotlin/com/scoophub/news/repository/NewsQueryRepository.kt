@@ -1,36 +1,19 @@
-package com.scoophub.news
+package com.scoophub.news.repository
 
+import com.scoophub.news.vo.NewsArticlePage
+import com.scoophub.news.vo.NewsArticleRow
 import io.github.oshai.kotlinlogging.KotlinLogging
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource
 import org.springframework.jdbc.core.simple.JdbcClient
-import org.springframework.stereotype.Component
+import org.springframework.stereotype.Repository
 import java.sql.Timestamp
 import java.time.Instant
 
 private val log = KotlinLogging.logger {}
 
 /** legacy `news/router.py` GET /news 쿼리 — 시간 필터 + category/min_importance + 카운트 */
-@Component
-class NewsQueryService(private val jdbcClient: JdbcClient) {
-    data class ArticleRow(
-        val id: Int,
-        val source: String,
-        val category: String?,
-        val title: String,
-        val summary: String?,
-        val url: String,
-        val normalizedUrl: String?,
-        val publishedAt: Instant?,
-        val importance: Int,
-        val summaryStatus: String,
-        val duplicated: Boolean,
-        val duplicatedNewsId: Int?,
-        val createdAt: Instant,
-        val updatedAt: Instant,
-    )
-
-    data class Page(val total: Int, val articles: List<ArticleRow>)
-
+@Repository
+class NewsQueryRepository(private val jdbcClient: JdbcClient) {
     fun findArticles(
         minutes: Int?,
         from: Instant?,
@@ -38,7 +21,7 @@ class NewsQueryService(private val jdbcClient: JdbcClient) {
         category: String?,
         minImportance: Int?,
         limit: Int,
-    ): Page {
+    ): NewsArticlePage {
         val params = MapSqlParameterSource()
         val conditions = mutableListOf("duplicated = false")
 
@@ -75,7 +58,7 @@ class NewsQueryService(private val jdbcClient: JdbcClient) {
         )
             .paramSource(params.addValue("limit", limit))
             .query { rs, _ ->
-                ArticleRow(
+                NewsArticleRow(
                     id = rs.getInt("id"),
                     source = rs.getString("source"),
                     category = rs.getString("category"),
@@ -94,14 +77,14 @@ class NewsQueryService(private val jdbcClient: JdbcClient) {
             }
             .list()
         log.info { "get_news 완료 - total=$total, returned=${articles.size}" }
-        return Page(total, articles)
+        return NewsArticlePage(total, articles)
     }
 
-    fun findById(articleId: Int): ArticleRow? =
+    fun findById(articleId: Int): NewsArticleRow? =
         jdbcClient.sql("SELECT * FROM feed_news WHERE id = :id AND duplicated = false")
             .param("id", articleId)
             .query { rs, _ ->
-                ArticleRow(
+                NewsArticleRow(
                     id = rs.getInt("id"),
                     source = rs.getString("source"),
                     category = rs.getString("category"),

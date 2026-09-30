@@ -5,8 +5,10 @@ import com.scoophub.global.api.ApiResponse
 import com.scoophub.global.api.ResponseMeta
 import com.scoophub.global.auth.SuperOnly
 import com.scoophub.global.crawl.CrawlRunner
-import com.scoophub.global.crawl.LatestBatchQuery
 import com.scoophub.global.crawl.dto.CrawlTriggerData
+import com.scoophub.global.crawl.service.LatestBatchService
+import com.scoophub.global.crawl.vo.BatchFilter
+import com.scoophub.global.crawl.vo.BatchSortKey
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.tags.Tag
@@ -21,7 +23,7 @@ private val log = KotlinLogging.logger {}
 
 @RestController
 class DevtoHashnodeController(
-    private val batchQuery: LatestBatchQuery,
+    private val batchService: LatestBatchService,
     private val crawlRunner: CrawlRunner,
     private val crawler: DevtoHashnodeCrawler,
     private val clock: Clock,
@@ -36,17 +38,15 @@ class DevtoHashnodeController(
     ): ApiResponse<List<DevblogItem>> {
         log.info { "get_devto_hashnode requested: limit=$limit tag=$tag since=$since" }
         // crawl_data(category=feed, purpose=devblog) 최신 배치
-        val latest = batchQuery.latestFetchedAt("feed", "devblog") ?: return empty()
         val filters = buildList {
-            tag?.let { add(LatestBatchQuery.JsonArrayContains("tags", """["$it"]""")) }
-            since?.let { add(LatestBatchQuery.TimestamptzGte("published_at", it)) }
+            tag?.let { add(BatchFilter.JsonArrayContains("tags", """["$it"]""")) }
+            since?.let { add(BatchFilter.TimestamptzGte("published_at", it)) }
         }
-        val items = batchQuery.fetch(
+        val items = batchService.findLatest(
             "feed",
             "devblog",
-            latest,
             filters,
-            LatestBatchQuery.SortKey.IntDesc("reactions_count"),
+            BatchSortKey.IntDesc("reactions_count"),
             limit,
         ).map { DevblogItem.from(it) }
         return ApiResponse.ok(items, ResponseMeta(clock.instant(), total = items.size, returned = items.size))
@@ -57,9 +57,4 @@ class DevtoHashnodeController(
     @SuperOnly
     @PostMapping("/api/crawling/devto-hashnode")
     fun triggerCrawl(): ApiResponse<CrawlTriggerData> = crawlRunner.trigger(crawler, "Dev.to")
-
-    private fun empty() = ApiResponse.ok(
-        emptyList<DevblogItem>(),
-        ResponseMeta(clock.instant(), total = 0, returned = 0),
-    )
 }

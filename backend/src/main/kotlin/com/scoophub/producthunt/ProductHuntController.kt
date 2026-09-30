@@ -4,8 +4,10 @@ import com.scoophub.global.api.ApiResponse
 import com.scoophub.global.api.ResponseMeta
 import com.scoophub.global.auth.SuperOnly
 import com.scoophub.global.crawl.CrawlRunner
-import com.scoophub.global.crawl.LatestBatchQuery
 import com.scoophub.global.crawl.dto.CrawlTriggerData
+import com.scoophub.global.crawl.service.LatestBatchService
+import com.scoophub.global.crawl.vo.BatchFilter
+import com.scoophub.global.crawl.vo.BatchSortKey
 import com.scoophub.producthunt.dto.ProductHuntItem
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.swagger.v3.oas.annotations.Operation
@@ -21,7 +23,7 @@ private val log = KotlinLogging.logger {}
 
 @RestController
 class ProductHuntController(
-    private val batchQuery: LatestBatchQuery,
+    private val batchService: LatestBatchService,
     private val crawlRunner: CrawlRunner,
     private val crawler: ProductHuntCrawler,
     private val clock: Clock,
@@ -36,17 +38,15 @@ class ProductHuntController(
     ): ApiResponse<List<ProductHuntItem>> {
         log.info { "get_product_hunt requested: limit=$limit topic=$topic since=$since" }
         // crawl_data(category=community, purpose=producthunt) 최신 배치
-        val latest = batchQuery.latestFetchedAt("community", "producthunt") ?: return empty()
         val filters = buildList {
-            topic?.let { add(LatestBatchQuery.JsonArrayContains("topics", """["$it"]""")) }
-            since?.let { add(LatestBatchQuery.TimestamptzGte("posted_at", it)) }
+            topic?.let { add(BatchFilter.JsonArrayContains("topics", """["$it"]""")) }
+            since?.let { add(BatchFilter.TimestamptzGte("posted_at", it)) }
         }
-        val items = batchQuery.fetch(
+        val items = batchService.findLatest(
             "community",
             "producthunt",
-            latest,
             filters,
-            LatestBatchQuery.SortKey.IntDesc("votes_count"),
+            BatchSortKey.IntDesc("votes_count"),
             limit,
         ).map { ProductHuntItem.from(it) }
         return ApiResponse.ok(items, ResponseMeta(clock.instant(), total = items.size, returned = items.size))
@@ -57,9 +57,4 @@ class ProductHuntController(
     @SuperOnly
     @PostMapping("/api/crawling/product-hunt")
     fun triggerCrawl(): ApiResponse<CrawlTriggerData> = crawlRunner.trigger(crawler, "Product Hunt")
-
-    private fun empty() = ApiResponse.ok(
-        emptyList<ProductHuntItem>(),
-        ResponseMeta(clock.instant(), total = 0, returned = 0),
-    )
 }

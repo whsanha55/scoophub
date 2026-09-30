@@ -1,6 +1,6 @@
 package com.scoophub.system.dto
 
-import java.sql.ResultSet
+import com.scoophub.global.notify.vo.NotifyRouteRow
 import java.time.Instant
 
 /** legacy notify_routes row */
@@ -17,17 +17,17 @@ data class NotifyRouteItem(
     val updatedAt: Instant,
 ) {
     companion object {
-        fun of(rs: ResultSet): NotifyRouteItem = NotifyRouteItem(
-            id = rs.getLong("id"),
-            category = rs.getString("category"),
-            purpose = rs.getString("purpose"),
-            channel = rs.getString("channel"),
-            chatId = rs.getString("chat_id"),
-            topicId = rs.getObject("topic_id") as Long?,
-            topicName = rs.getString("topic_name"),
-            enabled = rs.getBoolean("enabled"),
-            createdAt = rs.getTimestamp("created_at").toInstant(),
-            updatedAt = rs.getTimestamp("updated_at").toInstant(),
+        fun from(row: NotifyRouteRow) = NotifyRouteItem(
+            id = row.id,
+            category = row.category,
+            purpose = row.purpose,
+            channel = row.channel,
+            chatId = row.chatId,
+            topicId = row.topicId,
+            topicName = row.topicName,
+            enabled = row.enabled,
+            createdAt = row.createdAt,
+            updatedAt = row.updatedAt,
         )
     }
 }

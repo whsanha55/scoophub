@@ -4,8 +4,10 @@ import com.scoophub.global.api.ApiResponse
 import com.scoophub.global.api.ResponseMeta
 import com.scoophub.global.auth.SuperOnly
 import com.scoophub.global.crawl.CrawlRunner
-import com.scoophub.global.crawl.LatestBatchQuery
 import com.scoophub.global.crawl.dto.CrawlTriggerData
+import com.scoophub.global.crawl.service.LatestBatchService
+import com.scoophub.global.crawl.vo.BatchFilter
+import com.scoophub.global.crawl.vo.BatchSortKey
 import com.scoophub.youtube.dto.YoutubeTrendingItem
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.swagger.v3.oas.annotations.Operation
@@ -20,7 +22,7 @@ private val log = KotlinLogging.logger {}
 
 @RestController
 class YoutubeTrendingController(
-    private val batchQuery: LatestBatchQuery,
+    private val batchService: LatestBatchService,
     private val crawlRunner: CrawlRunner,
     private val crawler: YoutubeTrendingCrawler,
     private val clock: Clock,
@@ -35,22 +37,17 @@ class YoutubeTrendingController(
     ): ApiResponse<List<YoutubeTrendingItem>> {
         log.info { "get_youtube_trending requested: region=$regionCode category=$categoryId limit=$limit" }
         // crawl_data(category=feed, purpose=youtube). region별 최신 배치
-        val latest = batchQuery.latestFetchedAt(
-            "feed",
-            "youtube",
-            baseFilters = listOf(LatestBatchQuery.TextEq("region_code", regionCode)),
-        ) ?: return empty()
         val filters = buildList {
-            add(LatestBatchQuery.TextEq("region_code", regionCode))
-            categoryId?.let { add(LatestBatchQuery.TextEq("category_id", it)) }
+            add(BatchFilter.TextEq("region_code", regionCode))
+            categoryId?.let { add(BatchFilter.TextEq("category_id", it)) }
         }
-        val items = batchQuery.fetch(
+        val items = batchService.findLatest(
             "feed",
             "youtube",
-            latest,
             filters,
-            LatestBatchQuery.SortKey.LongDesc("view_count"),
+            BatchSortKey.LongDesc("view_count"),
             limit,
+            baseFilters = listOf(BatchFilter.TextEq("region_code", regionCode)),
         ).map { YoutubeTrendingItem.from(it) }
         return ApiResponse.ok(items, ResponseMeta(clock.instant(), total = items.size, returned = items.size))
     }
@@ -60,9 +57,4 @@ class YoutubeTrendingController(
     @SuperOnly
     @PostMapping("/api/crawling/youtube-trending")
     fun triggerCrawl(): ApiResponse<CrawlTriggerData> = crawlRunner.trigger(crawler, "YouTube Trending")
-
-    private fun empty() = ApiResponse.ok(
-        emptyList<YoutubeTrendingItem>(),
-        ResponseMeta(clock.instant(), total = 0, returned = 0),
-    )
 }

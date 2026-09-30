@@ -1,6 +1,6 @@
 package com.scoophub.arxiv.dto
 
-import com.scoophub.global.crawl.LatestBatchQuery
+import com.scoophub.global.crawl.vo.BatchRow
 import com.scoophub.global.jackson.scalar
 import tools.jackson.databind.JsonNode
 
@@ -22,7 +22,7 @@ data class ArxivItem(
     val fetchedAt: String?,
 ) {
     companion object {
-        fun from(row: LatestBatchQuery.BatchRow) = with(row.response) {
+        fun from(row: BatchRow) = with(row.response) {
             ArxivItem(
                 id = row.id,
                 arxivId = scalar("arxiv_id"),

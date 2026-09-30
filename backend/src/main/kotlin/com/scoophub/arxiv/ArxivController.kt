@@ -5,8 +5,10 @@ import com.scoophub.global.api.ApiResponse
 import com.scoophub.global.api.ResponseMeta
 import com.scoophub.global.auth.SuperOnly
 import com.scoophub.global.crawl.CrawlRunner
-import com.scoophub.global.crawl.LatestBatchQuery
 import com.scoophub.global.crawl.dto.CrawlTriggerData
+import com.scoophub.global.crawl.service.LatestBatchService
+import com.scoophub.global.crawl.vo.BatchFilter
+import com.scoophub.global.crawl.vo.BatchSortKey
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.tags.Tag
@@ -21,7 +23,7 @@ private val log = KotlinLogging.logger {}
 
 @RestController
 class ArxivController(
-    private val batchQuery: LatestBatchQuery,
+    private val batchService: LatestBatchService,
     private val crawlRunner: CrawlRunner,
     private val crawler: ArxivCrawler,
     private val clock: Clock,
@@ -37,13 +39,18 @@ class ArxivController(
     ): ApiResponse<List<ArxivItem>> {
         log.info { "get_arxiv requested: category=$category since=$since query=$query limit=$limit" }
         // crawl_data(category=feed, purpose=arxiv) 최신 배치
-        val latest = batchQuery.latestFetchedAt("feed", "arxiv") ?: return empty()
         val filters = buildList {
-            category?.let { add(LatestBatchQuery.TextEq("primary_category", it)) }
-            since?.let { add(LatestBatchQuery.TimestamptzGte("published_at", it)) }
-            query?.let { add(LatestBatchQuery.TextLike("title", "%$it%")) }
+            category?.let { add(BatchFilter.TextEq("primary_category", it)) }
+            since?.let { add(BatchFilter.TimestamptzGte("published_at", it)) }
+            query?.let { add(BatchFilter.TextLike("title", "%$it%")) }
         }
-        val items = batchQuery.fetch("feed", "arxiv", latest, filters, LatestBatchQuery.SortKey.DateAtDesc, limit)
+        val items = batchService.findLatest(
+            "feed",
+            "arxiv",
+            filters,
+            BatchSortKey.DateAtDesc,
+            limit,
+        )
             .map { ArxivItem.from(it) }
         return ApiResponse.ok(items, ResponseMeta(clock.instant(), total = items.size, returned = items.size))
     }
@@ -53,9 +60,4 @@ class ArxivController(
     @SuperOnly
     @PostMapping("/api/crawling/arxiv")
     fun triggerCrawl(): ApiResponse<CrawlTriggerData> = crawlRunner.trigger(crawler, "arXiv")
-
-    private fun empty() = ApiResponse.ok(
-        emptyList<ArxivItem>(),
-        ResponseMeta(clock.instant(), total = 0, returned = 0),
-    )
 }

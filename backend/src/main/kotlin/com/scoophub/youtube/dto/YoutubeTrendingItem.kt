@@ -1,6 +1,6 @@
 package com.scoophub.youtube.dto
 
-import com.scoophub.global.crawl.LatestBatchQuery
+import com.scoophub.global.crawl.vo.BatchRow
 import com.scoophub.global.jackson.scalar
 
 /** legacy `_youtube_item` — crawl_data row → youtube 응답 필드로 재구성 */
@@ -22,7 +22,7 @@ data class YoutubeTrendingItem(
     val fetchedAt: String?,
 ) {
     companion object {
-        fun from(row: LatestBatchQuery.BatchRow) = with(row.response) {
+        fun from(row: BatchRow) = with(row.response) {
             YoutubeTrendingItem(
                 id = row.id,
                 videoId = scalar("video_id"),

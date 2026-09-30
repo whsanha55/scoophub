@@ -6,12 +6,11 @@ import com.scoophub.global.api.ErrorDetail
 import com.scoophub.global.api.ResponseMeta
 import com.scoophub.global.auth.SuperOnly
 import com.scoophub.global.config.ScoophubProperties
-import com.scoophub.global.crawl.repository.CrawlLogRepository
 import com.scoophub.system.dto.CrawlLogItem
+import com.scoophub.system.service.CrawlLogService
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.tags.Tag
-import org.springframework.data.domain.Limit
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.RequestBody
@@ -25,7 +24,7 @@ private val log = KotlinLogging.logger {}
 class SystemController(
     private val llmClient: LlmClient,
     private val props: ScoophubProperties,
-    private val crawlLogRepository: CrawlLogRepository,
+    private val crawlLogService: CrawlLogService,
     private val clock: Clock,
 ) {
     @Tag(name = "System")
@@ -69,22 +68,7 @@ class SystemController(
         @RequestParam(defaultValue = "20") limit: Int = 20,
     ): ApiResponse<List<CrawlLogItem>> {
         log.info { "crawl logs requested: crawler=$crawler detail=$crawlerDetail limit=$limit" }
-        val rows = when {
-            crawler != null && crawlerDetail != null ->
-                crawlLogRepository.findByCrawlerAndCrawlerDetailOrderByStartedAtDesc(
-                    crawler,
-                    crawlerDetail,
-                    Limit.of(limit),
-                )
-
-            crawler != null ->
-                crawlLogRepository.findByCrawlerOrderByStartedAtDesc(crawler, Limit.of(limit))
-
-            crawlerDetail != null ->
-                crawlLogRepository.findByCrawlerDetailOrderByStartedAtDesc(crawlerDetail, Limit.of(limit))
-
-            else -> crawlLogRepository.findAllByOrderByStartedAtDesc(Limit.of(limit))
-        }
+        val rows = crawlLogService.find(crawler, crawlerDetail, limit)
         val logs = rows.map { CrawlLogItem.from(it) }
         return ApiResponse.ok(logs, ResponseMeta(clock.instant(), total = logs.size, returned = logs.size))
     }

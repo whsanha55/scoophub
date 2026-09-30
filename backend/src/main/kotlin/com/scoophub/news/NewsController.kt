@@ -6,6 +6,7 @@ import com.scoophub.global.api.ResponseMeta
 import com.scoophub.global.auth.SuperOnly
 import com.scoophub.global.crawl.CrawlRunner
 import com.scoophub.news.dto.NewsArticleItem
+import com.scoophub.news.service.NewsService
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.tags.Tag
@@ -23,7 +24,7 @@ private val log = KotlinLogging.logger {}
 
 @RestController
 class NewsController(
-    private val queryService: NewsQueryService,
+    private val newsService: NewsService,
     private val crawlRunner: CrawlRunner,
     private val crawler: NewsCrawler,
     private val summarizer: NewsSummarizer,
@@ -40,7 +41,7 @@ class NewsController(
         @RequestParam("min_importance") minImportance: Int? = null,
         @RequestParam(defaultValue = "20") limit: Int = 20,
     ): ApiResponse<List<NewsArticleItem>> {
-        val page = queryService.findArticles(minutes, from, to, category, minImportance, limit)
+        val page = newsService.findArticles(minutes, from, to, category, minImportance, limit)
         val articles = page.articles.map { NewsArticleItem.from(it) }
         return ApiResponse.ok(
             articles,
@@ -52,7 +53,7 @@ class NewsController(
     @Operation(summary = "뉴스 기사 단건 조회")
     @GetMapping("/api/news/{article_id}")
     fun getNewsById(@PathVariable("article_id") articleId: Int): ApiResponse<NewsArticleItem> {
-        val row = queryService.findById(articleId)
+        val row = newsService.findById(articleId)
             ?: throw ResponseStatusException(
                 HttpStatus.NOT_FOUND,
                 "Article $articleId not found",
