@@ -3,7 +3,6 @@ package com.scoophub.stock.repository
 import com.scoophub.stock.entity.StockAnalysisResultEntity
 import com.scoophub.stock.entity.StockCandleEntity
 import com.scoophub.stock.entity.StockSigmaEntity
-import com.scoophub.stock.entity.StockTickerParamsEntity
 import com.scoophub.stock.entity.StockWatchlistEntity
 import com.scoophub.stock.entity.StockWeeklyExpectedMoveEntity
 import org.springframework.data.domain.Limit
@@ -75,12 +74,6 @@ interface StockCandleRepository : JpaRepository<StockCandleEntity, Int> {
         @Param("closes") closes: DoubleArray,
         @Param("volumes") volumes: DoubleArray,
     )
-
-    fun findByTickerAndIntervalOrderByDateAsc(ticker: String, interval: String): List<StockCandleEntity>
-
-    fun findFirstByTickerAndIntervalOrderByDateDesc(ticker: String, interval: String): StockCandleEntity?
-
-    fun countByTickerAndInterval(ticker: String, interval: String): Long
 }
 
 interface StockAnalysisResultRepository : JpaRepository<StockAnalysisResultEntity, Int> {
@@ -176,8 +169,6 @@ interface StockSigmaRepository : JpaRepository<StockSigmaEntity, Long> {
 
     /** legacy `get_latest` — ORDER BY snapshot_date DESC, expiry_date ASC */
     fun findFirstByTickerOrderBySnapshotDateDescExpiryDateAsc(ticker: String): StockSigmaEntity?
-
-    fun findByTickerOrderBySnapshotDateDesc(ticker: String, limit: Limit): List<StockSigmaEntity>
 }
 
 interface StockWeeklyExpectedMoveRepository : JpaRepository<StockWeeklyExpectedMoveEntity, Int> {
@@ -205,14 +196,4 @@ interface StockWeeklyExpectedMoveRepository : JpaRepository<StockWeeklyExpectedM
     )
 
     fun findByTickerOrderByWeekStartDesc(ticker: String, limit: Limit): List<StockWeeklyExpectedMoveEntity>
-
-    fun findByWeekStart(weekStart: LocalDate): List<StockWeeklyExpectedMoveEntity>
-
-    fun findAllByOrderByWeekStartDesc(limit: Limit): List<StockWeeklyExpectedMoveEntity>
-}
-
-interface StockTickerParamsRepository : JpaRepository<StockTickerParamsEntity, Int> {
-    fun findByTicker(ticker: String): StockTickerParamsEntity?
-
-    fun findByIsAdoptedTrue(): List<StockTickerParamsEntity>
 }

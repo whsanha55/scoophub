@@ -23,8 +23,10 @@ interface CrawlLogRepository : JpaRepository<CrawlLogEntity, Int> {
 
     /** news cutoff — 직전 성공 크롤 완료 시각 */
     @Query(
-        "SELECT max(finished_at) FROM crawl_logs " +
-            "WHERE crawler = :crawler AND crawler_detail = :detail AND status IN ('success', 'partial')",
+        """
+        SELECT max(finished_at) FROM crawl_logs
+        WHERE crawler = :crawler AND crawler_detail = :detail AND status IN ('success', 'partial')
+        """,
         nativeQuery = true,
     )
     fun findLastFinishedAt(crawler: String, detail: String): Instant?
