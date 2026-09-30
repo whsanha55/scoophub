@@ -18,7 +18,7 @@ import org.springframework.test.web.client.response.MockRestResponseCreators.wit
 import org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess
 
 /** legacy tests/test_telegram.py 포팅 */
-@RestClientTest(TelegramNotifier::class)
+@RestClientTest(TelegramNotifier::class, properties = ["scoophub.telegram.bot-token="])
 @EnableConfigurationProperties(ScoophubProperties::class)
 class TelegramNotifierTest @Autowired constructor(
     private val notifier: TelegramNotifier,

@@ -24,15 +24,19 @@ function ConfigForm({
   const [draft, setDraft] = useState(() => JSON.stringify(entry.params, null, 2));
 
   const handleSaveClick = () => {
-    let parsed: Record<string, unknown>;
+    let parsed: unknown;
     try {
       parsed = JSON.parse(draft);
     } catch (err) {
       onError(err instanceof Error ? `JSON 파싱 실패: ${err.message}` : "JSON 파싱 실패");
       return;
     }
+    if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) {
+      onError("설정은 JSON 객체여야 합니다");
+      return;
+    }
     onError(null);
-    onSave(entry.crawler, parsed);
+    onSave(entry.crawler, parsed as Record<string, unknown>);
   };
 
   return (

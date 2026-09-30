@@ -1,6 +1,7 @@
 "use client";
 import { useState, useCallback } from "react";
 import type { ArxivPaper, ArxivPaperParams } from "../types";
+import { useCrawlTrigger } from "@/shared/hooks/use-crawl-trigger";
 import type { ApiResponse } from "@/shared/types";
 
 export function useArxiv() {
@@ -48,29 +49,5 @@ export function useArxiv() {
 }
 
 export function useArxivCrawl() {
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const triggerCrawl = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const res = await fetch("/api/crawling/arxiv", {
-        method: "POST",
-      });
-      const data: ApiResponse<{
-        items_fetched: number;
-        items_new: number;
-      }> = await res.json();
-      if (!data.success) {
-        setError(data.error?.message || "arXiv crawl failed");
-      }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Unknown error");
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  return { loading, error, triggerCrawl };
+  return useCrawlTrigger("arxiv", "arXiv crawl failed");
 }

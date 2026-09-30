@@ -11,6 +11,5 @@ export interface ApiResponse<T> {
     requested_at: string;
     total?: number | null;
     returned?: number | null;
-    months?: string[] | null;
   };
 }

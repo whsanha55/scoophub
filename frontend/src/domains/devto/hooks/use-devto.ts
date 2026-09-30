@@ -1,6 +1,7 @@
 "use client";
 import { useState, useCallback } from "react";
 import type { DevtoArticle, DevtoArticleParams } from "../types";
+import { useCrawlTrigger } from "@/shared/hooks/use-crawl-trigger";
 import type { ApiResponse } from "@/shared/types";
 
 export function useDevtoArticles() {
@@ -41,29 +42,5 @@ export function useDevtoArticles() {
 }
 
 export function useDevtoCrawl() {
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const triggerCrawl = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const res = await fetch("/api/crawling/devto-hashnode", {
-        method: "POST",
-      });
-      const data: ApiResponse<{
-        items_fetched: number;
-        items_new: number;
-      }> = await res.json();
-      if (!data.success) {
-        setError(data.error?.message || "Crawl failed");
-      }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Unknown error");
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  return { loading, error, triggerCrawl };
+  return useCrawlTrigger("devto-hashnode", "Crawl failed");
 }
