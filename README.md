@@ -2,8 +2,6 @@
 
 개인용 정보 수집 허브 — 뉴스·주식·날씨·개발 트렌드 등을 크롤링해 한 화면에서 보여준다.
 
-백엔드는 Python(FastAPI)에서 Kotlin(Spring Boot)으로 이관을 마쳤다. 운영 전환 작업은 [TODO.md](TODO.md) 참고.
-
 ## 구조
 
 ```
@@ -45,7 +43,7 @@ Alpaca WebSocket → `news_article` → 5초 DB 워커 → GLM 한국어 요약 
 
 ## 배포
 
-서버에서 각 디렉터리의 `deploy.sh` 가 `docker compose up -d --build` 후 헬스체크한다.
+서버에서 루트 `deploy.sh` 를 실행하면 backend → frontend 순으로 각 디렉터리의 `deploy.sh` 를 실행한다. 각 스크립트는 `docker compose up -d --build` 후 헬스체크한다.
 
 - `backend/deploy.sh` — `/docs` 응답 확인
 - `frontend/deploy.sh` — `:20020` 응답 확인

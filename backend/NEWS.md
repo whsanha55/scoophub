@@ -12,7 +12,6 @@
 5. 기존 배포 절차로 배포한다. WebSocket은 단일 앱 인스턴스에서만 켠다. 로컬·운영 동시 연결은 피한다.
 
 로컬 기본값은 연결·워커 모두 false다. 키를 쓰지 않고 검증할 때는 Gradle 테스트를 실행한다.
-이 구현 작업에서는 운영 키 재발급, 실제 연결, 실제 텔레그램 발송 또는 배포를 수행하지 않았다.
 
 프로토콜은 [Alpaca 공식 뉴스 문서](https://docs.alpaca.markets/us/docs/streaming-real-time-news)를 따른다.
 GLM 옵션은 [Z.ai Thinking Mode](https://docs.z.ai/guides/capabilities/thinking-mode)를 참고한다.
@@ -23,7 +22,7 @@ GLM 옵션은 [Z.ai Thinking Mode](https://docs.z.ai/guides/capabilities/thinkin
 - 단일 워커가 5초마다 `published_at, id` 순으로 최대 20건씩 조회하고 회차 안에서 큐를 비울 때까지 반복한다.
 - 잡음과 종목/거시 정보가 없는 기사는 filtered, 15분 초과는 skipped/stale이다.
 - 관심 종목 중요도 3 이상, 일반 기사 4 이상을 보낸다. 결과를 먼저 저장하므로 발송 재시도는 LLM을 재호출하지 않는다.
-- 실패 1회 후 30초, 2회 후 2분 대기하며 3회째 failed가 된다. 기획서의 10분 대기는 3회 실패 종료와 모순되므로 사용하지 않는다.
+- 실패 1회 후 30초, 2회 후 2분 대기하며 3회째 failed가 된다.
 - LLM 3회 실패한 관심 종목은 원문 헤드라인을 한 번 시도하고 failed에 결과를 기록한다.
 - 한 회차의 푸시를 카드 묶음으로 보내면서 기사별 `news:alpaca:{id}` 성공 키를 남긴다.
   뉴스는 chat당 최소 3.1초 간격으로 보내며 HTML 카드 크기를 제한한다.
