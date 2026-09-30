@@ -47,7 +47,7 @@ class ScheduleResolver(
 
     /**
      * crawl_config(crawler PK)의 params JSONB. 행이 없으면 빈 객체
-     * (weather/kal_bonus 처럼 params 가 필요 없는 도메인).
+     * (weather 처럼 params 가 필요 없는 도메인).
      */
     fun resolveParams(crawler: String): JsonNode =
         configRepository.findByCrawler(crawler)?.params ?: jsonMapper.readTree("{}")

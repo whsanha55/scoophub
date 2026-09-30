@@ -13,7 +13,6 @@ import java.time.format.DateTimeFormatter
  * enrich 반환 null 이면 발신 스킵.
  *
  * - weather     : crawl_data(weather, snapshot) → 온도/대기질/주간예보
- * - kal_bonus   : crawl_data(kal, bonus_seat) → 2027 Q1 프레스티지(P) 잔석 나라별 집계
  * - community/feed: crawl_data batch(updated_at DESC) → 도메인 sort key 탑5
  */
 @Component
@@ -23,10 +22,6 @@ class NotifyCard(private val crawlDataRepository: CrawlDataRepository) {
         if (category == "weather") {
             val body = enrichWeather() ?: return null
             return formatDefault("weather", detail, 0, body)
-        }
-        if (category == "kal_bonus") {
-            val body = enrichKal() ?: return null
-            return formatDefault("kal_bonus", detail, 0, body)
         }
         if (NAME_PURPOSE.containsKey(category)) {
             val body = enrichBatch(category) ?: return null
@@ -140,52 +135,6 @@ class NotifyCard(private val crawlDataRepository: CrawlDataRepository) {
         return lines.joinToString("")
     }
 
-    // ── kal_bonus ─────────────────────────────────────────────────────
-
-    /** crawl_data(kal, bonus_seat) → 2027 Q1 프레스티지(P) 잔석 나라별 집계 */
-    private fun enrichKal(): String? {
-        // arr(공항코드) → 2027 Q1 P 잔석 건수
-        val seats = mutableMapOf<String, Int>()
-        val (ymLo, ymHi) = KAL_PRESTIGE_Q1
-
-        for (row in crawlDataRepository.findFirst50ByCategoryAndPurposeOrderByUpdatedAtDesc(
-            KAL_CATEGORY,
-            KAL_PURPOSE,
-        )) {
-            val r = row.response
-            val arr = r.scalar("arrivalAirport").orEmpty()
-            for (flightDay in r["flightList"].elements()) {
-                val ym = flightDay.scalar("departureDate").orEmpty().take(6) // YYYYMMDD → YYYYMM
-                if (ym < ymLo || ym > ymHi) {
-                    continue
-                }
-                for (detail in flightDay["flightDetailList"].elements()) {
-                    if (detail.scalar("frontBookingClass") != "P") {
-                        continue
-                    }
-                    if (!hasSeat(detail["availableSeat"])) {
-                        continue
-                    }
-                    seats[arr] = (seats[arr] ?: 0) + 1
-                }
-            }
-        }
-
-        if (seats.isEmpty()) {
-            return null
-        }
-
-        // 잔석 수 기준 정렬 후 top8 (4096 한도 방지)
-        return seats.entries
-            .sortedByDescending { it.value }
-            .take(8)
-            .joinToString("") { (arr, cnt) ->
-                val city = KAL_ARR_CITY[arr]
-                val label = if (city != null) "${escapeHtml(city)}(${escapeHtml(arr)})" else escapeHtml(arr)
-                "\n• $label: P 잔석 ${escapeHtml(cnt)}건"
-            }
-    }
-
     companion object {
         /** 큰 섹터(category)별 토픽 이모지 — formatCard 표식 */
         private val EMOJI = mapOf(
@@ -194,7 +143,6 @@ class NotifyCard(private val crawlDataRepository: CrawlDataRepository) {
             "stock" to "📈",
             "community" to "👥",
             "feed" to "📜",
-            "kal_bonus" to "✈️",
         )
 
         /** 크롤러 name → (crawl_data category, purpose). batch 조회 키 */
@@ -218,27 +166,6 @@ class NotifyCard(private val crawlDataRepository: CrawlDataRepository) {
             "youtube_trending" to "view_count",
         )
 
-        // kal_bonus — config 상수와 동일 (순환 참조 방지용 로컬 복제. kal 도메인 이관 시 참조 전환)
-        private const val KAL_CATEGORY = "kal"
-        private const val KAL_PURPOSE = "bonus_seat"
-
-        /** arrival(공항코드) → 도시명 */
-        private val KAL_ARR_CITY = mapOf(
-            "LHR" to "런던/히스로",
-            "FCO" to "로마/레오나르도 다빈치",
-            "LIS" to "리스본",
-            "MAD" to "마드리드",
-            "MXP" to "밀라노/말펜사",
-            "AMS" to "암스테르담/스키폴",
-            "IST" to "이스탄불",
-            "ZRH" to "취리히",
-            "CDG" to "파리/샤를 드 골",
-            "FRA" to "프랑크푸르트",
-        )
-
-        /** 2027 Q1 잔석 집계 대상 기간(YYYYMM) */
-        private val KAL_PRESTIGE_Q1 = "202701" to "202703"
-
         /** HTML 특수문자 이스케이프. 동적 텍스트 전부 적용 */
         fun escapeHtml(s: Any?): String = when (s) {
             null -> ""
@@ -259,7 +186,7 @@ class NotifyCard(private val crawlDataRepository: CrawlDataRepository) {
             return "$head\n$body"
         }
 
-        /** community/feed/weather/kal 공용 카드 — 헤더 + body */
+        /** community/feed/weather 공용 카드 — 헤더 + body */
         fun formatDefault(name: String, detail: String, count: Int, body: String): String {
             val (category, _) = NAME_PURPOSE[name] ?: (name to "")
             var head = "${EMOJI[category] ?: "🔔"} [${escapeHtml(name)}"
@@ -278,9 +205,6 @@ class NotifyCard(private val crawlDataRepository: CrawlDataRepository) {
         } catch (e: Exception) {
             ""
         }
-
-        /** availableSeat → 잔석 존재 여부. API 가 문자열/정수/null 혼합 → bool() 오탐 방지 */
-        fun hasSeat(value: JsonNode?): Boolean = value != null && !value.isNull && value.asInt(0) > 0
 
         /** 대기질 수치 정수 반올림 → str. null/변환불가 → null (단위 µg/m³) */
         fun num(value: JsonNode?): String? {
