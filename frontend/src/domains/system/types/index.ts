@@ -58,7 +58,7 @@ export type CrawlConfigPatch = Record<string, unknown>;
 // #46 — notify 발신 라우팅 + 발신 이력
 export interface NotifyRoute {
   id: number;
-  category: string;        // news/weather/stock/community/feed/kal_bonus, "" = wildcard
+  category: string;        // news/weather/stock/community/feed, "" = wildcard
   purpose: string;         // 세부 목적, "" = wildcard
   channel: string;         // telegram | discord | email
   chat_id: string;

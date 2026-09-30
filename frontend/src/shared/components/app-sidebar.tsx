@@ -15,7 +15,6 @@ import {
   Rocket,
   Play,
   Mail,
-  Plane,
   Telescope,
   ChevronRight,
 } from "lucide-react";
@@ -55,7 +54,6 @@ const techTrendItems = [
 const navItems = [
   { title: "뉴스", href: "/news", icon: Newspaper },
   { title: "주식", href: "/stock", icon: TrendingUp },
-  { title: "대한항공 마일리지 좌석", href: "/kal-bonus", icon: Plane },
   { title: "날씨", href: "/weather", icon: Cloud },
   { title: "시스템 관리", href: "/system", icon: Wrench },
 ];

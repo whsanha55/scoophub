@@ -82,16 +82,6 @@ class NotifyCardTest {
     }
 
     @Test
-    fun `hasSeat 문자열 정수 혼합 오탐 방지`() {
-        assertThat(NotifyCard.hasSeat(jsonMapper.readTree("\"5\""))).isTrue()
-        assertThat(NotifyCard.hasSeat(jsonMapper.readTree("3"))).isTrue()
-        assertThat(NotifyCard.hasSeat(jsonMapper.readTree("\"0\""))).isFalse()
-        assertThat(NotifyCard.hasSeat(jsonMapper.readTree("0"))).isFalse()
-        assertThat(NotifyCard.hasSeat(null)).isFalse()
-        assertThat(NotifyCard.hasSeat(jsonMapper.readTree("\"\""))).isFalse()
-    }
-
-    @Test
     fun `num 대기질 수치 정수 반올림`() {
         assertThat(NotifyCard.num(null)).isNull()
         assertThat(NotifyCard.num(jsonMapper.readTree("15"))).isEqualTo("15")
@@ -125,48 +115,6 @@ class NotifyCardTest {
         assertThat(body).contains("23°C", "습도 60%")
         assertThat(body).contains("예보: 월 17/25 비40% · 화 16/24")
         assertThat(body).doesNotContain("일 18/27") // 오늘은 예보 줄에 없음
-    }
-
-    @Test
-    fun `enrichKal 2027 Q1 P 잔석 집계`() {
-        // given — legacy self-check 와 동일 fixture
-        every { repository.findFirst50ByCategoryAndPurposeOrderByUpdatedAtDesc("kal", "bonus_seat") } returns listOf(
-            row(
-                """
-                {"departureAirport": "ICN", "arrivalAirport": "LHR", "flightList": [
-                  {"departureDate": "20270115", "flightDetailList": [
-                    {"frontBookingClass": "P", "availableSeat": "2"},
-                    {"frontBookingClass": "P", "availableSeat": "0"},
-                    {"frontBookingClass": "C", "availableSeat": "9"}
-                  ]},
-                  {"departureDate": "20270220", "flightDetailList": [
-                    {"frontBookingClass": "P", "availableSeat": 1}
-                  ]},
-                  {"departureDate": "20260615", "flightDetailList": [
-                    {"frontBookingClass": "P", "availableSeat": "9"}
-                  ]}
-                ]}
-                """,
-            ),
-            row(
-                """
-                {"arrivalAirport": "ZZZ", "flightList": [
-                  {"departureDate": "20270310", "flightDetailList": [
-                    {"frontBookingClass": "P", "availableSeat": "1"}
-                  ]}
-                ]}
-                """,
-            ),
-        )
-
-        // when
-        val body = card.enrich("kal_bonus", "", "base")
-
-        // then
-        assertThat(body).isNotNull
-        // LHR: 202701(1건, "2">0) + 202702(1건) = 2건
-        assertThat(body).contains("• 런던/히스로(LHR): P 잔석 2건")
-        assertThat(body).contains("• ZZZ: P 잔석 1건") // ROUTES 미포함 → arr코드만
     }
 
     @Test
