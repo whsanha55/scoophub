@@ -129,7 +129,7 @@ class NewsArticleQueryRepository(private val jdbc: JdbcClient) {
     fun findBurstSymbols(since: Instant, now: Instant, threshold: Int): List<String> = jdbc.sql(
         """
         SELECT symbol FROM news_article, LATERAL unnest(symbols) AS symbol
-        WHERE published_at >= :since AND published_at <= :now
+        WHERE published_at >= :since AND published_at <= :now AND importance >= 3
         GROUP BY symbol HAVING COUNT(DISTINCT id) >= :threshold ORDER BY symbol
         """.trimIndent(),
     ).param(
@@ -138,7 +138,7 @@ class NewsArticleQueryRepository(private val jdbc: JdbcClient) {
     ).param("now", Timestamp.from(now)).param("threshold", threshold).query(String::class.java).list().filterNotNull()
 
     fun findBurstArticles(symbol: String, since: Instant, now: Instant): List<AlpacaArticleRow> = jdbc.sql(
-        "SELECT * FROM news_article WHERE symbols @> ARRAY[:symbol]::text[] AND published_at >= :since AND published_at <= :now ORDER BY published_at, id LIMIT 10",
+        "SELECT * FROM news_article WHERE symbols @> ARRAY[:symbol]::text[] AND published_at >= :since AND published_at <= :now AND importance >= 3 ORDER BY published_at, id LIMIT 10",
     ).param(
         "symbol",
         symbol,
