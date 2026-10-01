@@ -41,7 +41,7 @@ class WeatherCrawlerTest @Autowired constructor(
                 "temp_C": "22", "FeelsLikeC": "20", "humidity": "55",
                 "windspeedKmph": "12", "winddir16Point": "SW",
                 "weatherDesc": [{"value": "Light rain"}],
-                "precipMM": "1.2", "chanceofrain": "60"
+                "precipMM": "1.2"
             }],
             "weather": [
                 {"date": "2026-06-02", "maxtempC": "25", "mintempC": "18"},
@@ -62,6 +62,7 @@ class WeatherCrawlerTest @Autowired constructor(
         assertThat(row).isNotNull
         assertThat(row!!.response["temperature"].asDouble()).isEqualTo(22.0)
         assertThat(row.response.scalar("condition")).isEqualTo("가벼운 비")
+        assertThat(row.response["rain_chance"].asInt()).isZero() // 실제 wttr current_condition 에는 chanceofrain 없음
     }
 
     @Test
