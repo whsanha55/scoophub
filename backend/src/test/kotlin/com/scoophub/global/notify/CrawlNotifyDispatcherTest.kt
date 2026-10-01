@@ -42,7 +42,6 @@ class CrawlNotifyDispatcherTest {
                 oauthRedirectUri = "",
             ),
             telegram = ScoophubProperties.Telegram(botToken = token, defaultChatId = ""),
-            producthuntToken = "",
             youtubeApiKey = "",
         )
         return CrawlNotifyDispatcher(

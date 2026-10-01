@@ -12,7 +12,6 @@ import {
   FileText,
   Rss,
   Zap,
-  Rocket,
   Play,
   Mail,
   Telescope,
@@ -46,7 +45,6 @@ const techTrendItems = [
   { title: "arXiv", href: "/arxiv", icon: FileText },
   { title: "Dev.to", href: "/devto", icon: Rss },
   { title: "Hacker News", href: "/hacker-news", icon: Zap },
-  { title: "Product Hunt", href: "/product-hunt", icon: Rocket },
   { title: "YouTube", href: "/youtube", icon: Play },
   { title: "뉴스레터", href: "/tech-newsletter", icon: Mail },
 ];

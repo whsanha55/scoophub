@@ -149,7 +149,6 @@ class NotifyCard(private val crawlDataRepository: CrawlDataRepository) {
         val NAME_PURPOSE = mapOf(
             "weather" to ("weather" to "snapshot"),
             "hacker_news" to ("community" to "hackernews"),
-            "product_hunt" to ("community" to "producthunt"),
             "github_trending" to ("community" to "github"),
             "devto_hashnode" to ("feed" to "devblog"),
             "tech_newsletter" to ("feed" to "newsletter"),
@@ -160,7 +159,6 @@ class NotifyCard(private val crawlDataRepository: CrawlDataRepository) {
         /** 도메인별 탑5 정렬 기준 (response JSONB 안 필드 — DB 정렬 불가, 앱 단 정렬). null=최신순 그대로 */
         private val SORT_KEY = mapOf(
             "hacker_news" to "score",
-            "product_hunt" to "votes_count",
             "github_trending" to "stars",
             "devto_hashnode" to "reactions_count",
             "youtube_trending" to "view_count",
@@ -225,11 +223,6 @@ class NotifyCard(private val crawlDataRepository: CrawlDataRepository) {
                     url = r.scalar("url").orEmpty().trim()
                 }
 
-                "product_hunt" -> {
-                    title = r.scalar("name").orEmpty().trim()
-                    url = r.scalar("ph_url").orEmpty().trim()
-                }
-
                 else -> {
                     title = r.scalar("title").orEmpty().trim()
                     url = r.scalar("url").orEmpty().trim()
@@ -252,8 +245,6 @@ class NotifyCard(private val crawlDataRepository: CrawlDataRepository) {
         /** 도메인별 메타(score/votes/author). 값 없으면 빈 문자열 */
         private fun metaFor(name: String, r: JsonNode): String = when (name) {
             "hacker_news" -> r.scalar("score")?.let { "${escapeHtml(it)}점" } ?: ""
-
-            "product_hunt" -> r.scalar("votes_count")?.let { "▲${escapeHtml(it)}" } ?: ""
 
             "github_trending" -> r.scalar("stars")?.let { "★${escapeHtml(it)}" } ?: ""
 
