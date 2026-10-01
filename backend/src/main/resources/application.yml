@@ -42,7 +42,6 @@ springdoc:
 scoophub:
   enable-scheduler: ${ENABLE_SCHEDULER:true}
   cors-origins: ${CORS_ORIGINS:http://localhost:3000,http://localhost:8000}
-  producthunt-token: ${PRODUCTHUNT_TOKEN:}
   youtube-api-key: ${YOUTUBE_API_KEY:}
   alpaca:
     api-key: ${ALPACA_API_KEY:}

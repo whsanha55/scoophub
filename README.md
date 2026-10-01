@@ -7,7 +7,7 @@
 - **뉴스**: Alpaca 실시간 증시 뉴스 수집, 한국어 요약, 중요도 분류와 알림
 - **주식**: 관심 종목, 기간별 리포트, 분석과 시그널
 - **날씨**: 현재 날씨, 예보와 대기질
-- **기술 트렌드**: GitHub, arXiv, Dev.to/Hashnode, Hacker News, Product Hunt, YouTube, 뉴스레터
+- **기술 트렌드**: GitHub, arXiv, Dev.to/Hashnode, Hacker News, YouTube, 뉴스레터
 - **시스템 관리**: 수집 로그, 스케줄, 설정, 알림 라우팅과 LLM 테스트
 
 조회 화면은 로그인 없이 사용할 수 있습니다. Google OAuth로 로그인하며, 수집 실행과 관리 작업은 관리자(`SUPER_EMAILS`) 권한을 사용합니다.

@@ -56,7 +56,6 @@ class CrawlSchedulerTest {
             oauthRedirectUri = "",
         ),
         telegram = ScoophubProperties.Telegram(botToken = "", defaultChatId = ""),
-        producthuntToken = "",
         youtubeApiKey = "",
     )
 

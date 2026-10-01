@@ -62,12 +62,6 @@ class NotifyCardTest {
         )
         assertThat(gh).contains("<b>a/b</b>", "★10")
 
-        val ph = NotifyCard.lineFor(
-            "product_hunt",
-            jsonMapper.readTree("""{"name":"PH","ph_url":"http://p","votes_count":7}"""),
-        )
-        assertThat(ph).contains("<b>PH</b>", "▲7")
-
         assertThat(
             NotifyCard.lineFor("hacker_news", jsonMapper.readTree("""{"title":"","url":"x"}""")),
         ).isNull()

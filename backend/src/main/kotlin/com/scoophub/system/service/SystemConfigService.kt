@@ -61,7 +61,6 @@ class SystemConfigService(
             "github_trending" to setOf("since", "language", "max_repos"),
             "hacker_news" to setOf("max_items", "min_score", "story_types"),
             "arxiv" to setOf("categories", "max_results_per_category"),
-            "product_hunt" to setOf("developer_token", "max_posts"),
             "youtube_trending" to setOf("api_key", "region_codes", "max_results_per_region"),
             "devto_hashnode" to setOf("tags", "max_articles_per_tag"),
             "tech_newsletter" to setOf("feeds"),

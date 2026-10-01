@@ -35,7 +35,6 @@ class AutoTopicProvisionerTest {
                 oauthRedirectUri = "",
             ),
             telegram = ScoophubProperties.Telegram(botToken = "tok", defaultChatId = chatId),
-            producthuntToken = "",
             youtubeApiKey = "",
         )
         return AutoTopicProvisioner(props, routeRepository, llm, telegram, jsonMapper)

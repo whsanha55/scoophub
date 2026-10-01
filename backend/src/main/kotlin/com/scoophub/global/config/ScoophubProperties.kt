@@ -10,7 +10,6 @@ data class ScoophubProperties(
     val llm: Llm,
     val auth: Auth,
     val telegram: Telegram,
-    val producthuntToken: String,
     val youtubeApiKey: String,
     val alpaca: Alpaca = Alpaca(),
 ) {
