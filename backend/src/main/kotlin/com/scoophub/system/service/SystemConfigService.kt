@@ -55,7 +55,7 @@ class SystemConfigService(
         ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "crawl_config row not found: '$crawler'")
 
     companion object {
-        /** legacy PARAM_MODELS 허용 키 (news/reddit 는 도메인 이관 시점에 검증 강화) */
+        /** legacy PARAM_MODELS 허용 키 (news 는 도메인 이관 시점에 검증 강화) */
         private val PARAM_KEYS: Map<String, Set<String>> = mapOf(
             "news" to setOf("max_lookback_hours", "dedup_window_hours"),
             "github_trending" to setOf("since", "language", "max_repos"),

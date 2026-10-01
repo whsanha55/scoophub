@@ -10,7 +10,7 @@ import java.time.format.DateTimeFormatter
 
 /** 서울 좌표 고정 — legacy crawler 파라미터와 동일 */
 private const val SEOUL_QUERY =
-    "?latitude=37.5665&longitude=126.9780&hourly=pm10,pm2_5,ozone,uv_index&timezone=Asia%2FSeoul"
+    "?latitude=37.5665&longitude=126.9780&hourly=pm10,pm2_5,ozone,uv_index&timezone=Asia/Seoul"
 
 /** Open-Meteo 시간별 대기질 중 현재 시각 값 */
 data class AirQuality(val pm10: Double?, val pm25: Double?, val ozone: Double?, val uvIndex: Double?)
