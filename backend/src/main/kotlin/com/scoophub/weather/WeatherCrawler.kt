@@ -46,7 +46,7 @@ class WeatherCrawler(
         // wttr.in 실패 시 저장할 스냅샷 자체가 없음 (Open-Meteo 단독은 불완전)
         val data = wttrData ?: return CrawlResult(errors = errors)
 
-        // wttr.in 현재 날씨 파싱
+        // wttr.in 현재 날씨 파싱 — 응답에 없는 필드(예: current_condition.chanceofrain)는 path() 로 기본값
         val cc = requireNotNull(data["current_condition"]?.get(0)) { "wttr.in current_condition missing" }
         val conditionEn = cc["weatherDesc"]?.get(0)?.get("value")?.asText("") ?: ""
 
@@ -67,14 +67,14 @@ class WeatherCrawler(
             response = linkedMapOf(
                 "location" to "seoul",
                 "fetched_at" to fetchedAt.toString(),
-                "temperature" to cc["temp_C"].asDouble(0.0),
-                "feels_like" to cc["FeelsLikeC"].asDouble(0.0),
-                "humidity" to cc["humidity"].asInt(0),
-                "wind_speed" to cc["windspeedKmph"].asDouble(0.0),
-                "wind_direction" to cc["winddir16Point"].asText(""),
+                "temperature" to cc.path("temp_C").asDouble(0.0),
+                "feels_like" to cc.path("FeelsLikeC").asDouble(0.0),
+                "humidity" to cc.path("humidity").asInt(0),
+                "wind_speed" to cc.path("windspeedKmph").asDouble(0.0),
+                "wind_direction" to cc.path("winddir16Point").asText(""),
                 "condition" to translateCondition(conditionEn),
-                "precip_mm" to cc["precipMM"].asDouble(0.0),
-                "rain_chance" to cc["chanceofrain"].asInt(0),
+                "precip_mm" to cc.path("precipMM").asDouble(0.0),
+                "rain_chance" to cc.path("chanceofrain").asInt(0),
                 "pm10" to pm10,
                 "pm10_grade" to grade(pm10, PM10_THRESHOLDS),
                 "pm25" to pm25,
