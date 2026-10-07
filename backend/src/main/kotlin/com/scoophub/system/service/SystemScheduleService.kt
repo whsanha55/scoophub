@@ -69,6 +69,9 @@ class SystemScheduleService(
                 "schedule_minutes can only be set for schedule_type='interval'",
             )
         }
+        if (scheduleMinutes != null && scheduleMinutes <= 0) {
+            throw ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY, "schedule_minutes must be positive")
+        }
         if (!scheduleQueryRepository.update(crawler, jobId, schedules, scheduleMinutes, enabled)) {
             throw ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY, "no updatable fields provided")
         }
