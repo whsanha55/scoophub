@@ -10,6 +10,7 @@ import org.springframework.data.jpa.repository.JpaRepository
 import org.springframework.data.jpa.repository.Modifying
 import org.springframework.data.jpa.repository.Query
 import org.springframework.data.repository.query.Param
+import org.springframework.transaction.annotation.Transactional
 import java.time.Instant
 import java.time.LocalDate
 
@@ -56,11 +57,12 @@ interface StockWatchlistRepository : JpaRepository<StockWatchlistEntity, Int> {
 interface StockCandleRepository : JpaRepository<StockCandleEntity, Int> {
 
     /** 다중 upsert — (ticker, interval, date) 충돌 시 최신 갱신 */
+    @Transactional
     @Modifying
     @Query(
         value = """
         INSERT INTO stock_candles (ticker, interval, date, open, high, low, close, volume)
-        VALUES (:tickers, :intervals, :dates, :opens, :highs, :lows, :closes, :volumes)
+        SELECT * FROM unnest(:tickers, :intervals, :dates, :opens, :highs, :lows, :closes, :volumes)
         ON CONFLICT (ticker, interval, date) DO UPDATE SET
             open = EXCLUDED.open, high = EXCLUDED.high, low = EXCLUDED.low,
             close = EXCLUDED.close, volume = EXCLUDED.volume
@@ -81,6 +83,7 @@ interface StockCandleRepository : JpaRepository<StockCandleEntity, Int> {
 
 interface StockAnalysisResultRepository : JpaRepository<StockAnalysisResultEntity, Int> {
 
+    @Transactional
     @Modifying
     @Query(
         value = """
@@ -129,6 +132,7 @@ interface StockAnalysisResultRepository : JpaRepository<StockAnalysisResultEntit
 
 interface StockSigmaRepository : JpaRepository<StockSigmaEntity, Long> {
 
+    @Transactional
     @Modifying
     @Query(
         value = """
