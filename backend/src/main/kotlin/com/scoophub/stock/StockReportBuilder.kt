@@ -3,6 +3,7 @@ package com.scoophub.stock
 import com.scoophub.global.jackson.scalar
 import com.scoophub.global.notify.NotifyMessage
 import com.scoophub.global.notify.NotifyRouter
+import com.scoophub.stock.entity.StockAnalysisResultEntity
 import com.scoophub.stock.repository.StockAnalysisResultRepository
 import com.scoophub.stock.repository.StockWatchlistRepository
 import com.scoophub.stock.vo.SigmaRange
@@ -39,20 +40,24 @@ class StockReportBuilder(
             return null
         }
 
-        val blocks = mutableListOf<String>()
-        for (groupName in listOf("market", "sector", "individual")) {
-            val groupTickers = groups[groupName].orEmpty()
-            if (groupTickers.isEmpty()) {
-                continue
-            }
-            buildGroupBlock(groupName, groupTickers)?.let { blocks += it }
+        val rows1d = groups.mapValues { (_, groupTickers) ->
+            analysisRepository.findByTickerInAndTimeframeOrderByTotalScoreDesc(groupTickers, "1D")
         }
-        if (blocks.isEmpty()) {
+        if (rows1d.values.all { it.isEmpty() }) {
             log.info { "ReportBuilder.run: no analysis data to report — skip" }
             return null
         }
 
-        val full = "${header()}\n\n${blocks.joinToString("\n\n")}\n\n$REPORT_LINK"
+        val blocks = mutableListOf(header(groups["market"].orEmpty(), rows1d["market"].orEmpty()))
+        for ((groupName, title) in listOf("sector" to "🏭 섹터", "individual" to "📈 개별종목")) {
+            val groupTickers = groups[groupName].orEmpty()
+            if (groupTickers.isEmpty()) {
+                continue
+            }
+            blocks += buildSignalBlock(title, groupTickers, rows1d[groupName].orEmpty())
+        }
+
+        val full = "${blocks.joinToString("\n\n")}\n\n$REPORT_LINK"
         val today = clock.instant().atZone(SEOUL).toLocalDate().toString()
         val payloadKey = "stock:daily-report:$today"
 
@@ -85,41 +90,30 @@ class StockReportBuilder(
         return groups
     }
 
-    /** 단일 group 1D/1W/1M 분석 블록. 빈 시 null */
-    private fun buildGroupBlock(groupName: String, tickers: List<String>): String? {
-        val groupTitle =
-            mapOf("market" to "🌍 시장층", "sector" to "🏭 섹터층", "individual" to "📈 개별종목")[groupName] ?: groupName
-
-        val rows1d = analysisRepository.findByTickerInAndTimeframeOrderByTotalScoreDesc(tickers, "1D")
-        if (rows1d.isEmpty()) {
-            return null
-        }
+    /** 1D·1W 같은 방향 + 1D 신뢰도 기준 이상 종목만 매수/매도로 나눈 블록 */
+    private fun buildSignalBlock(
+        title: String,
+        tickers: List<String>,
+        rows1d: List<StockAnalysisResultEntity>,
+    ): String {
         val auxW = auxSignalMap(tickers, "1W")
-        val auxM = auxSignalMap(tickers, "1M")
+        val picked = rows1d
+            .filter { it.price > 0 && it.confidence >= MIN_CONFIDENCE }
+            .filter { direction(it.signal) != 0 && direction(it.signal) == direction(auxW[it.ticker]) }
+            .sortedByDescending { it.confidence }
+        val (buys, sells) = picked.partition { direction(it.signal) > 0 }
 
-        val lines = mutableListOf("<b>$groupTitle</b>")
-        for (row in rows1d) {
-            val price = row.price
-            if (price <= 0) {
-                continue
-            }
-            val sigmaRange = sigmaRangeFromSnapshot(row.technicalDetails.get("sigma_data"), price)
-            val levels = computeActionableLevels(price, sigmaRange, row.technicalDetails)
-            lines +=
-                formatTicker(
-                    row.ticker,
-                    row.signal,
-                    row.totalScore,
-                    row.confidence,
-                    row.changeRate,
-                    price,
-                    auxW[row.ticker],
-                    auxM[row.ticker],
-                    levels,
-                )
+        val lines = mutableListOf("<b>$title</b>")
+        if (picked.isEmpty()) {
+            lines += "강한 신호 없음"
         }
-        if (lines.size <= 1) { // 제목만
-            return null
+        if (buys.isNotEmpty()) {
+            lines += "🟢 매수"
+            buys.forEach { lines += formatBuy(it) }
+        }
+        if (sells.isNotEmpty()) {
+            lines += "🔴 매도"
+            sells.forEach { lines += formatSell(it) }
         }
         return lines.joinToString("\n")
     }
@@ -131,48 +125,45 @@ class StockReportBuilder(
         emptyMap()
     }
 
-    private fun header(): String {
+    /** 제목 + 시장층 1D 신호 한 줄 (STRONG 구분 없이) */
+    private fun header(marketTickers: List<String>, marketRows: List<StockAnalysisResultEntity>): String {
         val nowKst = clock.instant().atZone(SEOUL).format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")) + " KST"
-        return "<b>📊 주식 일간 분석 리포트</b>\n$nowKst"
+        val title = "<b>📊 주식 일간 신호</b> — $nowKst"
+        val signals = marketTickers.mapNotNull { t ->
+            marketRows.find { it.ticker == t }?.let { "${escapeHtml(t)} ${it.signal.removePrefix("STRONG_")}" }
+        }
+        return if (signals.isEmpty()) title else "$title\n시장: ${signals.joinToString(" · ")}"
     }
 
-    private fun formatTicker(
-        ticker: String,
-        signal: String,
-        score: Double,
-        conf: Double,
-        changeRate: Double,
-        price: Double,
-        auxW: String?,
-        auxM: String?,
-        levels: ActionableLevels?,
-    ): String {
-        val chg = if (changeRate != 0.0) " (%+.2f%%)".format(changeRate) else ""
-        val parts = mutableListOf(
-            "\n<b>${escapeHtml(ticker)}</b> ${fmtPrice(price)}$chg",
-            "  시그널: $signal  점수: %+.1f  신뢰도: %.0f%%".format(score, conf),
+    /** 매수: 현재가(변동률) + 목표·손절 */
+    private fun formatBuy(row: StockAnalysisResultEntity): String {
+        val sigmaRange = sigmaRangeFromSnapshot(row.technicalDetails.get("sigma_data"), row.price)
+        val levels = computeActionableLevels(row.price, sigmaRange, row.technicalDetails)
+        val lvParts = listOfNotNull(
+            levels?.targetPrice?.let { "목표 ${fmtPrice(it)}" },
+            levels?.stopLoss?.let { "손절 ${fmtPrice(it)}" },
         )
-        val auxParts = buildList {
-            auxW?.let { add("주봉 $it") }
-            auxM?.let { add("월봉 $it") }
-        }
-        if (auxParts.isNotEmpty()) {
-            parts += "  다기간: " + auxParts.joinToString(" / ")
-        }
-        if (levels != null) {
-            val lvLines = buildList {
-                levels.targetPrice?.let { add("목표 ${fmtPrice(it)}") }
-                levels.buyZone?.let { add("매수 ${fmtPrice(it)}") }
-                levels.stopLoss?.let { add("손절 ${fmtPrice(it)}") }
-                if (levels.momentumFire) {
-                    add("🔥불타기진입")
-                }
-            }
-            if (lvLines.isNotEmpty()) {
-                parts += "  " + lvLines.joinToString(" | ")
-            }
-        }
-        return parts.joinToString("\n")
+        return listOf(priceLine(row), lvParts.joinToString(" · ")).filter { it.isNotEmpty() }.joinToString("  ")
+    }
+
+    /** 매도: 현재가(변동률) + 재진입가(볼린저 하단) */
+    private fun formatSell(row: StockAnalysisResultEntity): String {
+        val reentry = row.technicalDetails.scalar("bb_lower")?.toDoubleOrNull()
+            ?: return priceLine(row)
+        return "${priceLine(row)}  재진입 ${fmtPrice(reentry)}"
+    }
+
+    private fun priceLine(row: StockAnalysisResultEntity): String {
+        val chg = if (row.changeRate != 0.0) " (%+.1f%%)".format(row.changeRate) else ""
+        return "<b>${escapeHtml(row.ticker)}</b> ${fmtPrice(row.price)}$chg"
+    }
+
+    /** BUY 계열 1, SELL 계열 -1, 그 외 0 */
+    private fun direction(signal: String?): Int = when {
+        signal == null -> 0
+        signal.endsWith("BUY") -> 1
+        signal.endsWith("SELL") -> -1
+        else -> 0
     }
 
     /** 4000자 초과 시 줄 단위 분할 */
@@ -197,7 +188,8 @@ class StockReportBuilder(
 
     companion object {
         private const val TELEGRAM_MAX = 4000
-        private const val REPORT_LINK = """<a href="https://scoophub.gonamu.com/stock">🔗 Scoophub에서 보기</a>"""
+        private const val MIN_CONFIDENCE = 60.0
+        private const val REPORT_LINK = """<a href="https://scoophub.gonamu.com/stock">🔗 Scoophub에서 전체 보기</a>"""
         private const val STOP_ATR_MULT = 1.5
         private val SEOUL = ZoneId.of("Asia/Seoul")
 
