@@ -39,7 +39,7 @@ class DevtoHashnodeController(
         log.info { "get_devto_hashnode requested: limit=$limit tag=$tag since=$since" }
         // crawl_data(category=feed, purpose=devblog) 최신 배치
         val filters = buildList {
-            tag?.let { add(BatchFilter.JsonArrayContains("tags", """["$it"]""")) }
+            tag?.let { add(BatchFilter.JsonArrayContains("tags", it)) }
             since?.let { add(BatchFilter.TimestamptzGte("published_at", it)) }
         }
         val items = batchService.findLatest(

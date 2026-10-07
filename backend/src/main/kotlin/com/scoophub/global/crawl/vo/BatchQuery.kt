@@ -15,7 +15,7 @@ sealed interface BatchFilter {
     /** ILIKE — value 에 와일드카드 포함(예: %kw%) */
     data class TextLike(val field: String, override val value: String) : BatchFilter
 
-    /** JSONB 배열 포함 — value 는 배열 엘리먼트 하나(예: tags @> '"["python"]"'::jsonb') */
+    /** JSONB 배열 포함 — value 는 배열 원소 하나(예: "python" → tags @> '["python"]'::jsonb) */
     data class JsonArrayContains(val field: String, override val value: String) : BatchFilter
 
     data class IntGte(val field: String, override val value: Int) : BatchFilter

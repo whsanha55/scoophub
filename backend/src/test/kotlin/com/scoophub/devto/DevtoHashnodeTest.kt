@@ -108,6 +108,12 @@ class DevtoHashnodeTest @Autowired constructor(
             jsonPath("$.data.length()") { value(1) }
             jsonPath("$.data[0].article_id") { value(3) }
         }
+
+        // 따옴표·역슬래시가 든 tag 도 JSON 캐스트 오류 없이 빈 결과
+        mockMvc.get("/api/devto-hashnode") { param("tag", "a\"b\\") }.andExpect {
+            status { isOk() }
+            jsonPath("$.data.length()") { value(0) }
+        }
     }
 
     @Test
