@@ -118,7 +118,7 @@ export interface StockAnalyzeResult {
   results: { ticker: string; status: string; detail?: string }[];
 }
 
-// #44 — 분석 / 실시간 quote / WEM
+// #44 — 분석 / 실시간 quote
 export interface StockQuote {
   ticker: string;
   price: number;

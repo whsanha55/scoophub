@@ -76,7 +76,7 @@ class StockAnalysisService(
 
                 // details dict + sigma enrichment
                 val details: ObjectNode = jsonMapper.valueToTree(report.technicalDetails)
-                fetchSigmaEnrichment(upper, price)?.let { details.set("sigma_data", it) }
+                fetchSigmaEnrichment(upper)?.let { details.set("sigma_data", it) }
                 analysisRepository.upsert(
                     ticker = upper,
                     exchange = exchange,
@@ -116,7 +116,7 @@ class StockAnalysisService(
     }
 
     /** 분석 시점 sigma(straddle) 스냅샷 (issue #49 JSON 스키마). 과거 분석 행의 WEM(주간 예상변동폭) JSON 은 데이터 불변 원칙으로 남겨두고 읽지 않음 */
-    fun fetchSigmaEnrichment(ticker: String, price: Double): JsonNode? {
+    fun fetchSigmaEnrichment(ticker: String): JsonNode? {
         val sigmaData: ObjectNode = jsonMapper.createObjectNode()
 
         // stock_sigma (ATM straddle, nearest expiry)
