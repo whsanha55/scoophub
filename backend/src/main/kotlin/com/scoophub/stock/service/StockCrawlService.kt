@@ -1,41 +1,57 @@
 package com.scoophub.stock.service
 
-import com.scoophub.external.yahoo.YahooFinanceClient
+import com.scoophub.external.alpaca.AlpacaMarketDataClient
+import com.scoophub.external.alpaca.AlpacaMarketDataException
 import com.scoophub.stock.StockSigma
 import com.scoophub.stock.repository.StockCandleRepository
 import com.scoophub.stock.repository.StockSigmaRepository
 import com.scoophub.stock.repository.StockWatchlistRepository
+import com.scoophub.stock.vo.FetchOutcome
 import io.github.oshai.kotlinlogging.KotlinLogging
 import org.springframework.stereotype.Service
 import java.time.Clock
 
 private val log = KotlinLogging.logger {}
 
-/** 수동 크롤 트리거 — 시그마 즉시 계산, 캔들 동기화 */
+/** 시세 수집 — 시그마 계산, 캔들 동기화. 스케줄 잡과 수동 트리거가 함께 쓴다 */
 @Service
 class StockCrawlService(
-    private val provider: YahooFinanceClient,
+    private val provider: AlpacaMarketDataClient,
     private val watchlistRepository: StockWatchlistRepository,
     private val sigmaRepository: StockSigmaRepository,
     private val candleRepository: StockCandleRepository,
     private val clock: Clock,
 ) {
-    /** ATM straddle 기반 시그마 계산 후 저장. (saved, errors) */
-    fun computeSigma(targetTickers: List<String>): Pair<Int, Int> {
+    /** ATM straddle 기반 시그마 계산 후 저장. saved 는 저장한 만기 수 */
+    fun computeSigma(targetTickers: List<String>): FetchOutcome {
         val snapshotAt = clock.instant()
+        val failures = mutableMapOf<String, String>()
+        val quotes = try {
+            provider.snapshots(targetTickers)
+        } catch (e: AlpacaMarketDataException) {
+            return FetchOutcome(targetTickers.size, 0, targetTickers.associateWith { failureReason(e) })
+        }
         var saved = 0
-        var errors = 0
         for (ticker in targetTickers) {
             try {
-                val price = provider.quote(ticker)?.regularMarketPrice ?: 0.0
+                val price = quotes[ticker]?.price ?: 0.0
                 if (price <= 0.0) {
-                    errors++
+                    failures[ticker] = "price unavailable"
                     continue
                 }
-                for (result in StockSigma.computeSigmaFromOptions(provider, ticker, price, snapshotAt, clock)) {
+                val results = StockSigma.computeSigmaFromOptions(
+                    provider.optionChains(ticker),
+                    ticker,
+                    price,
+                    snapshotAt,
+                )
+                if (results.isEmpty()) {
+                    failures[ticker] = "no sigma computed"
+                }
+                for (result in results) {
                     sigmaRepository.upsert(
                         ticker = result.ticker,
-                        expiryDate = result.expiryDate ?: continue,
+                        expiryDate = result.expiryDate,
                         snapshotDate = result.snapshotDate,
                         snapshotAt = result.snapshotAt,
                         currentPrice = result.currentPrice,
@@ -54,36 +70,49 @@ class StockCrawlService(
                 }
             } catch (e: Exception) {
                 log.error(e) { "Sigma compute failed for $ticker" }
-                errors++
+                failures[ticker] = failureReason(e)
             }
         }
-        return saved to errors
+        return FetchOutcome(targetTickers.size, saved, failures)
     }
 
-    /** 활성 관심종목 일봉 동기화. 저장한 캔들 수 */
-    fun syncCandles(): Int {
-        val items = watchlistRepository.findByIsActiveOrderByAddedAt()
+    /** 활성 관심종목 일봉 동기화. saved 는 저장한 캔들 수 */
+    fun syncCandles(): FetchOutcome {
+        val tickers = watchlistRepository.findByIsActiveOrderByAddedAt().map { it.ticker }
+        val barsByTicker = try {
+            provider.dailyBars(tickers)
+        } catch (e: AlpacaMarketDataException) {
+            return FetchOutcome(tickers.size, 0, tickers.associateWith { failureReason(e) })
+        }
+        val failures = mutableMapOf<String, String>()
         var totalSaved = 0
-        for (item in items) {
+        for (ticker in tickers) {
+            val candles = barsByTicker[ticker].orEmpty()
+            if (candles.isEmpty()) {
+                failures[ticker] = "no candles"
+                continue
+            }
             try {
-                val candles = provider.chart(item.ticker, "1d")
-                if (candles.isNotEmpty()) {
-                    candleRepository.saveBatch(
-                        tickers = candles.map { it.ticker }.toTypedArray(),
-                        intervals = candles.map { it.interval }.toTypedArray(),
-                        dates = candles.map { it.date }.toTypedArray(),
-                        opens = candles.map { it.open }.toDoubleArray(),
-                        highs = candles.map { it.high }.toDoubleArray(),
-                        lows = candles.map { it.low }.toDoubleArray(),
-                        closes = candles.map { it.close }.toDoubleArray(),
-                        volumes = candles.map { it.volume }.toDoubleArray(),
-                    )
-                    totalSaved += candles.size
-                }
+                candleRepository.saveBatch(
+                    tickers = candles.map { it.ticker }.toTypedArray(),
+                    intervals = candles.map { it.interval }.toTypedArray(),
+                    dates = candles.map { it.date }.toTypedArray(),
+                    opens = candles.map { it.open }.toDoubleArray(),
+                    highs = candles.map { it.high }.toDoubleArray(),
+                    lows = candles.map { it.low }.toDoubleArray(),
+                    closes = candles.map { it.close }.toDoubleArray(),
+                    volumes = candles.map { it.volume }.toDoubleArray(),
+                )
+                totalSaved += candles.size
             } catch (e: Exception) {
-                log.warn { "Candle sync failed for ${item.ticker}: ${e.message}" }
+                log.error(e) { "Candle save failed for $ticker" }
+                failures[ticker] = failureReason(e)
             }
         }
-        return totalSaved
+        log.info { "Candle sync: $totalSaved candles for ${tickers.size} tickers, ${failures.size} failed" }
+        return FetchOutcome(tickers.size, totalSaved, failures)
     }
+
+    private fun failureReason(e: Exception): String =
+        (e as? AlpacaMarketDataException)?.statusCode?.let { "HTTP $it" } ?: (e.message ?: e.javaClass.simpleName)
 }

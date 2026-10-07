@@ -1,6 +1,7 @@
 package com.scoophub.stock
 
-import com.scoophub.external.yahoo.YahooFinanceClient
+import com.scoophub.external.alpaca.AlpacaMarketDataClient
+import com.scoophub.external.alpaca.AlpacaMarketDataException
 import com.scoophub.global.jackson.scalar
 import com.scoophub.stock.repository.StockAnalysisResultRepository
 import com.scoophub.stock.repository.StockSigmaRepository
@@ -23,7 +24,7 @@ data class AnalyzeResponse(val total: Int, val ok: Int, val errors: Int, val res
 /** legacy `stock/analysis_service.py` — 티커 분석 + 저장 + 리포트 발신 연쇄 */
 @Component
 class StockAnalysisService(
-    private val provider: YahooFinanceClient,
+    private val provider: AlpacaMarketDataClient,
     private val analysisRepository: StockAnalysisResultRepository,
     private val watchlistRepository: StockWatchlistRepository,
     private val sigmaRepository: StockSigmaRepository,
@@ -38,14 +39,21 @@ class StockAnalysisService(
         val results = mutableListOf<AnalyzeResult>()
         var ok = 0
         var errors = 0
+        val symbols = tickers.map { it.uppercase() }
+        val (quotes, candlesBySymbol) = try {
+            provider.snapshots(symbols) to provider.dailyBars(symbols)
+        } catch (e: AlpacaMarketDataException) {
+            log.warn { "market data fetch failed for analysis: ${e.message}" }
+            return AnalyzeResponse(tickers.size, 0, tickers.size, symbols.map { AnalyzeResult(it, "error", e.message) })
+        }
 
         for (ticker in tickers) {
             try {
                 val upper = ticker.uppercase()
-                val quote = provider.quote(upper)
-                val price = quote?.regularMarketPrice ?: 0.0
-                val change = quote?.regularMarketChange ?: 0.0
-                val changeRate = quote?.regularMarketChangePercent ?: 0.0
+                val quote = quotes[upper]
+                val price = quote?.price ?: 0.0
+                val change = quote?.change ?: 0.0
+                val changeRate = quote?.changePercent ?: 0.0
 
                 if (price == 0.0) {
                     results += AnalyzeResult(upper, "error", "Price unavailable — provider returned no data")
@@ -53,7 +61,7 @@ class StockAnalysisService(
                     continue
                 }
 
-                val candles = provider.chart(upper, "1d")
+                val candles = candlesBySymbol[upper].orEmpty()
                 if (candles.isEmpty()) {
                     // 빈 캔들(provider 실패) 시 가짜 분석이 ok 로 영속화되는 것 방지
                     results += AnalyzeResult(upper, "error", "No candle data — provider returned empty")

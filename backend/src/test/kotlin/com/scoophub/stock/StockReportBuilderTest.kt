@@ -105,19 +105,19 @@ class StockReportBuilderTest {
         // given
         stubGroups(
             mapOf(
-                "market" to listOf("^NDX"),
+                "market" to listOf("QQQ"),
                 "sector" to listOf("XLK"),
                 "individual" to listOf("AAPL"),
             ),
         )
-        stubRows(listOf(row("^NDX", price = 15000.0), row("XLK", price = 200.0), row("AAPL")))
+        stubRows(listOf(row("QQQ", price = 750.0), row("XLK", price = 200.0), row("AAPL")))
 
         // when
         val result = builder.run()
 
         // then
         assertThat(result).isNotNull()
-        assertThat(result).contains("시장층", "섹터층", "개별종목", "^NDX", "XLK", "AAPL")
+        assertThat(result).contains("시장층", "섹터층", "개별종목", "QQQ", "XLK", "AAPL")
     }
 
     @Test

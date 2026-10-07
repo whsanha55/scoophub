@@ -219,9 +219,9 @@ class StockController(
                 ResponseMeta(clock.instant()),
             )
         }
-        val (saved, errors) = crawlService.computeSigma(targetTickers)
+        val outcome = crawlService.computeSigma(targetTickers)
         return ApiResponse.ok(
-            mapOf("saved" to saved, "errors" to errors, "tickers" to targetTickers),
+            mapOf("saved" to outcome.saved, "errors" to outcome.failures.size, "tickers" to targetTickers),
             ResponseMeta(clock.instant()),
         )
     }
@@ -232,8 +232,8 @@ class StockController(
     @PostMapping("/crawling/stock/sync")
     fun crawlingSync(): ApiResponse<Map<String, Int>> {
         log.info { "_do_sync_candles() 진입" }
-        val totalSaved = crawlService.syncCandles()
-        return ApiResponse.ok(mapOf("synced" to totalSaved), ResponseMeta(clock.instant()))
+        val outcome = crawlService.syncCandles()
+        return ApiResponse.ok(mapOf("synced" to outcome.saved), ResponseMeta(clock.instant()))
     }
 
     // ── Daily Report Send (on-demand) ────────────────────────────────────────
