@@ -30,7 +30,7 @@ class LatestBatchQueryRepository(private val jdbcClient: JdbcClient, private val
             WHERE category = :category AND purpose = :purpose
         """
         baseFilters.forEachIndexed { i, f ->
-            params.addValue("f$i", f.value)
+            params.addValue("f$i", paramValue(f))
             sql += when (f) {
                 is TextEq -> " AND response ->> '${f.field}' = :f$i"
                 is TextLike -> " AND response ->> '${f.field}' ILIKE :f$i"
@@ -66,7 +66,7 @@ class LatestBatchQueryRepository(private val jdbcClient: JdbcClient, private val
               AND (response ->> 'fetched_at')::timestamptz = :latest
         """
         filters.forEachIndexed { i, f ->
-            params.addValue("f$i", f.value)
+            params.addValue("f$i", paramValue(f))
             sql += when (f) {
                 is TextEq -> " AND response ->> '${f.field}' = :f$i"
                 is TextLike -> " AND response ->> '${f.field}' ILIKE :f$i"
@@ -94,4 +94,8 @@ class LatestBatchQueryRepository(private val jdbcClient: JdbcClient, private val
             }
             .list()
     }
+
+    /** JsonArrayContains 는 원소 하나를 JSON 배열로 직렬화한다 (사용자 입력의 따옴표 등 이스케이프) */
+    private fun paramValue(f: BatchFilter): Any =
+        if (f is JsonArrayContains) jsonMapper.writeValueAsString(listOf(f.value)) else f.value
 }
