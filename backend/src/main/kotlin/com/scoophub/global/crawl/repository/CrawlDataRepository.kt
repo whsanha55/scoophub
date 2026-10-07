@@ -73,22 +73,4 @@ interface CrawlDataRepository : JpaRepository<CrawlDataEntity, Long> {
         nativeQuery = true,
     )
     fun findLatestSnapshotWithForecast(key: String): CrawlDataEntity?
-
-    /** response JSONB 경로 값으로 필터. path 예: `flightList` / `meta.score` */
-    @Query(
-        """
-        SELECT * FROM crawl_data
-        WHERE category = :category AND purpose = :purpose
-          AND response #>> string_to_array(:path, '.') = :value
-        ORDER BY date_at DESC LIMIT :limit
-        """,
-        nativeQuery = true,
-    )
-    fun findByPath(
-        category: String,
-        purpose: String,
-        path: String,
-        value: String,
-        limit: Int = 100,
-    ): List<CrawlDataEntity>
 }
