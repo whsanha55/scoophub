@@ -132,6 +132,27 @@ class StockApiTest @Autowired constructor(
     }
 
     @Test
+    fun `같은 티커의 다른 관심종목이 남아 있으면 비활성 행을 삭제해도 분석 결과는 유지된다`() {
+        // given
+        insertWatchlist("AMD")
+        val inactiveId = insertWatchlist("AMD", active = false)
+        insertAnalysis("AMD")
+
+        // when
+        mockMvc.delete("/api/stock/watchlist/$inactiveId") {
+            header("Authorization", bearer)
+        }.andExpect {
+            jsonPath("$.data.deleted") { value(inactiveId) }
+        }
+
+        // then
+        val remaining = jdbcClient.sql("SELECT COUNT(*) FROM stock_analysis_results WHERE ticker = 'AMD'")
+            .query(Int::class.java)
+            .single()
+        assertThat(remaining).isOne()
+    }
+
+    @Test
     fun `리포트는 관심종목 그룹과 WEM 시그마 폴백을 채운다`() {
         // given
         insertWatchlist("AAPL", group = "market")
@@ -257,14 +278,16 @@ class StockApiTest @Autowired constructor(
         }
     }
 
-    private fun insertWatchlist(ticker: String, group: String = "individual"): Int = jdbcClient.sql(
-        "INSERT INTO stock_watchlist (ticker, exchange, name, is_active, \"group\") " +
-            "VALUES (:ticker, 'NAS', '', TRUE, :group) RETURNING id",
-    )
-        .param("ticker", ticker)
-        .param("group", group)
-        .query(Int::class.java)
-        .single()
+    private fun insertWatchlist(ticker: String, group: String = "individual", active: Boolean = true): Int =
+        jdbcClient.sql(
+            "INSERT INTO stock_watchlist (ticker, exchange, name, is_active, \"group\") " +
+                "VALUES (:ticker, 'NAS', '', :active, :group) RETURNING id",
+        )
+            .param("ticker", ticker)
+            .param("group", group)
+            .param("active", active)
+            .query(Int::class.java)
+            .single()
 
     private fun insertAnalysis(ticker: String) {
         jdbcClient.sql(

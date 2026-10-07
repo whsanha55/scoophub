@@ -41,7 +41,7 @@ class StockWatchlistService(
         return watchlistQueryRepository.findById(id) ?: existing
     }
 
-    /** 관련 캔들/sigma/분석 결과까지 함께 삭제 (legacy remove 와 동일) */
+    /** 같은 티커의 다른 행이 없으면 관련 캔들/sigma/분석 결과까지 함께 삭제 */
     @Transactional
     fun delete(id: Int) {
         if (!watchlistRepository.existsById(id)) {
