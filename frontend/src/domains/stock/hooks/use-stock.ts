@@ -225,29 +225,6 @@ export function useStockAnalyze() {
   return { loading, result, error, triggerAnalyze };
 }
 
-export function useStockSigmaCrawl() {
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const triggerSigmaCrawl = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const res = await fetch("/api/crawling/stock/sigma", { method: "POST" });
-      const data: ApiResponse<{ items_fetched: number; items_new: number }> = await res.json();
-      if (!data.success) {
-        setError(data.error?.message || "Sigma crawl failed");
-      }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Unknown error");
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  return { loading, error, triggerSigmaCrawl };
-}
-
 export function useStockSigmaCompute() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);

@@ -67,9 +67,6 @@ export function StockReportCard({ report }: { report: StockReportSummarized }) {
           <div>
             Regime: <span className="text-foreground font-medium capitalize">{report.market_regime}</span>
           </div>
-          <div>
-            1σ Move: <span className="text-foreground font-medium">{report.expected_move_pct.toFixed(1)}%</span>
-          </div>
         </div>
         {(report.actionable_levels || report.hit_rate != null) && (
           <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground pt-1 border-t">

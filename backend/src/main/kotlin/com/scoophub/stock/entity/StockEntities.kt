@@ -32,27 +32,6 @@ class StockWatchlistEntity(
         protected set
 }
 
-/** V4 stock_weekly_expected_moves — 주간 예상움직임 */
-@Entity
-@Table(name = "stock_weekly_expected_moves")
-class StockWeeklyExpectedMoveEntity(
-    val ticker: String,
-    val weekStart: LocalDate,
-    val weekEnd: LocalDate,
-    var expectedMoveHigh: Double,
-    var expectedMoveLow: Double,
-    var expectedMovePct: Double,
-    @Column(insertable = false, updatable = false)
-    val createdAt: Instant,
-    @Column(insertable = false, updatable = false)
-    val updatedAt: Instant,
-) {
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    var id: Int? = null
-        protected set
-}
-
 /** V4 stock_candles — OHLCV */
 @Entity
 @Table(name = "stock_candles")

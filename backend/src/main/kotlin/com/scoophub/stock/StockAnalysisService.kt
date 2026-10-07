@@ -6,8 +6,6 @@ import com.scoophub.global.jackson.scalar
 import com.scoophub.stock.repository.StockAnalysisResultRepository
 import com.scoophub.stock.repository.StockSigmaRepository
 import com.scoophub.stock.repository.StockWatchlistRepository
-import com.scoophub.stock.repository.StockWeeklyExpectedMoveRepository
-import com.scoophub.stock.vo.SigmaModel
 import io.github.oshai.kotlinlogging.KotlinLogging
 import org.springframework.stereotype.Component
 import tools.jackson.databind.JsonNode
@@ -28,7 +26,6 @@ class StockAnalysisService(
     private val analysisRepository: StockAnalysisResultRepository,
     private val watchlistRepository: StockWatchlistRepository,
     private val sigmaRepository: StockSigmaRepository,
-    private val wemRepository: StockWeeklyExpectedMoveRepository,
     private val reportBuilder: StockReportBuilder,
     private val jsonMapper: JsonMapper,
     private val clock: Clock,
@@ -79,7 +76,7 @@ class StockAnalysisService(
 
                 // details dict + sigma enrichment
                 val details: ObjectNode = jsonMapper.valueToTree(report.technicalDetails)
-                fetchSigmaEnrichment(upper, price)?.let { details.set("sigma_data", it) }
+                fetchSigmaEnrichment(upper)?.let { details.set("sigma_data", it) }
                 analysisRepository.upsert(
                     ticker = upper,
                     exchange = exchange,
@@ -118,11 +115,11 @@ class StockAnalysisService(
         return AnalyzeResponse(tickers.size, ok, errors, results)
     }
 
-    /** 분석 시점 sigma + WEM 스냅샷 (issue #49 JSON 스키마) */
-    fun fetchSigmaEnrichment(ticker: String, price: Double): JsonNode? {
+    /** 분석 시점 sigma(straddle) 스냅샷 (issue #49 JSON 스키마). 과거 분석 행의 WEM(주간 예상변동폭) JSON 은 데이터 불변 원칙으로 남겨두고 읽지 않음 */
+    fun fetchSigmaEnrichment(ticker: String): JsonNode? {
         val sigmaData: ObjectNode = jsonMapper.createObjectNode()
 
-        // 1. stock_sigma (ATM straddle, nearest expiry)
+        // stock_sigma (ATM straddle, nearest expiry)
         sigmaRepository.findFirstByTickerOrderBySnapshotDateDescSnapshotAtDesc(ticker)?.let { s ->
             sigmaData.set(
                 "straddle",
@@ -140,41 +137,6 @@ class StockAnalysisService(
                 },
             )
         }
-
-        // 2. stock_weekly_expected_moves
-        wemRepository.findByTickerOrderByWeekStartDesc(ticker, org.springframework.data.domain.Limit.of(1))
-            .firstOrNull()
-            ?.let { w ->
-                val sigmaRange = SigmaModel.computeSigmaRange(
-                    com.scoophub.stock.vo.WeeklyExpectedMove(
-                        id = w.id,
-                        ticker = w.ticker,
-                        weekStart = w.weekStart,
-                        weekEnd = w.weekEnd,
-                        expectedMoveHigh = w.expectedMoveHigh,
-                        expectedMoveLow = w.expectedMoveLow,
-                        expectedMovePct = w.expectedMovePct,
-                    ),
-                    price,
-                )
-                val sigmaSignal = SigmaModel.generateSigmaSignal(sigmaRange)
-                sigmaData.set(
-                    "weekly_expected_move",
-                    jsonMapper.createObjectNode().apply {
-                        put("week_start", w.weekStart?.toString())
-                        put("week_end", w.weekEnd?.toString())
-                        put("expected_move_high", w.expectedMoveHigh)
-                        put("expected_move_low", w.expectedMoveLow)
-                        put("expected_move_pct", w.expectedMovePct)
-                        put("sigma_position", sigmaSignal.sigmaPosition.name)
-                        put("sigma_signal", sigmaSignal.signal.name)
-                        put("sigma_confidence", sigmaSignal.confidence)
-                        put("center", sigmaRange.center)
-                        put("upper_1sigma", sigmaRange.upper1sigma)
-                        put("lower_1sigma", sigmaRange.lower1sigma)
-                    },
-                )
-            }
 
         return if (sigmaData.isEmpty) null else sigmaData
     }
