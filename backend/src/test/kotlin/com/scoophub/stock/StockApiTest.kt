@@ -4,6 +4,9 @@ import com.ninjasquad.springmockk.MockkBean
 import com.scoophub.TestcontainersConfiguration
 import com.scoophub.external.alpaca.AlpacaMarketDataClient
 import com.scoophub.global.auth.JwtService
+import com.scoophub.stock.vo.Candle
+import com.scoophub.stock.vo.OptionQuote
+import com.scoophub.stock.vo.OptionsChain
 import com.scoophub.stock.vo.Quote
 import io.mockk.every
 import org.assertj.core.api.Assertions.assertThat
@@ -20,6 +23,7 @@ import org.springframework.test.web.servlet.delete
 import org.springframework.test.web.servlet.get
 import org.springframework.test.web.servlet.post
 import org.springframework.test.web.servlet.put
+import java.time.LocalDate
 
 /** StockController API 동작 고정 — 관심종목 CRUD, 리포트, 시그마 조회 */
 @SpringBootTest
@@ -308,6 +312,85 @@ class StockApiTest @Autowired constructor(
             jsonPath("$.data.saved") { value(0) }
             jsonPath("$.data.tickers.length()") { value(0) }
         }
+    }
+
+    @Test
+    fun `캔들 동기화는 시세 일봉을 stock_candles 에 저장한다`() {
+        // given
+        insertWatchlist("QQQ")
+        every { provider.dailyBars(listOf("QQQ")) } returns mapOf("QQQ" to candles("QQQ", 3))
+
+        // when & then
+        mockMvc.post("/api/crawling/stock/sync") { header("Authorization", bearer) }.andExpect {
+            jsonPath("$.data.synced") { value(3) }
+        }
+        val count = jdbcClient.sql(
+            "SELECT count(*) FROM stock_candles WHERE ticker = 'QQQ'",
+        ).query(Int::class.java).single()
+        assertThat(count).isEqualTo(3)
+    }
+
+    @Test
+    fun `시그마 즉시 계산은 옵션 체인으로 계산한 스트래들을 저장한다`() {
+        // given
+        every { provider.snapshots(listOf("QQQ")) } returns mapOf("QQQ" to quote(759.66))
+        every { provider.optionChains("QQQ") } returns listOf(
+            OptionsChain(
+                expiry = LocalDate.parse("2026-10-09"),
+                calls = listOf(OptionQuote(strike = 760.0, bid = 4.25, ask = 4.39, lastPrice = 4.3, volume = 9675)),
+                puts = listOf(OptionQuote(strike = 760.0, bid = 4.1, ask = 4.31, lastPrice = 4.2, volume = 24456)),
+            ),
+        )
+
+        // when & then
+        mockMvc.post("/api/crawling/stock/sigma/compute") {
+            header("Authorization", bearer)
+            param("tickers", "QQQ")
+        }.andExpect {
+            jsonPath("$.data.saved") { value(1) }
+            jsonPath("$.data.errors") { value(0) }
+        }
+        val count = jdbcClient.sql(
+            "SELECT count(*) FROM stock_sigma WHERE ticker = 'QQQ'",
+        ).query(Int::class.java).single()
+        assertThat(count).isOne()
+    }
+
+    @Test
+    fun `분석 실행은 시세와 일봉으로 분석 결과를 저장한다`() {
+        // given
+        insertWatchlist("QQQ")
+        every { provider.snapshots(listOf("QQQ")) } returns mapOf("QQQ" to quote(759.66))
+        every { provider.dailyBars(listOf("QQQ")) } returns mapOf("QQQ" to candles("QQQ", 130))
+
+        // when & then
+        mockMvc.post("/api/crawling/stock/analyze") {
+            header("Authorization", bearer)
+            param("tickers", "QQQ")
+        }.andExpect {
+            jsonPath("$.data.ok") { value(1) }
+        }
+        val timeframes = jdbcClient.sql("SELECT timeframe FROM stock_analysis_results WHERE ticker = 'QQQ'")
+            .query(String::class.java)
+            .list()
+        assertThat(timeframes).contains("1D")
+    }
+
+    private fun quote(price: Double) =
+        Quote(price = price, change = 1.0, changePercent = 0.1, open = price, high = price, low = price, volume = 1.0)
+
+    private fun candles(ticker: String, days: Int): List<Candle> = (0 until days).map { i ->
+        val close = 700.0 + i
+        Candle(
+            ticker = ticker,
+            interval = "1D",
+            date = LocalDate.parse("2026-04-01").plusDays(i.toLong()),
+            open = close - 1,
+            high = close + 2,
+            low = close - 2,
+            close = close,
+            volume = 1_000_000.0 + i,
+        )
     }
 
     private fun insertWatchlist(ticker: String, group: String = "individual", active: Boolean = true): Int =
