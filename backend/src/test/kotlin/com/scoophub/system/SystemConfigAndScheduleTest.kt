@@ -131,6 +131,20 @@ class SystemConfigAndScheduleTest @Autowired constructor(
     }
 
     @Test
+    fun `crawl_schedule CHECK — 비양수 interval 과 빈 cron 저장 거부`() {
+        org.assertj.core.api.Assertions.assertThatThrownBy {
+            jdbcClient.sql(
+                "UPDATE crawl_schedule SET schedule_minutes = 0 WHERE crawler='weather' AND job_id='weather_crawler'",
+            ).update()
+        }.isInstanceOf(org.springframework.dao.DataIntegrityViolationException::class.java)
+        org.assertj.core.api.Assertions.assertThatThrownBy {
+            jdbcClient.sql(
+                "UPDATE crawl_schedule SET schedules = '{}' WHERE crawler='github_trending' AND job_id='github_trending_crawler'",
+            ).update()
+        }.isInstanceOf(org.springframework.dao.DataIntegrityViolationException::class.java)
+    }
+
+    @Test
     fun `스케줄 PATCH — 검증 오류`() {
         // 잘못된 cron expr → 422
         mockMvc.patch("/api/schedules/github_trending/github_trending_crawler") {
@@ -152,6 +166,17 @@ class SystemConfigAndScheduleTest @Autowired constructor(
             contentType = MediaType.APPLICATION_JSON
             content = """{"schedules": ["0 9 * * *"]}"""
         }.andExpect { status { isUnprocessableEntity() } }
+
+        // 0 이하 schedule_minutes → 422, DB 는 그대로
+        mockMvc.patch("/api/schedules/weather/weather_crawler") {
+            header("Authorization", bearer)
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"schedule_minutes": 0}"""
+        }.andExpect { status { isUnprocessableEntity() } }
+        val minutes = jdbcClient.sql(
+            "SELECT schedule_minutes FROM crawl_schedule WHERE crawler='weather' AND job_id='weather_crawler'",
+        ).query(Int::class.java).single()
+        org.assertj.core.api.Assertions.assertThat(minutes).isEqualTo(30)
 
         // 빈 body → 422
         mockMvc.patch("/api/schedules/weather/weather_crawler") {
