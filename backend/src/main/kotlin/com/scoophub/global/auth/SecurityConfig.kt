@@ -31,9 +31,6 @@ private val log = KotlinLogging.logger {}
 class SecurityConfig(private val jwtService: JwtService, private val props: ScoophubProperties) {
 
     init {
-        if (props.auth.jwtSecret == DEFAULT_JWT_SECRET) {
-            log.warn { "JWT_SECRET is insecure (default) — set a strong random JWT_SECRET in production" }
-        }
         if (props.auth.bypass) {
             log.warn { "AUTH_BYPASS is ON — all auth checks skipped (local dev only, NEVER enable in production)" }
         }
@@ -88,7 +85,6 @@ class SecurityConfig(private val jwtService: JwtService, private val props: Scoo
     }
 
     companion object {
-        const val DEFAULT_JWT_SECRET = "dev-secret-change-me-dev-secret-change-me"
         private const val BEARER_PREFIX = "Bearer "
         private const val ATTR_AUTH_ERROR = "scoophub.authError"
         private val BYPASS_USER = AuthUser(email = "dev@local", isSuper = true)

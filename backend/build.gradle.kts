@@ -88,5 +88,6 @@ tasks.withType<Test> {
     // 테스트 컨텍스트에서 실제 크롤 잡이 돌지 않도록 (테스트는 잡 미등록 전제)
     environment("ENABLE_SCHEDULER", "false")
     environment("ALPACA_STREAM_ENABLED", "false")
+    environment("JWT_SECRET", "test-secret-test-secret-test-secret-0000")
     environment("ALPACA_WORKER_ENABLED", "false")
 }
