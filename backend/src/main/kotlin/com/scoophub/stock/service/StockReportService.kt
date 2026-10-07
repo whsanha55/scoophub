@@ -1,6 +1,6 @@
 package com.scoophub.stock.service
 
-import com.scoophub.external.yahoo.YahooFinanceClient
+import com.scoophub.external.alpaca.AlpacaMarketDataClient
 import com.scoophub.global.jackson.scalar
 import com.scoophub.stock.StockReportBuilder
 import com.scoophub.stock.dto.ActionableLevelsOut
@@ -30,7 +30,7 @@ private val log = KotlinLogging.logger {}
 /** legacy `stock/router.py` 리포트 조회 — 분석 결과 + sigma 폴백 + actionable levels + group */
 @Service
 class StockReportService(
-    private val provider: YahooFinanceClient,
+    private val provider: AlpacaMarketDataClient,
     private val watchlistRepository: StockWatchlistRepository,
     private val analysisRepository: StockAnalysisResultRepository,
     private val wemRepository: StockWeeklyExpectedMoveRepository,
@@ -134,12 +134,12 @@ class StockReportService(
     /** 실시간 quote. 실패 시 quote=None, 나머지 정상 (legacy /stock/detail) */
     private fun attachQuote(report: StockReport, ticker: String) {
         try {
-            val q = provider.quote(ticker) ?: return
-            if (q.regularMarketPrice != 0.0) {
+            val q = provider.snapshots(listOf(ticker))[ticker] ?: return
+            if (q.price != 0.0) {
                 report.quote = StockQuoteOut(
-                    price = q.regularMarketPrice,
-                    change = q.regularMarketChange,
-                    changeRate = q.regularMarketChangePercent,
+                    price = q.price,
+                    change = q.change,
+                    changeRate = q.changePercent,
                     volume = q.volume.takeIf { it != 0.0 },
                     high = q.high.takeIf { it != 0.0 },
                     low = q.low.takeIf { it != 0.0 },

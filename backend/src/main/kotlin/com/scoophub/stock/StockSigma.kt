@@ -1,10 +1,8 @@
 package com.scoophub.stock
 
-import com.scoophub.external.yahoo.OptionQuote
-import com.scoophub.external.yahoo.OptionsChain
-import com.scoophub.external.yahoo.YahooFinanceClient
+import com.scoophub.stock.vo.OptionQuote
+import com.scoophub.stock.vo.OptionsChain
 import io.github.oshai.kotlinlogging.KotlinLogging
-import java.time.Clock
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
@@ -17,7 +15,7 @@ private val log = KotlinLogging.logger {}
 data class SigmaResult(
     val ticker: String,
     val currentPrice: Double,
-    val expiryDate: LocalDate?,
+    val expiryDate: LocalDate,
     val atmStrike: Double,
     val atmCall: Double,
     val atmPut: Double,
@@ -37,7 +35,7 @@ data class SigmaResult(
 object StockSigma {
     private val ET: ZoneId = ZoneId.of("America/New_York")
 
-    /** 티커당 저장 만기 상한 (yfinance 3초 throttle × 만기수 → 지연 상한) */
+    /** 티커당 저장 만기 상한 (가까운 만기부터) */
     const val MAX_EXPIRIES = 6
 
     private fun optionPrice(opt: OptionQuote): Double {
@@ -86,11 +84,10 @@ object StockSigma {
         val totalPutVolume = chain.puts.sumOf { it.volume }
         val pcr = if (totalCallVolume > 0) totalPutVolume.toDouble() / totalCallVolume else null
 
-        val expiryDate = runCatching { LocalDate.parse(chain.expiry.take(10)) }.getOrNull()
         return SigmaResult(
             ticker = ticker,
             currentPrice = currentPrice,
-            expiryDate = expiryDate,
+            expiryDate = chain.expiry,
             atmStrike = atmStrike,
             atmCall = round4(callPrice),
             atmPut = round4(putPrice),
@@ -98,7 +95,7 @@ object StockSigma {
             expectedMovePct = round4(expectedMovePct),
             snapshotDate = snapshotAt.atZone(ET).toLocalDate(), // ET 거래일
             snapshotAt = snapshotAt,
-            source = "yfinance_straddle",
+            source = SOURCE,
             totalCallVolume = totalCallVolume,
             totalPutVolume = totalPutVolume,
             putCallVolumeRatio = pcr?.let { round4(it) },
@@ -107,32 +104,27 @@ object StockSigma {
         )
     }
 
-    /** 만기별 sigma 계산. expected_move = ATM call + ATM put */
+    /** 만기별 sigma 계산. expected_move = ATM call + ATM put. chains 는 만기 오름차순 */
     fun computeSigmaFromOptions(
-        provider: YahooFinanceClient,
+        chains: List<OptionsChain>,
         ticker: String,
         currentPrice: Double,
-        snapshotAt: Instant? = null,
-        clock: Clock,
+        snapshotAt: Instant,
     ): List<SigmaResult> {
         if (currentPrice <= 0) {
             return emptyList()
         }
-        val at = snapshotAt ?: clock.instant()
-
-        val firstChain = provider.optionsChain(ticker) ?: run {
+        if (chains.isEmpty()) {
             log.warn { "No options chain data for $ticker" }
             return emptyList()
         }
-        val expiries = firstChain.expiries.take(MAX_EXPIRIES)
-
-        val results = expiries.mapNotNull { expiry ->
-            val chain = if (expiry == firstChain.expiry) firstChain else provider.optionsChain(ticker, expiry)
-            chain?.let { computeOne(it, ticker, currentPrice, at) }
-        }
+        val expiries = chains.take(MAX_EXPIRIES)
+        val results = expiries.mapNotNull { computeOne(it, ticker, currentPrice, snapshotAt) }
         if (results.isEmpty()) {
             log.warn { "No valid sigma computed for $ticker across ${expiries.size} expiries" }
         }
         return results
     }
+
+    const val SOURCE = "alpaca_straddle"
 }

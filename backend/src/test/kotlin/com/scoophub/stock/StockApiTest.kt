@@ -2,9 +2,9 @@ package com.scoophub.stock
 
 import com.ninjasquad.springmockk.MockkBean
 import com.scoophub.TestcontainersConfiguration
-import com.scoophub.external.yahoo.Quote
-import com.scoophub.external.yahoo.YahooFinanceClient
+import com.scoophub.external.alpaca.AlpacaMarketDataClient
 import com.scoophub.global.auth.JwtService
+import com.scoophub.stock.vo.Quote
 import io.mockk.every
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.BeforeEach
@@ -31,7 +31,7 @@ class StockApiTest @Autowired constructor(
     private val jdbcClient: JdbcClient,
 ) {
     @MockkBean
-    private lateinit var provider: YahooFinanceClient
+    private lateinit var provider: AlpacaMarketDataClient
 
     private val bearer by lazy { "Bearer ${jwtService.create("admin@test.com", true)}" }
 
@@ -73,6 +73,18 @@ class StockApiTest @Autowired constructor(
 
         mockMvc.get("/api/stock/watchlist").andExpect {
             jsonPath("$.data.length()") { value(1) }
+        }
+    }
+
+    @Test
+    fun `지수 기호 관심종목은 추가할 수 없다`() {
+        // when & then
+        mockMvc.post("/api/stock/watchlist") {
+            header("Authorization", bearer)
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"ticker": "^IXIC"}"""
+        }.andExpect {
+            status { isUnprocessableEntity() }
         }
     }
 
@@ -157,11 +169,11 @@ class StockApiTest @Autowired constructor(
         // given — float4 유효숫자(약 7자리)를 넘는 값
         jdbcClient.sql(
             "INSERT INTO stock_candles (ticker, interval, date, open, high, low, close, volume) " +
-                "VALUES ('^IXIC', '1D', '2026-10-06', 18234.56, 18300.12, 18100.01, 18250.78, 123456789)",
+                "VALUES ('QQQ', '1D', '2026-10-06', 18234.56, 18300.12, 18100.01, 18250.78, 123456789)",
         ).update()
 
         // when
-        val (close, volume) = jdbcClient.sql("SELECT close, volume FROM stock_candles WHERE ticker = '^IXIC'")
+        val (close, volume) = jdbcClient.sql("SELECT close, volume FROM stock_candles WHERE ticker = 'QQQ'")
             .query { rs, _ -> rs.getDouble("close") to rs.getDouble("volume") }
             .single()
 
@@ -221,14 +233,16 @@ class StockApiTest @Autowired constructor(
     fun `상세 조회는 실시간 quote 를 붙이고 분석이 없으면 data 가 null 이다`() {
         // given
         insertAnalysis("AAPL")
-        every { provider.quote("AAPL") } returns Quote(
-            regularMarketPrice = 101.0,
-            regularMarketChange = 1.0,
-            regularMarketChangePercent = 1.0,
-            open = 100.0,
-            high = 102.0,
-            low = 99.0,
-            volume = 0.0,
+        every { provider.snapshots(listOf("AAPL")) } returns mapOf(
+            "AAPL" to Quote(
+                price = 101.0,
+                change = 1.0,
+                changePercent = 1.0,
+                open = 100.0,
+                high = 102.0,
+                low = 99.0,
+                volume = 0.0,
+            ),
         )
 
         // when & then
@@ -268,7 +282,7 @@ class StockApiTest @Autowired constructor(
     @Test
     fun `시그마 즉시 계산은 시세가 없으면 에러로 집계한다`() {
         // given
-        every { provider.quote("AAPL") } returns null
+        every { provider.snapshots(listOf("AAPL")) } returns emptyMap()
 
         // when & then
         mockMvc.post("/api/crawling/stock/sigma/compute") {

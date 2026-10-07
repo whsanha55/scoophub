@@ -3,6 +3,7 @@ package com.scoophub.stock.dto
 import com.fasterxml.jackson.annotation.JsonInclude
 import com.scoophub.global.jackson.scalar
 import com.scoophub.stock.ActionableLevels
+import com.scoophub.stock.StockSigma
 import com.scoophub.stock.entity.StockAnalysisResultEntity
 import com.scoophub.stock.entity.StockSigmaEntity
 import com.scoophub.stock.entity.StockWeeklyExpectedMoveEntity
@@ -123,7 +124,7 @@ data class StockQuoteOut(
     val high: Double? = null,
     val low: Double? = null,
     val open: Double? = null,
-    val source: String = "yfinance",
+    val source: String = "alpaca",
     val timestamp: Instant? = null,
 )
 
@@ -221,7 +222,7 @@ data class SigmaSnapshotOut(
             expectedMovePct = row.expectedMovePct,
             snapshotDate = row.snapshotDate.toString(),
             snapshotAt = row.snapshotAt,
-            source = "yfinance_straddle",
+            source = StockSigma.SOURCE,
             totalCallVolume = row.totalCallVolume,
             totalPutVolume = row.totalPutVolume,
             putCallVolumeRatio = row.putCallVolumeRatio,

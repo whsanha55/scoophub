@@ -24,15 +24,19 @@ class StockWatchlistService(
             ?: watchlistRepository.findByIsActiveOrderByAddedAt().map { it.ticker }
 
     /** 중복 티커는 DataIntegrityViolationException */
-    fun add(item: WatchlistItemIn): WatchlistRow = watchlistQueryRepository.insert(
-        ticker = item.ticker.uppercase(),
-        exchange = item.exchange.uppercase(),
-        name = item.name,
-        memo = item.memo,
-        group = item.group.ifEmpty { "individual" },
-    )
+    fun add(item: WatchlistItemIn): WatchlistRow {
+        validateTicker(item.ticker)
+        return watchlistQueryRepository.insert(
+            ticker = item.ticker.uppercase(),
+            exchange = item.exchange.uppercase(),
+            name = item.name,
+            memo = item.memo,
+            group = item.group.ifEmpty { "individual" },
+        )
+    }
 
     fun update(id: Int, item: WatchlistUpdateIn): WatchlistRow {
+        item.ticker?.let { validateTicker(it) }
         val existing = watchlistQueryRepository.findById(id)
             ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "Watchlist item $id not found")
         if (!watchlistQueryRepository.update(id, item)) {
@@ -51,5 +55,12 @@ class StockWatchlistService(
         watchlistRepository.deleteSigmaOf(id)
         watchlistRepository.deleteAnalysisOf(id)
         watchlistRepository.deleteByIdRow(id)
+    }
+
+    /** 시세 소스(Alpaca)가 지수 기호를 지원하지 않는다 */
+    private fun validateTicker(ticker: String) {
+        if (ticker.startsWith("^")) {
+            throw ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY, "Index symbols are not supported: $ticker")
+        }
     }
 }
