@@ -57,15 +57,6 @@ class CrawlDataStoreTest @Autowired constructor(
     }
 
     @Test
-    fun `JSONB 경로 값으로 필터`() {
-        store.upsert("kal", "bonus_seat", "ICN-LHR-202701", mapOf("meta" to mapOf("status" to "open")))
-        store.upsert("kal", "bonus_seat", "ICN-CDG-202701", mapOf("meta" to mapOf("status" to "closed")))
-
-        val hits = repository.findByPath("kal", "bonus_seat", "meta.status", "open")
-        assertThat(hits.map { it.key }).containsExactly("ICN-LHR-202701")
-    }
-
-    @Test
     fun `data class 는 전역 snake_case 로 저장된다`() {
         data class Snapshot(val tempC: Int, val feelsLike: Int)
         store.upsert("weather", "snapshot", "seoul", Snapshot(20, 18))

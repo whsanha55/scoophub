@@ -2,6 +2,7 @@ package com.scoophub.news
 
 import com.scoophub.TestcontainersConfiguration
 import org.assertj.core.api.Assertions.assertThat
+import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
@@ -18,6 +19,13 @@ class RssNewsRemovalTest @Autowired constructor(private val jdbc: JdbcClient, pr
     @BeforeEach
     fun clean() {
         jdbc.sql("DELETE FROM notify_routes WHERE category = 'news'").update()
+        // V31 에서 삭제된 테이블 — V22 실행 시점의 스키마를 재현한다
+        jdbc.sql("CREATE TABLE IF NOT EXISTS crawl_sources (crawler TEXT, name TEXT, url TEXT)").update()
+    }
+
+    @AfterEach
+    fun dropLegacyTables() {
+        jdbc.sql("DROP TABLE IF EXISTS crawl_sources").update()
     }
 
     private fun migrate() {

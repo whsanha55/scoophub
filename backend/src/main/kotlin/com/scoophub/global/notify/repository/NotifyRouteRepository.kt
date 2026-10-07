@@ -8,7 +8,7 @@ import org.springframework.transaction.annotation.Transactional
 
 interface NotifyRouteRepository : JpaRepository<NotifyRouteEntity, Long> {
 
-    /** exact (category,purpose) 매칭 우선, 없으면 ''(wildcard) 폴백 */
+    /** exact 와 ''(wildcard) 라우트를 모두 반환한다(exact 먼저). 호출부는 반환된 라우트 전부에 발신한다 */
     @Query(
         """
         SELECT * FROM notify_routes
