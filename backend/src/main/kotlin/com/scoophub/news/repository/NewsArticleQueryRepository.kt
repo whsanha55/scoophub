@@ -29,11 +29,11 @@ class NewsArticleQueryRepository(private val jdbc: JdbcClient) {
         )
     }
 
-    fun upsert(article: AlpacaArticleRow) {
+    fun upsert(article: AlpacaArticleRow, now: Instant) {
         jdbc.sql(
             """
-            INSERT INTO news_article (id, source, headline, summary, content, author, url, symbols, published_at, source_updated_at)
-            VALUES (:id, :source, :headline, :summary, :content, :author, :url, :symbols::text[], :published, :updated)
+            INSERT INTO news_article (id, source, headline, summary, content, author, url, symbols, published_at, source_updated_at, next_attempt_at)
+            VALUES (:id, :source, :headline, :summary, :content, :author, :url, :symbols::text[], :published, :updated, :now)
             ON CONFLICT (id) DO UPDATE SET source = EXCLUDED.source, headline = EXCLUDED.headline,
                 summary = EXCLUDED.summary, content = EXCLUDED.content, author = EXCLUDED.author,
                 url = EXCLUDED.url, symbols = EXCLUDED.symbols, source_updated_at = EXCLUDED.source_updated_at, updated_at = NOW()
@@ -45,7 +45,7 @@ class NewsArticleQueryRepository(private val jdbc: JdbcClient) {
             .param(
                 "published",
                 Timestamp.from(article.publishedAt),
-            ).param("updated", Timestamp.from(article.sourceUpdatedAt)).update()
+            ).param("updated", Timestamp.from(article.sourceUpdatedAt)).param("now", Timestamp.from(now)).update()
     }
 
     fun findPending(now: Instant): List<AlpacaArticleRow> = jdbc.sql(

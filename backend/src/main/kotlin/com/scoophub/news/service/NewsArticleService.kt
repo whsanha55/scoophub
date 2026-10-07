@@ -14,7 +14,7 @@ import java.util.Locale
 @Service
 class NewsArticleService(private val repository: NewsArticleQueryRepository, private val clock: Clock) {
     @Transactional
-    fun receive(article: AlpacaArticleRow): Unit = repository.upsert(article)
+    fun receive(article: AlpacaArticleRow): Unit = repository.upsert(article, clock.instant())
 
     fun findArticles(
         minutes: Int?,
