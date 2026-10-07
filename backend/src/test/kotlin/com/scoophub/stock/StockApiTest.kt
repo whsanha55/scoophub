@@ -153,6 +153,24 @@ class StockApiTest @Autowired constructor(
     }
 
     @Test
+    fun `캔들 가격과 거래량은 float4 로 깎이지 않고 그대로 저장된다`() {
+        // given — float4 유효숫자(약 7자리)를 넘는 값
+        jdbcClient.sql(
+            "INSERT INTO stock_candles (ticker, interval, date, open, high, low, close, volume) " +
+                "VALUES ('^IXIC', '1D', '2026-10-06', 18234.56, 18300.12, 18100.01, 18250.78, 123456789)",
+        ).update()
+
+        // when
+        val (close, volume) = jdbcClient.sql("SELECT close, volume FROM stock_candles WHERE ticker = '^IXIC'")
+            .query { rs, _ -> rs.getDouble("close") to rs.getDouble("volume") }
+            .single()
+
+        // then
+        assertThat(close).isEqualTo(18250.78)
+        assertThat(volume).isEqualTo(123456789.0)
+    }
+
+    @Test
     fun `리포트는 관심종목 그룹과 WEM 시그마 폴백을 채운다`() {
         // given
         insertWatchlist("AAPL", group = "market")
