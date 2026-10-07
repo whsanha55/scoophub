@@ -4,8 +4,6 @@ import com.scoophub.stock.entity.StockAnalysisResultEntity
 import com.scoophub.stock.entity.StockCandleEntity
 import com.scoophub.stock.entity.StockSigmaEntity
 import com.scoophub.stock.entity.StockWatchlistEntity
-import com.scoophub.stock.entity.StockWeeklyExpectedMoveEntity
-import org.springframework.data.domain.Limit
 import org.springframework.data.jpa.repository.JpaRepository
 import org.springframework.data.jpa.repository.Modifying
 import org.springframework.data.jpa.repository.Query
@@ -176,31 +174,4 @@ interface StockSigmaRepository : JpaRepository<StockSigmaEntity, Long> {
 
     /** legacy `get_latest` — ORDER BY snapshot_date DESC, expiry_date ASC */
     fun findFirstByTickerOrderBySnapshotDateDescExpiryDateAsc(ticker: String): StockSigmaEntity?
-}
-
-interface StockWeeklyExpectedMoveRepository : JpaRepository<StockWeeklyExpectedMoveEntity, Int> {
-
-    @Modifying
-    @Query(
-        value = """
-        INSERT INTO stock_weekly_expected_moves
-            (ticker, week_start, week_end, expected_move_high, expected_move_low, expected_move_pct)
-        VALUES (:ticker, :weekStart, :weekEnd, :high, :low, :pct)
-        ON CONFLICT (ticker, week_end) DO UPDATE SET
-            week_start = EXCLUDED.week_start, expected_move_high = EXCLUDED.expected_move_high,
-            expected_move_low = EXCLUDED.expected_move_low, expected_move_pct = EXCLUDED.expected_move_pct,
-            updated_at = now()
-        """,
-        nativeQuery = true,
-    )
-    fun upsert(
-        @Param("ticker") ticker: String,
-        @Param("weekStart") weekStart: LocalDate,
-        @Param("weekEnd") weekEnd: LocalDate,
-        @Param("high") high: Double,
-        @Param("low") low: Double,
-        @Param("pct") pct: Double,
-    )
-
-    fun findByTickerOrderByWeekStartDesc(ticker: String, limit: Limit): List<StockWeeklyExpectedMoveEntity>
 }

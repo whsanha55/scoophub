@@ -1,14 +1,9 @@
 package com.scoophub.stock.dto
 
-import com.fasterxml.jackson.annotation.JsonInclude
-import com.scoophub.global.jackson.scalar
 import com.scoophub.stock.ActionableLevels
 import com.scoophub.stock.StockSigma
 import com.scoophub.stock.entity.StockAnalysisResultEntity
 import com.scoophub.stock.entity.StockSigmaEntity
-import com.scoophub.stock.entity.StockWeeklyExpectedMoveEntity
-import com.scoophub.stock.vo.SigmaModel
-import com.scoophub.stock.vo.WeeklyExpectedMove
 import tools.jackson.databind.JsonNode
 import java.time.Instant
 
@@ -20,82 +15,6 @@ data class TechnicalOut(
     val marketRegime: String,
     val technicalScores: JsonNode,
     val technicalDetails: JsonNode,
-)
-
-/**
- * legacy `schemas.py` SigmaOut. NON_NULL — legacy 응답 형식 유지:
- * 저장 스냅샷 경로(생성자 검증)는 `source` 키가 제거되고 `weekly_moves=[]`,
- * WEM 폴백 경우(대입)는 원본 dict(source + weekly_moves) 그대로 직렬화된다.
- */
-@JsonInclude(JsonInclude.Include.NON_NULL)
-data class SigmaOut(
-    val sigmaPosition: String,
-    val sigmaSignal: String,
-    val sigmaConfidence: Double,
-    val expectedMovePct: Double,
-    val expectedMoveHigh: Double,
-    val expectedMoveLow: Double,
-    val source: String? = null,
-    val weeklyMoves: List<WeeklyMoveOut> = emptyList(),
-) {
-    companion object {
-        /** `_analysis_row_to_report` — technical_details.sigma_data.weekly_expected_move 저장 스냅샷 */
-        fun fromPersistedSnapshot(techDetails: JsonNode?): SigmaOut? {
-            val wem = techDetails?.get("sigma_data")?.get("weekly_expected_move")?.takeIf { !it.isNull }
-                ?: return null
-            return SigmaOut(
-                sigmaPosition = wem.scalar("sigma_position") ?: "",
-                sigmaSignal = wem.scalar("sigma_signal") ?: "",
-                sigmaConfidence = wem.scalar("sigma_confidence")?.toDouble() ?: 0.0,
-                expectedMovePct = wem.scalar("expected_move_pct")?.toDouble() ?: 0.0,
-                expectedMoveHigh = wem.scalar("expected_move_high")?.toDouble() ?: 0.0,
-                expectedMoveLow = wem.scalar("expected_move_low")?.toDouble() ?: 0.0,
-            )
-        }
-
-        /** `_enrich_sigma_fallback` — WEM 최근 내역으로 실시간 산출 */
-        fun fromWem(wemList: List<StockWeeklyExpectedMoveEntity>, price: Double): SigmaOut {
-            val first = wemList.first()
-            val signal = SigmaModel.generateSigmaSignal(SigmaModel.computeSigmaRange(first.toVo(), price))
-            return SigmaOut(
-                sigmaPosition = signal.sigmaPosition.name,
-                sigmaSignal = signal.signal.name,
-                sigmaConfidence = signal.confidence,
-                expectedMovePct = first.expectedMovePct,
-                expectedMoveHigh = first.expectedMoveHigh,
-                expectedMoveLow = first.expectedMoveLow,
-                source = "usstocksigma_html",
-                weeklyMoves = wemList.map {
-                    WeeklyMoveOut(
-                        weekStart = it.weekStart.toString(),
-                        weekEnd = it.weekEnd.toString(),
-                        expectedMovePct = it.expectedMovePct,
-                        expectedMoveHigh = it.expectedMoveHigh,
-                        expectedMoveLow = it.expectedMoveLow,
-                    )
-                },
-            )
-        }
-
-        private fun StockWeeklyExpectedMoveEntity.toVo() = WeeklyExpectedMove(
-            id = id,
-            ticker = ticker,
-            weekStart = weekStart,
-            weekEnd = weekEnd,
-            expectedMoveHigh = expectedMoveHigh,
-            expectedMoveLow = expectedMoveLow,
-            expectedMovePct = expectedMovePct,
-        )
-    }
-}
-
-/** legacy `schemas.py` SigmaOut.weekly_moves 항목 */
-data class WeeklyMoveOut(
-    val weekStart: String?,
-    val weekEnd: String?,
-    val expectedMovePct: Double,
-    val expectedMoveHigh: Double,
-    val expectedMoveLow: Double,
 )
 
 /** legacy `schemas.py` ActionableLevelsOut */
@@ -128,7 +47,7 @@ data class StockQuoteOut(
     val timestamp: Instant? = null,
 )
 
-/** legacy `schemas.py` StockReport — sigma/actionable_levels/group/quote enrichment 로 var */
+/** legacy `schemas.py` StockReport — actionable_levels/group/quote enrichment 로 var */
 data class StockReport(
     val ticker: String,
     val exchange: String,
@@ -136,7 +55,6 @@ data class StockReport(
     val change: Double,
     val changeRate: Double,
     val technical: TechnicalOut,
-    var sigma: SigmaOut? = null,
     var actionableLevels: ActionableLevelsOut? = null,
     val hitRate: Double? = null,
     var group: String? = null,
@@ -156,10 +74,6 @@ data class StockSummary(
     val totalScore: Double,
     val confidence: Double,
     val marketRegime: String,
-    val sigmaPosition: String,
-    val sigmaSignal: String,
-    val sigmaConfidence: Double,
-    val expectedMovePct: Double,
     val actionableLevels: ActionableLevelsOut? = null,
     val hitRate: Double? = null,
     val group: String? = null,
@@ -177,10 +91,6 @@ data class StockSummary(
             totalScore = row.totalScore,
             confidence = row.confidence,
             marketRegime = row.marketRegime,
-            sigmaPosition = report.sigma?.sigmaPosition ?: "NEAR_CENTER",
-            sigmaSignal = report.sigma?.sigmaSignal ?: "NEUTRAL",
-            sigmaConfidence = report.sigma?.sigmaConfidence ?: 0.0,
-            expectedMovePct = report.sigma?.expectedMovePct ?: 0.0,
             actionableLevels = report.actionableLevels,
             group = report.group,
             dataDate = report.dataDate,

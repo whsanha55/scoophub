@@ -1,14 +1,11 @@
 package com.scoophub.stock
 
-import com.scoophub.stock.vo.SigmaModel
 import com.scoophub.stock.vo.SigmaRange
-import com.scoophub.stock.vo.WeeklyExpectedMove
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.within
 import org.junit.jupiter.api.Test
 import tools.jackson.databind.JsonNode
 import tools.jackson.databind.json.JsonMapper
-import java.time.LocalDate
 
 /**
  * legacy tests/test_stock_report.py 포팅 — T4(compute_actionable_levels) +
@@ -20,15 +17,10 @@ class StockReportLevelsTest {
 
     private fun details(json: String): JsonNode = jsonMapper.readTree(json)
 
-    private fun sigma(high: Double, low: Double, price: Double): SigmaRange = SigmaModel.computeSigmaRange(
-        WeeklyExpectedMove(
-            ticker = "AAPL",
-            weekStart = LocalDate.of(2024, 1, 1),
-            weekEnd = LocalDate.of(2024, 1, 5),
-            expectedMoveHigh = high,
-            expectedMoveLow = low,
-            expectedMovePct = 10.0,
-        ),
+    private fun sigma(high: Double, low: Double, price: Double): SigmaRange = SigmaRange(
+        center = (high + low) / 2,
+        upper1sigma = high,
+        lower1sigma = low,
         currentPrice = price,
     )
 
@@ -172,21 +164,7 @@ class StockReportLevelsTest {
     }
 
     @Test
-    fun `straddle 부재 시 WEM 스냅샷의 ±1시그마로 폴백한다`() {
-        // when
-        val sr = StockReportBuilder.sigmaRangeFromSnapshot(
-            details("""{"weekly_expected_move": {"upper_1sigma": 110.0, "lower_1sigma": 90.0, "center": 100.0}}"""),
-            price = 100.0,
-        )
-
-        // then
-        val range = requireNotNull(sr)
-        assertThat(range.upper1sigma).isCloseTo(110.0, within(1e-9))
-        assertThat(range.lower1sigma).isCloseTo(90.0, within(1e-9))
-    }
-
-    @Test
-    fun `straddle 과 WEM 모두 없으면 null 을 반환한다`() {
+    fun `straddle expected_move 없으면 null 을 반환한다`() {
         // given & when & then — levels 산출 스킵
         assertThat(StockReportBuilder.sigmaRangeFromSnapshot(details("{}"), price = 100.0)).isNull()
         assertThat(StockReportBuilder.sigmaRangeFromSnapshot(details("""{"straddle": {}}"""), price = 100.0)).isNull()

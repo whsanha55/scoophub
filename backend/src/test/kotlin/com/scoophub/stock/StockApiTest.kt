@@ -43,7 +43,6 @@ class StockApiTest @Autowired constructor(
     fun clean() {
         listOf(
             "stock_analysis_results",
-            "stock_weekly_expected_moves",
             "stock_sigma",
             "stock_candles",
             "stock_watchlist",
@@ -187,15 +186,10 @@ class StockApiTest @Autowired constructor(
     }
 
     @Test
-    fun `리포트는 관심종목 그룹과 WEM 시그마 폴백을 채운다`() {
+    fun `리포트는 관심종목 그룹을 채운다`() {
         // given
         insertWatchlist("AAPL", group = "market")
         insertAnalysis("AAPL")
-        jdbcClient.sql(
-            "INSERT INTO stock_weekly_expected_moves " +
-                "(ticker, week_start, week_end, expected_move_high, expected_move_low, expected_move_pct) " +
-                "VALUES ('AAPL', DATE '2026-09-28', DATE '2026-10-02', 110, 90, 10)",
-        ).update()
 
         // when & then
         mockMvc.get("/api/stock/report") { param("tickers", "aapl, ") }.andExpect {
@@ -203,7 +197,6 @@ class StockApiTest @Autowired constructor(
             jsonPath("$.data[0].ticker") { value("AAPL") }
             jsonPath("$.data[0].group") { value("market") }
             jsonPath("$.data[0].technical.signal") { value("BUY") }
-            jsonPath("$.data[0].sigma") { exists() }
             jsonPath("$.data[0].is_stale") { value(false) }
         }
     }

@@ -26,16 +26,6 @@ export interface StockReport {
     technical_scores: Record<string, number>;
     technical_details: Record<string, number>;
   };
-  sigma: {
-    sigma_position: string;
-    sigma_signal: string;
-    sigma_confidence: number;
-    expected_move_pct: number;
-    expected_move_high: number;
-    expected_move_low: number;
-    source: string;
-    weekly_moves: unknown[];
-  };
   data_date: string;
   is_stale: boolean;
   // #59 — 액션러블 레벨/히트레이트/그룹 (백엔드 #149 확정 스키마 정합)
@@ -56,10 +46,6 @@ export interface StockReportSummarized {
   total_score: number;
   confidence: number;
   market_regime: string;
-  sigma_position: string;
-  sigma_signal: string;
-  sigma_confidence: number;
-  expected_move_pct: number;
   data_date: string;
   is_stale: boolean;
   // #59 — 액션러블 레벨/히트레이트/그룹 (백엔드 #149 확정 스키마 정합)
@@ -145,17 +131,6 @@ export interface StockQuote {
   prev_close?: number;
   timestamp?: string;
   source?: string;
-}
-
-export interface StockWem {
-  ticker: string;
-  expiry_date?: string;
-  expected_move_high: number;
-  expected_move_low: number;
-  expected_move_pct: number;
-  expected_move?: number;
-  source?: string;
-  updated_at?: string;
 }
 
 export interface StockAnalysis {

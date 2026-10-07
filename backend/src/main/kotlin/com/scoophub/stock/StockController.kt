@@ -4,8 +4,6 @@ import com.scoophub.global.api.ApiResponse
 import com.scoophub.global.api.ErrorDetail
 import com.scoophub.global.api.ResponseMeta
 import com.scoophub.global.auth.SuperOnly
-import com.scoophub.global.crawl.CrawlRunner
-import com.scoophub.global.crawl.dto.CrawlTriggerData
 import com.scoophub.stock.dto.MarketStatusOut
 import com.scoophub.stock.dto.SigmaSnapshotOut
 import com.scoophub.stock.dto.StockReport
@@ -44,8 +42,6 @@ private val log = KotlinLogging.logger {}
 class StockController(
     private val analysisService: StockAnalysisService,
     private val reportBuilder: StockReportBuilder,
-    private val sigmaCrawler: SigmaCrawler,
-    private val crawlRunner: CrawlRunner,
     private val watchlistService: StockWatchlistService,
     private val reportService: StockReportService,
     private val crawlService: StockCrawlService,
@@ -200,12 +196,6 @@ class StockController(
     }
 
     // ── Manual Crawl Triggers ────────────────────────────────────────────────
-
-    @Tag(name = "Stock Crawling")
-    @Operation(summary = "Sigma(1σ) 주간 예상 변동폭 크롤 (월 03:00 자동 / 수동 트리거)")
-    @SuperOnly
-    @PostMapping("/crawling/stock/sigma")
-    fun crawlingSigma(): ApiResponse<CrawlTriggerData> = crawlRunner.trigger(sigmaCrawler, "Sigma")
 
     @Tag(name = "Stock Crawling")
     @Operation(summary = "Sigma 즉시 계산 (ATM straddle 기반)")

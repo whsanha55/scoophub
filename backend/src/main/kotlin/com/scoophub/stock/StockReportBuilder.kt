@@ -205,7 +205,7 @@ class StockReportBuilder(
 
         fun fmtPrice(v: Double?): String = if (v == null) "N/A" else "$%,.2f".format(v)
 
-        /** technical_details.sigma_data → SigmaRange. straddle 우선, WEM 폴백 */
+        /** technical_details.sigma_data.straddle → SigmaRange (없으면 null, BB 폴백은 computeActionableLevels 담당) */
         fun sigmaRangeFromSnapshot(sigmaData: JsonNode?, price: Double): SigmaRange? {
             val em = sigmaData?.get("straddle")?.scalar("expected_move")?.toDoubleOrNull()
             if (em != null && em > 0) {
@@ -216,15 +216,7 @@ class StockReportBuilder(
                     currentPrice = price,
                 )
             }
-            val wem = sigmaData?.get("weekly_expected_move") ?: return null
-            val upper = wem.scalar("upper_1sigma")?.toDoubleOrNull() ?: return null
-            val lower = wem.scalar("lower_1sigma")?.toDoubleOrNull() ?: return null
-            return SigmaRange(
-                center = wem.scalar("center")?.toDoubleOrNull() ?: price,
-                upper1sigma = upper,
-                lower1sigma = lower,
-                currentPrice = price,
-            )
+            return null
         }
 
         /** sigma ±1σ 우선, 부재 시 BB 밴드 폴백으로 액션러블 레벨 산출 */

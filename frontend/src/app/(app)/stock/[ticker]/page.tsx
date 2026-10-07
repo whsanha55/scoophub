@@ -87,7 +87,6 @@ export default function StockDetailPage() {
 
   const report = detail;
   const quote = detail.quote ?? null;
-  const sigma = detail.sigma;
 
   const changeColor =
     report.change > 0
@@ -211,45 +210,6 @@ export default function StockDetailPage() {
         </CardContent>
       </Card>
 
-      {/* Sigma Overview */}
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-lg">Sigma 분석</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
-            <div>
-              <span className="text-muted-foreground">위치</span>
-              <p className="font-semibold capitalize">{report.sigma.sigma_position}</p>
-            </div>
-            <div>
-              <span className="text-muted-foreground">시그널</span>
-              <p className="font-semibold capitalize">{report.sigma.sigma_signal}</p>
-            </div>
-            <div>
-              <span className="text-muted-foreground">신뢰도</span>
-              <p className="font-semibold">{(report.sigma.sigma_confidence * 100).toFixed(0)}%</p>
-            </div>
-            <div>
-              <span className="text-muted-foreground">예상 변동폭</span>
-              <p className="font-semibold">{report.sigma.expected_move_pct.toFixed(1)}%</p>
-            </div>
-            <div>
-              <span className="text-muted-foreground">예상 상한</span>
-              <p className="font-semibold">${report.sigma.expected_move_high.toFixed(2)}</p>
-            </div>
-            <div>
-              <span className="text-muted-foreground">예상 하한</span>
-              <p className="font-semibold">${report.sigma.expected_move_low.toFixed(2)}</p>
-            </div>
-            <div>
-              <span className="text-muted-foreground">출처</span>
-              <p className="font-semibold">{report.sigma.source}</p>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
       {/* #57 — 액션러블 레벨 (optional, 레거시 호환) */}
       {(report.actionable_levels || report.hit_rate != null) && (
         <Card>
@@ -333,32 +293,6 @@ export default function StockDetailPage() {
                   <p className="font-semibold">{quote.timestamp.replace("T", " ").slice(0, 19)}</p>
                 </div>
               )}
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* #82 — WEM (detail.sigma의 expected_move) */}
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-lg">주간 예상 움직임 (WEM)</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {!sigma && <p className="text-muted-foreground text-sm">WEM 데이터가 없습니다.</p>}
-          {sigma && (
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
-              <div>
-                <span className="text-muted-foreground">예상 상한</span>
-                <p className="font-semibold text-green-500">${sigma.expected_move_high.toFixed(2)}</p>
-              </div>
-              <div>
-                <span className="text-muted-foreground">예상 하한</span>
-                <p className="font-semibold text-red-500">${sigma.expected_move_low.toFixed(2)}</p>
-              </div>
-              <div>
-                <span className="text-muted-foreground">예상 변동폭</span>
-                <p className="font-semibold">{sigma.expected_move_pct.toFixed(1)}%</p>
-              </div>
             </div>
           )}
         </CardContent>

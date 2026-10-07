@@ -1,6 +1,5 @@
 package com.scoophub.stock
 
-import com.scoophub.global.crawl.CrawlRunner
 import com.scoophub.global.schedule.ScheduledJob
 import com.scoophub.stock.repository.StockWatchlistRepository
 import com.scoophub.stock.service.StockCrawlService
@@ -12,7 +11,7 @@ import java.time.Clock
 
 private val log = KotlinLogging.logger {}
 
-/** legacy `stock/scheduler.py` — 캔들 동기화 / 시그마 스캔 / 시그마 계산+분석 파이프라인 (3잡 묶음 네임스페이스) */
+/** legacy `stock/scheduler.py` — 캔들 동기화 / 시그마 계산+분석 파이프라인 (2잡 묶음 네임스페이스) */
 class StockScheduledJobs {
     /** 관심종목 일봉 동기화 — job_id stock_sync (interval 60분) */
     @Component
@@ -27,21 +26,6 @@ class StockScheduledJobs {
         override fun run(params: JsonNode) {
             val startedAt = clock.instant()
             fetchMonitor.record(jobId, startedAt, crawlService.syncCandles())
-        }
-    }
-
-    /** usstocksigma 주간 예상움직임 스크래핑 — job_id stock_sigma_scan (월 03:00) */
-    @Component
-    class StockSigmaScanJob(private val crawlRunner: CrawlRunner, private val sigmaCrawler: SigmaCrawler) :
-        ScheduledJob {
-        override val crawler = "stock"
-        override val jobId = "stock_sigma_scan"
-
-        override fun run(params: JsonNode) {
-            val result = crawlRunner.run(sigmaCrawler)
-            if (result != null) {
-                log.info { "Sigma crawl: ${result.itemsFetched} fetched, ${result.itemsNew} new" }
-            }
         }
     }
 

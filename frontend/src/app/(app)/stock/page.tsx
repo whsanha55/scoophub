@@ -5,7 +5,6 @@ import Link from "next/link";
 import {
   useAllStockReportsMulti,
   useStockAnalyze,
-  useStockSigmaCrawl,
   useStockSigmaCompute,
   useStockSync,
   useMarketStatus,
@@ -19,7 +18,6 @@ import { Skeleton } from "@/components/ui/skeleton";
 export default function StockPage() {
   const { reports, loading: reportsLoading, fetchReports } = useAllStockReportsMulti();
   const { loading: analyzeLoading, triggerAnalyze } = useStockAnalyze();
-  const { loading: sigmaCrawlLoading, triggerSigmaCrawl } = useStockSigmaCrawl();
   const { loading: sigmaComputeLoading, triggerCompute } = useStockSigmaCompute();
   const { loading: syncLoading, triggerSync } = useStockSync();
   const { loading: sendLoading, error: sendError, triggerSend } =
@@ -33,11 +31,6 @@ export default function StockPage() {
 
   const handleAnalyze = async () => {
     await triggerAnalyze();
-    await fetchReports(true);
-  };
-
-  const handleSigmaCrawl = async () => {
-    await triggerSigmaCrawl();
     await fetchReports(true);
   };
 
@@ -65,11 +58,6 @@ export default function StockPage() {
             onClick={handleAnalyze}
             loading={analyzeLoading}
             label="분석 실행"
-          />
-          <CrawlTriggerButton
-            onClick={handleSigmaCrawl}
-            loading={sigmaCrawlLoading}
-            label="시그마 수집"
           />
           <CrawlTriggerButton
             onClick={handleSigmaCompute}
