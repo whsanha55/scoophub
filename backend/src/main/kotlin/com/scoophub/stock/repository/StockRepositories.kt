@@ -77,6 +77,8 @@ interface StockCandleRepository : JpaRepository<StockCandleEntity, Int> {
         @Param("closes") closes: DoubleArray,
         @Param("volumes") volumes: DoubleArray,
     )
+
+    fun findByTickerAndIntervalOrderByDate(ticker: String, interval: String): List<StockCandleEntity>
 }
 
 interface StockAnalysisResultRepository : JpaRepository<StockAnalysisResultEntity, Int> {
@@ -112,6 +114,38 @@ interface StockAnalysisResultRepository : JpaRepository<StockAnalysisResultEntit
         @Param("changeRate") changeRate: Double,
         @Param("technicalScores") technicalScores: String,
         @Param("technicalDetails") technicalDetails: String,
+    )
+
+    /** 일별 이력 — (ticker, timeframe, trade_date) 충돌 시 그날 행 갱신 */
+    @Transactional
+    @Modifying
+    @Query(
+        value = """
+        INSERT INTO stock_analysis_history
+            (ticker, timeframe, trade_date, signal, total_score, confidence, market_regime,
+             price, change_rate, technical_scores, analyzed_at)
+        VALUES (:ticker, :timeframe, :tradeDate, :signal, :totalScore, :confidence, :marketRegime,
+                :price, :changeRate, CAST(:technicalScores AS jsonb), :analyzedAt)
+        ON CONFLICT (ticker, timeframe, trade_date) DO UPDATE SET
+            signal = EXCLUDED.signal, total_score = EXCLUDED.total_score,
+            confidence = EXCLUDED.confidence, market_regime = EXCLUDED.market_regime,
+            price = EXCLUDED.price, change_rate = EXCLUDED.change_rate,
+            technical_scores = EXCLUDED.technical_scores, analyzed_at = EXCLUDED.analyzed_at
+        """,
+        nativeQuery = true,
+    )
+    fun upsertHistory(
+        @Param("ticker") ticker: String,
+        @Param("timeframe") timeframe: String,
+        @Param("tradeDate") tradeDate: LocalDate,
+        @Param("signal") signal: String,
+        @Param("totalScore") totalScore: Double,
+        @Param("confidence") confidence: Double,
+        @Param("marketRegime") marketRegime: String,
+        @Param("price") price: Double,
+        @Param("changeRate") changeRate: Double,
+        @Param("technicalScores") technicalScores: String,
+        @Param("analyzedAt") analyzedAt: Instant,
     )
 
     fun findByTickerInAndTimeframeOrderByTotalScoreDesc(

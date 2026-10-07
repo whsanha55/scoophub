@@ -4,14 +4,18 @@ import com.scoophub.external.alpaca.AlpacaMarketDataClient
 import com.scoophub.external.alpaca.AlpacaMarketDataException
 import com.scoophub.global.jackson.scalar
 import com.scoophub.stock.repository.StockAnalysisResultRepository
+import com.scoophub.stock.repository.StockCandleRepository
 import com.scoophub.stock.repository.StockSigmaRepository
 import com.scoophub.stock.repository.StockWatchlistRepository
+import com.scoophub.stock.vo.Candle
 import io.github.oshai.kotlinlogging.KotlinLogging
 import org.springframework.stereotype.Component
 import tools.jackson.databind.JsonNode
 import tools.jackson.databind.json.JsonMapper
 import tools.jackson.databind.node.ObjectNode
 import java.time.Clock
+import java.time.ZoneId
+import java.time.ZoneOffset
 
 private val log = KotlinLogging.logger {}
 
@@ -24,6 +28,7 @@ data class AnalyzeResponse(val total: Int, val ok: Int, val errors: Int, val res
 class StockAnalysisService(
     private val provider: AlpacaMarketDataClient,
     private val analysisRepository: StockAnalysisResultRepository,
+    private val candleRepository: StockCandleRepository,
     private val watchlistRepository: StockWatchlistRepository,
     private val sigmaRepository: StockSigmaRepository,
     private val reportBuilder: StockReportBuilder,
@@ -37,8 +42,8 @@ class StockAnalysisService(
         var ok = 0
         var errors = 0
         val symbols = tickers.map { it.uppercase() }
-        val (quotes, candlesBySymbol) = try {
-            provider.snapshots(symbols) to provider.dailyBars(symbols)
+        val quotes = try {
+            provider.snapshots(symbols)
         } catch (e: AlpacaMarketDataException) {
             log.warn { "market data fetch failed for analysis: ${e.message}" }
             return AnalyzeResponse(tickers.size, 0, tickers.size, symbols.map { AnalyzeResult(it, "error", e.message) })
@@ -58,10 +63,10 @@ class StockAnalysisService(
                     continue
                 }
 
-                val candles = candlesBySymbol[upper].orEmpty()
+                val candles = findDailyCandles(upper)
                 if (candles.isEmpty()) {
-                    // 빈 캔들(provider 실패) 시 가짜 분석이 ok 로 영속화되는 것 방지
-                    results += AnalyzeResult(upper, "error", "No candle data — provider returned empty")
+                    // 빈 캔들 시 가짜 분석이 ok 로 영속화되는 것 방지
+                    results += AnalyzeResult(upper, "error", "No candle data — run candle sync first")
                     errors++
                     continue
                 }
@@ -71,26 +76,13 @@ class StockAnalysisService(
                     upper,
                     price,
                     candles,
-                    clock.instant().atZone(java.time.ZoneOffset.UTC).toLocalDate(),
+                    clock.instant().atZone(ZoneOffset.UTC).toLocalDate(),
                 )
 
                 // details dict + sigma enrichment
                 val details: ObjectNode = jsonMapper.valueToTree(report.technicalDetails)
                 fetchSigmaEnrichment(upper)?.let { details.set("sigma_data", it) }
-                analysisRepository.upsert(
-                    ticker = upper,
-                    exchange = exchange,
-                    timeframe = "1D",
-                    signal = report.signal.name,
-                    totalScore = report.totalScore,
-                    confidence = report.confidence,
-                    marketRegime = report.marketRegime.name,
-                    price = price,
-                    change = change,
-                    changeRate = changeRate,
-                    technicalScores = jsonMapper.writeValueAsString(report.technicalScores),
-                    technicalDetails = details.toString(),
-                )
+                save(upper, exchange, "1D", report, price, change, changeRate, details.toString())
 
                 // 다중 기간(1W/1M): resample → 분석 → 평면 저장. 캔들 부족 시 스킵.
                 saveMultiTimeframe(upper, exchange, candles, price, change, changeRate)
@@ -141,10 +133,57 @@ class StockAnalysisService(
         return if (sigmaData.isEmpty) null else sigmaData
     }
 
+    private fun findDailyCandles(ticker: String): List<Candle> =
+        candleRepository.findByTickerAndIntervalOrderByDate(ticker, "1D").map {
+            Candle(it.ticker, it.interval, it.date, it.open, it.high, it.low, it.close, it.volume)
+        }
+
+    /** 최신 결과 upsert + 거래일(ET) 이력 upsert */
+    private fun save(
+        ticker: String,
+        exchange: String,
+        timeframe: String,
+        report: AnalysisReport,
+        price: Double,
+        change: Double,
+        changeRate: Double,
+        technicalDetails: String,
+    ) {
+        val technicalScores = jsonMapper.writeValueAsString(report.technicalScores)
+        analysisRepository.upsert(
+            ticker = ticker,
+            exchange = exchange,
+            timeframe = timeframe,
+            signal = report.signal.name,
+            totalScore = report.totalScore,
+            confidence = report.confidence,
+            marketRegime = report.marketRegime.name,
+            price = price,
+            change = change,
+            changeRate = changeRate,
+            technicalScores = technicalScores,
+            technicalDetails = technicalDetails,
+        )
+        val analyzedAt = clock.instant()
+        analysisRepository.upsertHistory(
+            ticker = ticker,
+            timeframe = timeframe,
+            tradeDate = analyzedAt.atZone(ET).toLocalDate(),
+            signal = report.signal.name,
+            totalScore = report.totalScore,
+            confidence = report.confidence,
+            marketRegime = report.marketRegime.name,
+            price = price,
+            changeRate = changeRate,
+            technicalScores = technicalScores,
+            analyzedAt = analyzedAt,
+        )
+    }
+
     private fun saveMultiTimeframe(
         ticker: String,
         exchange: String,
-        dailyCandles: List<com.scoophub.stock.vo.Candle>,
+        dailyCandles: List<Candle>,
         price: Double,
         change: Double,
         changeRate: Double,
@@ -159,25 +198,25 @@ class StockAnalysisService(
                     ticker,
                     price,
                     resampled,
-                    clock.instant().atZone(java.time.ZoneOffset.UTC).toLocalDate(),
+                    clock.instant().atZone(ZoneOffset.UTC).toLocalDate(),
                 )
-                analysisRepository.upsert(
-                    ticker = ticker,
-                    exchange = exchange,
-                    timeframe = rule.first,
-                    signal = report.signal.name,
-                    totalScore = report.totalScore,
-                    confidence = report.confidence,
-                    marketRegime = report.marketRegime.name,
-                    price = price,
-                    change = change,
-                    changeRate = changeRate,
-                    technicalScores = jsonMapper.writeValueAsString(report.technicalScores),
-                    technicalDetails = jsonMapper.writeValueAsString(report.technicalDetails),
+                save(
+                    ticker,
+                    exchange,
+                    rule.first,
+                    report,
+                    price,
+                    change,
+                    changeRate,
+                    jsonMapper.writeValueAsString(report.technicalDetails),
                 )
             } catch (e: Exception) {
                 log.warn { "multi-timeframe ${rule.first} analysis failed for $ticker: ${e.message}" }
             }
         }
+    }
+
+    companion object {
+        private val ET: ZoneId = ZoneId.of("America/New_York")
     }
 }

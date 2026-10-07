@@ -47,13 +47,14 @@ class AlpacaMarketDataClient(
         }
         .build()
 
-    /** 최근 6개월 split 조정 일봉. 응답에 없는 심볼은 결과에서 빠진다 */
+    /** 최근 2년 split 조정 일봉. 응답에 없는 심볼은 결과에서 빠진다 */
     fun dailyBars(symbols: List<String>): Map<String, List<Candle>> {
         if (symbols.isEmpty()) {
             return emptyMap()
         }
         val now = clock.instant()
-        val start = now.atZone(ET).toLocalDate().minusMonths(6)
+        // 월봉 분석 최소 20봉(StockResample.MIN_MONTHLY_CANDLES)을 채우는 기간
+        val start = now.atZone(ET).toLocalDate().minusYears(HISTORY_YEARS)
         // 무료 플랜은 최근 15분 SIP 조회가 막힌다. 기본 IEX feed 는 거래량이 통합 거래량의 일부라 SIP 를 쓴다.
         val end = now.minus(SIP_DELAY).truncatedTo(ChronoUnit.SECONDS)
         val result = mutableMapOf<String, MutableList<Candle>>()
@@ -83,12 +84,14 @@ class AlpacaMarketDataClient(
         return symbols.mapNotNull { symbol -> body[symbol]?.let(::toQuote)?.let { symbol to it } }.toMap()
     }
 
-    /** 오늘(ET) 이후 만기 옵션 체인. 만기 오름차순 */
+    /** 오늘(ET)부터 60일 안에 만기인 옵션 체인. 만기 오름차순 */
     fun optionChains(underlying: String): List<OptionsChain> {
         val today = clock.instant().atZone(ET).toLocalDate()
+        // 시그마는 가까운 만기만 쓴다(StockSigma.MAX_EXPIRIES). 장기 만기까지 받으면 SPY 는 13페이지가 된다
         val contracts = paginate(arrayOf(underlying)) { builder ->
             builder.path("/v1beta1/options/snapshots/{underlying}")
                 .queryParam("expiration_date_gte", today)
+                .queryParam("expiration_date_lte", today.plusDays(OPTION_EXPIRY_WINDOW_DAYS))
                 .queryParam("limit", PAGE_LIMIT_OPTIONS)
         }.flatMap { page ->
             page["snapshots"]?.properties()?.mapNotNull { (symbol, snapshot) -> toContract(symbol, snapshot) }.orEmpty()
@@ -190,6 +193,8 @@ class AlpacaMarketDataClient(
         const val BASE_URL = "https://data.alpaca.markets"
         private val ET: ZoneId = ZoneId.of("America/New_York")
         private val SIP_DELAY = Duration.ofMinutes(16)
+        private const val HISTORY_YEARS = 2L
+        private const val OPTION_EXPIRY_WINDOW_DAYS = 60L
         private const val PAGE_LIMIT_BARS = 10_000
         private const val PAGE_LIMIT_OPTIONS = 1_000
         private const val OCC_SUFFIX_LENGTH = 15

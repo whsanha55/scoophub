@@ -43,6 +43,7 @@ class StockApiTest @Autowired constructor(
     fun clean() {
         listOf(
             "stock_analysis_results",
+            "stock_analysis_history",
             "stock_sigma",
             "stock_candles",
             "stock_watchlist",
@@ -350,11 +351,11 @@ class StockApiTest @Autowired constructor(
     }
 
     @Test
-    fun `분석 실행은 시세와 일봉으로 분석 결과를 저장한다`() {
+    fun `분석 실행은 DB 일봉으로 일 주 월 분석 결과와 이력을 저장한다`() {
         // given
         insertWatchlist("QQQ")
+        insertCandles(candles("QQQ", 650))
         every { provider.snapshots(listOf("QQQ")) } returns mapOf("QQQ" to quote(759.66))
-        every { provider.dailyBars(listOf("QQQ")) } returns mapOf("QQQ" to candles("QQQ", 130))
 
         // when & then
         mockMvc.post("/api/crawling/stock/analyze") {
@@ -366,7 +367,54 @@ class StockApiTest @Autowired constructor(
         val timeframes = jdbcClient.sql("SELECT timeframe FROM stock_analysis_results WHERE ticker = 'QQQ'")
             .query(String::class.java)
             .list()
-        assertThat(timeframes).contains("1D")
+        assertThat(timeframes).containsExactlyInAnyOrder("1D", "1W", "1M")
+        val historyTimeframes = jdbcClient.sql("SELECT timeframe FROM stock_analysis_history WHERE ticker = 'QQQ'")
+            .query(String::class.java)
+            .list()
+        assertThat(historyTimeframes).containsExactlyInAnyOrder("1D", "1W", "1M")
+    }
+
+    @Test
+    fun `같은 거래일에 다시 분석하면 이력은 그날 행을 갱신한다`() {
+        // given
+        insertWatchlist("QQQ")
+        insertCandles(candles("QQQ", 130))
+        every { provider.snapshots(listOf("QQQ")) } returns mapOf("QQQ" to quote(759.66))
+        mockMvc.post("/api/crawling/stock/analyze") {
+            header("Authorization", bearer)
+            param("tickers", "QQQ")
+        }
+        every { provider.snapshots(listOf("QQQ")) } returns mapOf("QQQ" to quote(800.0))
+
+        // when
+        mockMvc.post("/api/crawling/stock/analyze") {
+            header("Authorization", bearer)
+            param("tickers", "QQQ")
+        }
+
+        // then
+        val prices = jdbcClient.sql(
+            "SELECT price FROM stock_analysis_history WHERE ticker = 'QQQ' AND timeframe = '1D'",
+        )
+            .query(Double::class.java)
+            .list()
+        assertThat(prices).containsExactly(800.0)
+    }
+
+    @Test
+    fun `DB 에 일봉이 없으면 분석은 에러로 집계한다`() {
+        // given
+        insertWatchlist("QQQ")
+        every { provider.snapshots(listOf("QQQ")) } returns mapOf("QQQ" to quote(759.66))
+
+        // when & then
+        mockMvc.post("/api/crawling/stock/analyze") {
+            header("Authorization", bearer)
+            param("tickers", "QQQ")
+        }.andExpect {
+            jsonPath("$.data.ok") { value(0) }
+            jsonPath("$.data.errors") { value(1) }
+        }
     }
 
     private fun quote(price: Double) =
@@ -384,6 +432,24 @@ class StockApiTest @Autowired constructor(
             close = close,
             volume = 1_000_000.0 + i,
         )
+    }
+
+    private fun insertCandles(candles: List<Candle>) {
+        candles.forEach { c ->
+            jdbcClient.sql(
+                "INSERT INTO stock_candles (ticker, interval, date, open, high, low, close, volume) " +
+                    "VALUES (:ticker, :interval, :date, :open, :high, :low, :close, :volume)",
+            )
+                .param("ticker", c.ticker)
+                .param("interval", c.interval)
+                .param("date", c.date)
+                .param("open", c.open)
+                .param("high", c.high)
+                .param("low", c.low)
+                .param("close", c.close)
+                .param("volume", c.volume)
+                .update()
+        }
     }
 
     private fun insertWatchlist(ticker: String, group: String = "individual", active: Boolean = true): Int =

@@ -39,7 +39,7 @@ class AlpacaMarketDataClientTest @Autowired constructor(
     }
 
     @Test
-    fun `일봉은 SIP split 조정으로 요청하고 다음 페이지까지 모아 ET 날짜로 변환한다`() {
+    fun `일봉은 최근 2년을 SIP split 조정으로 요청하고 다음 페이지까지 모아 ET 날짜로 변환한다`() {
         // given
         server.expect(requestTo(org.hamcrest.Matchers.startsWith("${AlpacaMarketDataClient.BASE_URL}/v2/stocks/bars")))
             .andExpect(header("APCA-API-KEY-ID", "key"))
@@ -47,7 +47,7 @@ class AlpacaMarketDataClientTest @Autowired constructor(
             .andExpect(queryParam("symbols", "AAPL,QQQ"))
             .andExpect(queryParam("feed", "sip"))
             .andExpect(queryParam("adjustment", "split"))
-            .andExpect(queryParam("start", "2026-04-07"))
+            .andExpect(queryParam("start", "2024-10-07"))
             .andExpect(queryParam("end", "2026-10-07T13:44:00Z"))
             .andExpect(queryParamCount(7)) // page_token 없음
             .andRespond(
@@ -105,7 +105,7 @@ class AlpacaMarketDataClientTest @Autowired constructor(
     }
 
     @Test
-    fun `옵션 체인은 OCC 심볼을 만기별 콜 풋으로 묶고 최신 거래일이 아닌 거래량은 0 으로 본다`() {
+    fun `옵션 체인은 60일 안의 만기만 요청해 OCC 심볼을 만기별 콜 풋으로 묶고 최신 거래일이 아닌 거래량은 0 으로 본다`() {
         // given
         server.expect(
             requestTo(
@@ -113,6 +113,7 @@ class AlpacaMarketDataClientTest @Autowired constructor(
             ),
         )
             .andExpect(queryParam("expiration_date_gte", "2026-10-07"))
+            .andExpect(queryParam("expiration_date_lte", "2026-12-06"))
             .andRespond(
                 withSuccess(
                     """{"snapshots":{
