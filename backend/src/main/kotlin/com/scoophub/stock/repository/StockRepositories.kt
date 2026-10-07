@@ -23,24 +23,27 @@ interface StockWatchlistRepository : JpaRepository<StockWatchlistEntity, Int> {
 
     fun findByIsActiveAndGroupOrderByAddedAt(isActive: Boolean, group: String): List<StockWatchlistEntity>
 
-    /** 관심종목 제거 — 관련 캔들/sigma/분석 결과까지 함께 (legacy remove 와 동일) */
+    /** 관심종목 제거 — 같은 티커의 다른 행이 없을 때만 관련 캔들/sigma/분석 결과까지 함께 */
     @Modifying
     @Query(
-        "DELETE FROM stock_candles WHERE ticker = (SELECT ticker FROM stock_watchlist WHERE id = :id)",
+        "DELETE FROM stock_candles WHERE ticker = (SELECT ticker FROM stock_watchlist WHERE id = :id)" +
+            " AND NOT EXISTS (SELECT 1 FROM stock_watchlist WHERE ticker = stock_candles.ticker AND id <> :id)",
         nativeQuery = true,
     )
     fun deleteCandlesOf(@Param("id") id: Int)
 
     @Modifying
     @Query(
-        "DELETE FROM stock_sigma WHERE ticker = (SELECT ticker FROM stock_watchlist WHERE id = :id)",
+        "DELETE FROM stock_sigma WHERE ticker = (SELECT ticker FROM stock_watchlist WHERE id = :id)" +
+            " AND NOT EXISTS (SELECT 1 FROM stock_watchlist WHERE ticker = stock_sigma.ticker AND id <> :id)",
         nativeQuery = true,
     )
     fun deleteSigmaOf(@Param("id") id: Int)
 
     @Modifying
     @Query(
-        "DELETE FROM stock_analysis_results WHERE ticker = (SELECT ticker FROM stock_watchlist WHERE id = :id)",
+        "DELETE FROM stock_analysis_results WHERE ticker = (SELECT ticker FROM stock_watchlist WHERE id = :id)" +
+            " AND NOT EXISTS (SELECT 1 FROM stock_watchlist WHERE ticker = stock_analysis_results.ticker AND id <> :id)",
         nativeQuery = true,
     )
     fun deleteAnalysisOf(@Param("id") id: Int)
