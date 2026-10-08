@@ -6,38 +6,6 @@ export interface IndicatorMeta {
   desc: string;
 }
 
-// technical_scores (-2~+2, 양수 = 매수 우호)
-const SCORE_META: Record<string, IndicatorMeta> = {
-  ma: {
-    label: "이동평균",
-    desc: "이동평균선(MA) 점수. -2~+2 범위, 양수면 가격이 MA 위에 있어 강세(매수 우호).",
-  },
-  rsi: {
-    label: "RSI",
-    desc: "상대강도지수 점수. -2~+2 범위. RSI 30 이하(과매도)이면 양수(매수 우호), 70 이상(과매수)이면 음수.",
-  },
-  macd: {
-    label: "MACD",
-    desc: "MACD 점수. -2~+2 범위, 히스토그램이 양수(상승 모멘텀)면 매수 우호.",
-  },
-  bb: {
-    label: "볼린저 밴드",
-    desc: "볼린저 밴드 점수. -2~+2 범위. %B가 0 이하(밴드 하단 돌파)면 매수 우호, 1 이상(상단 돌파)이면 과열.",
-  },
-  stochastic: {
-    label: "스토캐스틱",
-    desc: "스토캐스틱 %K 점수. -2~+2 범위. 20 이하(과매도)이면 매수 우호, 80 이상(과매수)이면 음수.",
-  },
-  adx: {
-    label: "ADX",
-    desc: "추세 강도 점수. -2~+2 범위. ADX 25 이상이면 강한 추세(방향성 있는 시장).",
-  },
-  vwap: {
-    label: "VWAP",
-    desc: "거래량가중평균가 점수. -2~+2 범위. 가격이 VWAP 위면 강세(매수 우호).",
-  },
-};
-
 // technical_details (실제 지표값)
 const DETAIL_META: Record<string, IndicatorMeta> = {
   ma5: {
@@ -47,6 +15,14 @@ const DETAIL_META: Record<string, IndicatorMeta> = {
   ma20: {
     label: "20일 이동평균",
     desc: "최근 20거래일 종가 평균. 중기 추세 기준선(볼린저 밴드 중단과 동일).",
+  },
+  sma50: {
+    label: "50일 이동평균",
+    desc: "최근 50거래일 종가 평균. 200일선 위로 올라가면 골든크로스, 아래로 내려가면 데드크로스.",
+  },
+  sma200: {
+    label: "200일 이동평균",
+    desc: "최근 200거래일 종가 평균. 장기 추세 기준선. 일봉 200개 미만이면 0.",
   },
   ema12: {
     label: "12일 지수이평",
@@ -106,7 +82,7 @@ const DETAIL_META: Record<string, IndicatorMeta> = {
   },
   atr: {
     label: "ATR",
-    desc: "평균진폭. 클수록 변동성 큼. 손절가 산출에 사용.",
+    desc: "평균진폭. 클수록 변동성 큼.",
   },
   obv: {
     label: "OBV",
@@ -122,9 +98,7 @@ const DETAIL_META: Record<string, IndicatorMeta> = {
   },
 };
 
-const ALL_META: Record<string, IndicatorMeta> = { ...SCORE_META, ...DETAIL_META };
-
 // 매핑 없는 key는 null 반환 → 호출부에서 label=raw key, 툴팁 없음 처리
 export function getIndicatorMeta(key: string): IndicatorMeta | null {
-  return ALL_META[key] ?? null;
+  return DETAIL_META[key] ?? null;
 }

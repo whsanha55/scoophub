@@ -47,13 +47,13 @@ class AlpacaMarketDataClient(
         }
         .build()
 
-    /** 최근 2년 split 조정 일봉. 응답에 없는 심볼은 결과에서 빠진다 */
+    /** 최근 10년 split 조정 일봉. 응답에 없는 심볼은 결과에서 빠진다 */
     fun dailyBars(symbols: List<String>): Map<String, List<Candle>> {
         if (symbols.isEmpty()) {
             return emptyMap()
         }
         val now = clock.instant()
-        // 월봉 분석 최소 20봉(StockResample.MIN_MONTHLY_CANDLES)을 채우는 기간
+        // 백테스트(/stock/backtest)가 2018·2020·2022 하락장을 포함하도록 10년 (#251)
         val start = now.atZone(ET).toLocalDate().minusYears(HISTORY_YEARS)
         // 무료 플랜은 최근 15분 SIP 조회가 막힌다. 기본 IEX feed 는 거래량이 통합 거래량의 일부라 SIP 를 쓴다.
         val end = now.minus(SIP_DELAY).truncatedTo(ChronoUnit.SECONDS)
@@ -193,7 +193,7 @@ class AlpacaMarketDataClient(
         const val BASE_URL = "https://data.alpaca.markets"
         private val ET: ZoneId = ZoneId.of("America/New_York")
         private val SIP_DELAY = Duration.ofMinutes(16)
-        private const val HISTORY_YEARS = 2L
+        private const val HISTORY_YEARS = 10L
         private const val OPTION_EXPIRY_WINDOW_DAYS = 14L
         private const val PAGE_LIMIT_BARS = 10_000
         private const val PAGE_LIMIT_OPTIONS = 1_000

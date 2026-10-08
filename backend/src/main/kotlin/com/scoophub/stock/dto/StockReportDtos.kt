@@ -1,38 +1,13 @@
 package com.scoophub.stock.dto
 
-import com.scoophub.stock.ActionableLevels
 import com.scoophub.stock.StockSigma
-import com.scoophub.stock.entity.StockAnalysisResultEntity
 import com.scoophub.stock.entity.StockSigmaEntity
 import tools.jackson.databind.JsonNode
 import java.time.Instant
+import java.time.LocalDate
 
-/** legacy `schemas.py` TechnicalOut */
-data class TechnicalOut(
-    val signal: String,
-    val totalScore: Double,
-    val confidence: Double,
-    val marketRegime: String,
-    val technicalScores: JsonNode,
-    val technicalDetails: JsonNode,
-)
-
-/** legacy `schemas.py` ActionableLevelsOut */
-data class ActionableLevelsOut(
-    val targetPrice: Double? = null,
-    val buyZone: Double? = null,
-    val stopLoss: Double? = null,
-    val momentumFire: Boolean = false,
-) {
-    companion object {
-        fun from(levels: ActionableLevels) = ActionableLevelsOut(
-            targetPrice = levels.targetPrice,
-            buyZone = levels.buyZone,
-            stopLoss = levels.stopLoss,
-            momentumFire = levels.momentumFire,
-        )
-    }
-}
+/** legacy `schemas.py` TechnicalOut — 매수·매도 점수 대신 50/200 추세 상태 (#251) */
+data class TechnicalOut(val trend: String, val trendSince: LocalDate?, val technicalDetails: JsonNode)
 
 /** legacy `schemas.py` StockQuoteOut — /stock/detail 실시간 시세 */
 data class StockQuoteOut(
@@ -47,7 +22,7 @@ data class StockQuoteOut(
     val timestamp: Instant? = null,
 )
 
-/** legacy `schemas.py` StockReport — actionable_levels/group/quote enrichment 로 var */
+/** legacy `schemas.py` StockReport — group/quote enrichment 로 var */
 data class StockReport(
     val ticker: String,
     val exchange: String,
@@ -55,8 +30,6 @@ data class StockReport(
     val change: Double,
     val changeRate: Double,
     val technical: TechnicalOut,
-    var actionableLevels: ActionableLevelsOut? = null,
-    val hitRate: Double? = null,
     var group: String? = null,
     val dataDate: Instant? = null,
     val isStale: Boolean? = null,
@@ -70,28 +43,21 @@ data class StockSummary(
     val price: Double,
     val change: Double,
     val changeRate: Double,
-    val signal: String,
-    val totalScore: Double,
-    val confidence: Double,
-    val marketRegime: String,
-    val actionableLevels: ActionableLevelsOut? = null,
-    val hitRate: Double? = null,
+    val trend: String,
+    val trendSince: LocalDate?,
     val group: String? = null,
     val dataDate: Instant? = null,
     val isStale: Boolean? = null,
 ) {
     companion object {
-        fun from(report: StockReport, row: StockAnalysisResultEntity) = StockSummary(
+        fun from(report: StockReport) = StockSummary(
             ticker = report.ticker,
             exchange = report.exchange,
             price = report.price,
             change = report.change,
             changeRate = report.changeRate,
-            signal = row.signal,
-            totalScore = row.totalScore,
-            confidence = row.confidence,
-            marketRegime = row.marketRegime,
-            actionableLevels = report.actionableLevels,
+            trend = report.technical.trend,
+            trendSince = report.technical.trendSince,
             group = report.group,
             dataDate = report.dataDate,
             isStale = report.isStale,

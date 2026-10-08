@@ -88,15 +88,14 @@ interface StockAnalysisResultRepository : JpaRepository<StockAnalysisResultEntit
     @Query(
         value = """
         INSERT INTO stock_analysis_results
-            (ticker, exchange, timeframe, signal, total_score, confidence, market_regime,
-             price, change, change_rate, technical_scores, technical_details, analyzed_at)
-        VALUES (:ticker, :exchange, :timeframe, :signal, :totalScore, :confidence, :marketRegime,
-                :price, :change, :changeRate, CAST(:technicalScores AS jsonb), CAST(:technicalDetails AS jsonb), now())
+            (ticker, exchange, timeframe, trend, trend_since, candle_date,
+             price, change, change_rate, technical_details, analyzed_at)
+        VALUES (:ticker, :exchange, '1D', :trend, :trendSince, :candleDate,
+                :price, :change, :changeRate, CAST(:technicalDetails AS jsonb), now())
         ON CONFLICT (ticker, timeframe) DO UPDATE SET
-            signal = EXCLUDED.signal, total_score = EXCLUDED.total_score,
-            confidence = EXCLUDED.confidence, market_regime = EXCLUDED.market_regime,
+            trend = EXCLUDED.trend, trend_since = EXCLUDED.trend_since, candle_date = EXCLUDED.candle_date,
             price = EXCLUDED.price, change = EXCLUDED.change, change_rate = EXCLUDED.change_rate,
-            technical_scores = EXCLUDED.technical_scores, technical_details = EXCLUDED.technical_details,
+            technical_details = EXCLUDED.technical_details,
             analyzed_at = now()
         """,
         nativeQuery = true,
@@ -104,54 +103,14 @@ interface StockAnalysisResultRepository : JpaRepository<StockAnalysisResultEntit
     fun upsert(
         @Param("ticker") ticker: String,
         @Param("exchange") exchange: String,
-        @Param("timeframe") timeframe: String,
-        @Param("signal") signal: String,
-        @Param("totalScore") totalScore: Double,
-        @Param("confidence") confidence: Double,
-        @Param("marketRegime") marketRegime: String,
+        @Param("trend") trend: String,
+        @Param("trendSince") trendSince: LocalDate?,
+        @Param("candleDate") candleDate: LocalDate,
         @Param("price") price: Double,
         @Param("change") change: Double,
         @Param("changeRate") changeRate: Double,
-        @Param("technicalScores") technicalScores: String,
         @Param("technicalDetails") technicalDetails: String,
     )
-
-    /** 일별 이력 — (ticker, timeframe, trade_date) 충돌 시 그날 행 갱신 */
-    @Transactional
-    @Modifying
-    @Query(
-        value = """
-        INSERT INTO stock_analysis_history
-            (ticker, timeframe, trade_date, signal, total_score, confidence, market_regime,
-             price, change_rate, technical_scores, analyzed_at)
-        VALUES (:ticker, :timeframe, :tradeDate, :signal, :totalScore, :confidence, :marketRegime,
-                :price, :changeRate, CAST(:technicalScores AS jsonb), :analyzedAt)
-        ON CONFLICT (ticker, timeframe, trade_date) DO UPDATE SET
-            signal = EXCLUDED.signal, total_score = EXCLUDED.total_score,
-            confidence = EXCLUDED.confidence, market_regime = EXCLUDED.market_regime,
-            price = EXCLUDED.price, change_rate = EXCLUDED.change_rate,
-            technical_scores = EXCLUDED.technical_scores, analyzed_at = EXCLUDED.analyzed_at
-        """,
-        nativeQuery = true,
-    )
-    fun upsertHistory(
-        @Param("ticker") ticker: String,
-        @Param("timeframe") timeframe: String,
-        @Param("tradeDate") tradeDate: LocalDate,
-        @Param("signal") signal: String,
-        @Param("totalScore") totalScore: Double,
-        @Param("confidence") confidence: Double,
-        @Param("marketRegime") marketRegime: String,
-        @Param("price") price: Double,
-        @Param("changeRate") changeRate: Double,
-        @Param("technicalScores") technicalScores: String,
-        @Param("analyzedAt") analyzedAt: Instant,
-    )
-
-    fun findByTickerInAndTimeframeOrderByTotalScoreDesc(
-        tickers: Collection<String>,
-        timeframe: String,
-    ): List<StockAnalysisResultEntity>
 
     /** legacy `find_by_tickers` — ORDER BY analyzed_at DESC */
     fun findByTickerInAndTimeframeOrderByAnalyzedAtDesc(

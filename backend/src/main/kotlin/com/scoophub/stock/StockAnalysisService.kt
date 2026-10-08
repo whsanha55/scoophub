@@ -13,9 +13,6 @@ import org.springframework.stereotype.Component
 import tools.jackson.databind.JsonNode
 import tools.jackson.databind.json.JsonMapper
 import tools.jackson.databind.node.ObjectNode
-import java.time.Clock
-import java.time.ZoneId
-import java.time.ZoneOffset
 
 private val log = KotlinLogging.logger {}
 
@@ -33,7 +30,6 @@ class StockAnalysisService(
     private val sigmaRepository: StockSigmaRepository,
     private val reportBuilder: StockReportBuilder,
     private val jsonMapper: JsonMapper,
-    private val clock: Clock,
 ) {
 
     fun runAnalysisForTickers(tickers: List<String>): AnalyzeResponse {
@@ -72,20 +68,22 @@ class StockAnalysisService(
                 }
 
                 val exchange = watchlistRepository.findByTickerAndIsActive(upper)?.exchange ?: "NAS"
-                val report = StockSignal.generateReport(
-                    upper,
-                    price,
-                    candles,
-                    clock.instant().atZone(ZoneOffset.UTC).toLocalDate(),
-                )
+                val trend = StockTrend.evaluate(candles)
 
                 // details dict + sigma enrichment
-                val details: ObjectNode = jsonMapper.valueToTree(report.technicalDetails)
+                val details: ObjectNode = jsonMapper.valueToTree(StockTechnical.analyze(candles))
                 fetchSigmaEnrichment(upper)?.let { details.set("sigma_data", it) }
-                save(upper, exchange, "1D", report, price, change, changeRate, details.toString())
-
-                // 다중 기간(1W/1M): resample → 분석 → 평면 저장. 캔들 부족 시 스킵.
-                saveMultiTimeframe(upper, exchange, candles, price, change, changeRate)
+                analysisRepository.upsert(
+                    ticker = upper,
+                    exchange = exchange,
+                    trend = trend.state.name,
+                    trendSince = trend.since,
+                    candleDate = candles.last().date,
+                    price = price,
+                    change = change,
+                    changeRate = changeRate,
+                    technicalDetails = details.toString(),
+                )
 
                 results += AnalyzeResult(upper, "ok")
                 ok++
@@ -137,86 +135,4 @@ class StockAnalysisService(
         candleRepository.findByTickerAndIntervalOrderByDate(ticker, "1D").map {
             Candle(it.ticker, it.interval, it.date, it.open, it.high, it.low, it.close, it.volume)
         }
-
-    /** 최신 결과 upsert + 거래일(ET) 이력 upsert */
-    private fun save(
-        ticker: String,
-        exchange: String,
-        timeframe: String,
-        report: AnalysisReport,
-        price: Double,
-        change: Double,
-        changeRate: Double,
-        technicalDetails: String,
-    ) {
-        val technicalScores = jsonMapper.writeValueAsString(report.technicalScores)
-        analysisRepository.upsert(
-            ticker = ticker,
-            exchange = exchange,
-            timeframe = timeframe,
-            signal = report.signal.name,
-            totalScore = report.totalScore,
-            confidence = report.confidence,
-            marketRegime = report.marketRegime.name,
-            price = price,
-            change = change,
-            changeRate = changeRate,
-            technicalScores = technicalScores,
-            technicalDetails = technicalDetails,
-        )
-        val analyzedAt = clock.instant()
-        analysisRepository.upsertHistory(
-            ticker = ticker,
-            timeframe = timeframe,
-            tradeDate = analyzedAt.atZone(ET).toLocalDate(),
-            signal = report.signal.name,
-            totalScore = report.totalScore,
-            confidence = report.confidence,
-            marketRegime = report.marketRegime.name,
-            price = price,
-            changeRate = changeRate,
-            technicalScores = technicalScores,
-            analyzedAt = analyzedAt,
-        )
-    }
-
-    private fun saveMultiTimeframe(
-        ticker: String,
-        exchange: String,
-        dailyCandles: List<Candle>,
-        price: Double,
-        change: Double,
-        changeRate: Double,
-    ) {
-        for (rule in listOf("1W" to StockResample::weekly, "1M" to StockResample::monthly)) {
-            try {
-                val resampled = rule.second(dailyCandles)
-                if (resampled.isEmpty()) {
-                    continue
-                }
-                val report = StockSignal.generateReport(
-                    ticker,
-                    price,
-                    resampled,
-                    clock.instant().atZone(ZoneOffset.UTC).toLocalDate(),
-                )
-                save(
-                    ticker,
-                    exchange,
-                    rule.first,
-                    report,
-                    price,
-                    change,
-                    changeRate,
-                    jsonMapper.writeValueAsString(report.technicalDetails),
-                )
-            } catch (e: Exception) {
-                log.warn { "multi-timeframe ${rule.first} analysis failed for $ticker: ${e.message}" }
-            }
-        }
-    }
-
-    companion object {
-        private val ET: ZoneId = ZoneId.of("America/New_York")
-    }
 }

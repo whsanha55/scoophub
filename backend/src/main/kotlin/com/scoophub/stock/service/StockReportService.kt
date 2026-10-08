@@ -1,8 +1,6 @@
 package com.scoophub.stock.service
 
 import com.scoophub.external.alpaca.AlpacaMarketDataClient
-import com.scoophub.stock.StockReportBuilder
-import com.scoophub.stock.dto.ActionableLevelsOut
 import com.scoophub.stock.dto.SigmaSnapshotOut
 import com.scoophub.stock.dto.StockQuoteOut
 import com.scoophub.stock.dto.StockReport
@@ -19,7 +17,7 @@ import java.time.Duration
 
 private val log = KotlinLogging.logger {}
 
-/** legacy `stock/router.py` 리포트 조회 — 분석 결과 + actionable levels + group */
+/** legacy `stock/router.py` 리포트 조회 — 분석 결과 + group */
 @Service
 class StockReportService(
     private val provider: AlpacaMarketDataClient,
@@ -28,12 +26,12 @@ class StockReportService(
     private val sigmaRepository: StockSigmaRepository,
     private val clock: Clock,
 ) {
-    fun findReports(tickers: List<String>, timeframe: String): List<StockReport> =
-        analysisRepository.findByTickerInAndTimeframeOrderByAnalyzedAtDesc(tickers, timeframe).map { buildReport(it) }
+    fun findReports(tickers: List<String>): List<StockReport> =
+        analysisRepository.findByTickerInAndTimeframeOrderByAnalyzedAtDesc(tickers, TIMEFRAME).map { buildReport(it) }
 
     /** 1D 분석 + 실시간 quote. 분석이 없으면 null */
     fun findDetail(ticker: String): StockReport? {
-        val row = analysisRepository.findByTickerInAndTimeframeOrderByAnalyzedAtDesc(listOf(ticker), "1D")
+        val row = analysisRepository.findByTickerInAndTimeframeOrderByAnalyzedAtDesc(listOf(ticker), TIMEFRAME)
             .firstOrNull()
             ?: return null
         val report = buildReport(row)
@@ -41,24 +39,20 @@ class StockReportService(
         return report
     }
 
-    fun findAll(timeframe: String): List<StockReport> =
-        analysisRepository.findByTimeframeOrderByAnalyzedAtDesc(timeframe).map { buildReport(it) }
+    fun findAll(): List<StockReport> =
+        analysisRepository.findByTimeframeOrderByAnalyzedAtDesc(TIMEFRAME).map { buildReport(it) }
 
-    fun findAllSummaries(timeframe: String): List<StockSummary> =
-        analysisRepository.findByTimeframeOrderByAnalyzedAtDesc(timeframe)
-            .map { StockSummary.from(buildReport(it), it) }
+    fun findAllSummaries(): List<StockSummary> = analysisRepository.findByTimeframeOrderByAnalyzedAtDesc(TIMEFRAME)
+        .map { StockSummary.from(buildReport(it)) }
 
     fun findLatestSigma(ticker: String): SigmaSnapshotOut? =
         sigmaRepository.findFirstByTickerOrderBySnapshotDateDescExpiryDateAsc(ticker)?.let { SigmaSnapshotOut.from(it) }
 
-    /** `_analysis_row_to_report` + `_enrich_report_levels` */
+    /** `_analysis_row_to_report` + group 매핑 */
     private fun buildReport(row: StockAnalysisResultEntity): StockReport {
         val technical = TechnicalOut(
-            signal = row.signal,
-            totalScore = row.totalScore,
-            confidence = row.confidence,
-            marketRegime = row.marketRegime,
-            technicalScores = row.technicalScores,
+            trend = row.trend,
+            trendSince = row.trendSince,
             technicalDetails = row.technicalDetails,
         )
         val report = StockReport(
@@ -71,23 +65,10 @@ class StockReportService(
             dataDate = row.analyzedAt,
             isStale = Duration.between(row.analyzedAt, clock.instant()).seconds > STALE_SECONDS,
         )
-        enrichReportLevels(report, row)
-        return report
-    }
-
-    /** StockReport 에 actionable_levels + group 채우기 (#149) */
-    private fun enrichReportLevels(report: StockReport, row: StockAnalysisResultEntity) {
-        // 1. sigma range 확보 (straddle 스냅샷 — Telegram 리포트와 동일 로직)
-        val sigmaRange = StockReportBuilder.sigmaRangeFromSnapshot(row.technicalDetails.get("sigma_data"), report.price)
-
-        StockReportBuilder.computeActionableLevels(report.price, sigmaRange, row.technicalDetails)?.let { levels ->
-            report.actionableLevels = ActionableLevelsOut.from(levels)
-        }
-
-        // 2. group 매핑
         watchlistRepository.findByTickerAndIsActive(report.ticker)?.group?.takeIf { it.isNotEmpty() }?.let {
             report.group = it
         }
+        return report
     }
 
     /** 실시간 quote. 실패 시 quote=None, 나머지 정상 (legacy /stock/detail) */
@@ -113,5 +94,8 @@ class StockReportService(
 
     companion object {
         private const val STALE_SECONDS = 86_400L // 24h — is_stale 기준
+
+        /** 다기간(1W/1M) 분석은 신호용이라 #251 에서 제거해 일봉만 남는다 */
+        private const val TIMEFRAME = "1D"
     }
 }

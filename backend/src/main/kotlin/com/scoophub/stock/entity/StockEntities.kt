@@ -58,15 +58,15 @@ class StockAnalysisResultEntity(
     val ticker: String,
     val exchange: String = "NAS",
     val timeframe: String = "1D",
-    val signal: String,
-    var totalScore: Double = 0.0,
-    var confidence: Double = 0.0,
-    var marketRegime: String = "RANGING",
+    /** V38 — TrendStateEnum 이름 */
+    var trend: String = "UNKNOWN",
+    /** V38 — 마지막 골든·데드크로스 일자 */
+    var trendSince: LocalDate? = null,
+    /** V38 — 분석에 쓴 마지막 일봉 일자. trendSince 와 같으면 그날 교차 */
+    var candleDate: LocalDate? = null,
     var price: Double = 0.0,
     var change: Double = 0.0,
     var changeRate: Double = 0.0,
-    @JdbcTypeCode(SqlTypes.JSON)
-    var technicalScores: JsonNode,
     @JdbcTypeCode(SqlTypes.JSON)
     var technicalDetails: JsonNode,
     var analyzedAt: Instant,

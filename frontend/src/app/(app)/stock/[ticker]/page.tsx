@@ -10,16 +10,8 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
-import { ArrowLeft, RefreshCw, Info, Flame } from "lucide-react";
-
-function signalStyle(signal: string): { variant: "default" | "outline" | "secondary"; className: string } {
-  const s = signal.toUpperCase();
-  if (s === "STRONG_BUY") return { variant: "default", className: "bg-green-500 hover:bg-green-500 text-white border-green-500" };
-  if (s === "BUY") return { variant: "outline", className: "text-green-500 border-green-500" };
-  if (s === "STRONG_SELL") return { variant: "default", className: "bg-red-500 hover:bg-red-500 text-white border-red-500" };
-  if (s === "SELL") return { variant: "outline", className: "text-red-500 border-red-500" };
-  return { variant: "secondary", className: "text-yellow-500" };
-}
+import { ArrowLeft, RefreshCw, Info } from "lucide-react";
+import { TrendBadge } from "@/domains/stock/components/trend-badge";
 
 // #82 — 지표 label + 느낌표 툴팁 셀
 function IndicatorCell({ k, value }: { k: string; value: number }) {
@@ -45,6 +37,11 @@ function IndicatorCell({ k, value }: { k: string; value: number }) {
       <p className="font-semibold">{value.toFixed(typeof value === "number" && Math.abs(value) <= 2 ? 1 : 2)}</p>
     </div>
   );
+}
+
+// SMA200 은 일봉 200개 미만이면 0 으로 온다
+function fmtSma(v: number | undefined) {
+  return v ? `$${v.toFixed(2)}` : "-";
 }
 
 export default function StockDetailPage() {
@@ -134,14 +131,7 @@ export default function StockDetailPage() {
           </div>
         </div>
         <div className="flex items-center gap-2">
-          {(() => {
-            const st = signalStyle(report.technical.signal);
-            return (
-              <Badge variant={st.variant} className={`text-xs ${st.className}`}>
-                {report.technical.signal}
-              </Badge>
-            );
-          })()}
+          <TrendBadge trend={report.technical.trend} since={report.technical.trend_since} />
           {report.is_stale && (
             <Badge variant="secondary" className="text-xs">Stale data</Badge>
           )}
@@ -156,43 +146,16 @@ export default function StockDetailPage() {
         <CardContent className="space-y-4">
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
             <div>
-              <span className="text-muted-foreground">시그널</span>
-              {(() => {
-                const st = signalStyle(report.technical.signal);
-                return (
-                  <p className={`font-semibold ${st.className}`}>
-                    {report.technical.signal}
-                  </p>
-                );
-              })()}
+              <span className="text-muted-foreground">추세 (50/200일선)</span>
+              <div className="mt-1"><TrendBadge trend={report.technical.trend} since={report.technical.trend_since} /></div>
             </div>
             <div>
-              <span className="text-muted-foreground">종합 점수</span>
-              <p className="font-semibold">{report.technical.total_score.toFixed(1)}</p>
+              <span className="text-muted-foreground">50일선</span>
+              <p className="font-semibold">{fmtSma(report.technical.technical_details.sma50)}</p>
             </div>
             <div>
-              <span className="text-muted-foreground">신뢰도</span>
-              <div className="h-2 mt-1 rounded-full bg-muted overflow-hidden">
-                <div
-                  className={`h-full ${report.technical.confidence >= 70 ? "bg-green-500" : report.technical.confidence >= 40 ? "bg-yellow-500" : "bg-red-500"}`}
-                  style={{ width: `${Math.min(Math.max(report.technical.confidence, 0), 100)}%` }}
-                />
-              </div>
-              <p className="text-xs mt-0.5 font-medium">{report.technical.confidence.toFixed(1)}%</p>
-            </div>
-            <div>
-              <span className="text-muted-foreground">시장 국면</span>
-              <p className="font-semibold capitalize">{report.technical.market_regime}</p>
-            </div>
-          </div>
-
-          {/* Technical Scores */}
-          <div>
-            <p className="text-sm font-medium mb-2">기술적 지표 점수</p>
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-sm">
-              {Object.entries(report.technical.technical_scores).map(([key, value]) => (
-                <IndicatorCell key={key} k={key} value={Number(value)} />
-              ))}
+              <span className="text-muted-foreground">200일선</span>
+              <p className="font-semibold">{fmtSma(report.technical.technical_details.sma200)}</p>
             </div>
           </div>
 
@@ -209,49 +172,6 @@ export default function StockDetailPage() {
           </div>
         </CardContent>
       </Card>
-
-      {/* #57 — 액션러블 레벨 (optional, 레거시 호환) */}
-      {(report.actionable_levels || report.hit_rate != null) && (
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-lg">액션러블 레벨</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
-              {report.actionable_levels?.target_price != null && (
-                <div>
-                  <span className="text-muted-foreground">목표가</span>
-                  <p className="font-semibold">${report.actionable_levels.target_price.toFixed(2)}</p>
-                </div>
-              )}
-              {report.actionable_levels?.buy_zone != null && (
-                <div>
-                  <span className="text-muted-foreground">매수가</span>
-                  <p className="font-semibold text-green-500">${report.actionable_levels.buy_zone.toFixed(2)}</p>
-                </div>
-              )}
-              {report.actionable_levels?.stop_loss != null && (
-                <div>
-                  <span className="text-muted-foreground">손절가</span>
-                  <p className="font-semibold text-red-500">${report.actionable_levels.stop_loss.toFixed(2)}</p>
-                </div>
-              )}
-              {report.actionable_levels?.momentum_fire && (
-                <div>
-                  <span className="text-muted-foreground">불타기</span>
-                  <p className="font-semibold text-orange-500 inline-flex items-center gap-1"><Flame className="h-3 w-3" aria-hidden="true" />진입</p>
-                </div>
-              )}
-              {report.hit_rate != null && (
-                <div>
-                  <span className="text-muted-foreground">히트레이트</span>
-                  <p className="font-semibold">{(report.hit_rate > 1 ? report.hit_rate : report.hit_rate * 100).toFixed(0)}%</p>
-                </div>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-      )}
 
       {/* #82 — 실시간 Quote (detail.quote) */}
       <Card>
@@ -295,35 +215,6 @@ export default function StockDetailPage() {
               )}
             </div>
           )}
-        </CardContent>
-      </Card>
-
-      {/* 분석 (detail 자체가 분석 리포트) */}
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-lg">분석</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-2 text-sm">
-            <p>
-              <span className="text-muted-foreground">시그널: </span>
-              {(() => {
-                const st = signalStyle(report.technical.signal);
-                return (
-                  <span className={`font-semibold ${st.className}`}>
-                    {report.technical.signal}
-                  </span>
-                );
-              })()}
-            </p>
-            <p>
-              <span className="text-muted-foreground">종합 점수: </span>
-              <span className="font-semibold">{report.technical.total_score}</span>
-            </p>
-            {report.data_date && (
-              <p className="text-xs text-muted-foreground">기준일: {report.data_date}</p>
-            )}
-          </div>
         </CardContent>
       </Card>
 
