@@ -10,7 +10,7 @@ import tools.jackson.databind.json.JsonMapper
 class NewsBatchAssessor(private val llm: LlmClient, private val mapper: JsonMapper) {
     fun assess(
         articles: List<AlpacaArticleRow>,
-        watchlist: Set<String>,
+        bigTechSymbols: Set<String>,
         recentlySent: List<String>,
     ): Map<Long, ArticleAssessment> {
         val input = articles.map { article ->
@@ -19,7 +19,7 @@ class NewsBatchAssessor(private val llm: LlmClient, private val mapper: JsonMapp
                 "headline" to article.headline.take(1000),
                 "summary" to article.summary.orEmpty().take(2000),
                 "symbols" to article.symbols,
-                "watchlist" to article.symbols.any { it in watchlist },
+                "big_tech" to article.symbols.any { it in bigTechSymbols },
             )
         }
         val response = llm.chatNews(
@@ -32,7 +32,7 @@ class NewsBatchAssessor(private val llm: LlmClient, private val mapper: JsonMapp
             5: urgent market-moving event; 4: major material event; 3: relevant company development; 1..2: routine/noise.
             Score 1..2 for stock price move explainers, analyst opinions or price targets, columns, outlooks and listicles,
             and crypto price commentary, even when they mention big companies.
-            Do not invent facts. Watchlist membership alone must not inflate importance.
+            Do not invent facts. A big_tech flag alone must not inflate importance.
             """.trimIndent(),
             mapper.writeValueAsString(mapOf("recently_sent" to recentlySent, "articles" to input)),
         )

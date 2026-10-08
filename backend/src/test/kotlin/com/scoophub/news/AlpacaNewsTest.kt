@@ -44,7 +44,6 @@ class AlpacaNewsTest @Autowired constructor(
     fun clean() {
         jdbc.sql("DELETE FROM news_article").update()
         jdbc.sql("DELETE FROM notify_log WHERE payload_key LIKE 'news:%'").update()
-        jdbc.sql("DELETE FROM stock_watchlist").update()
         every { router.dispatchBatch(any(), any(), any()) } returns true
         every { router.dispatchConfirmed(any(), any(), any(), any()) } returns true
     }
@@ -130,7 +129,7 @@ class AlpacaNewsTest @Autowired constructor(
     @Test
     fun `20건 넘는 적체를 같은 회차에 모두 처리하고 발행 순서를 유지한다`() {
         // given
-        (1L..25L).reversed().forEach { service.receive(article(it, "SPY", clock.instant().minusSeconds(60 - it))) }
+        (1L..25L).reversed().forEach { service.receive(article(it, "NVDA", clock.instant().minusSeconds(60 - it))) }
         every { llm.chatNews(any(), any()) } answers {
             val ids = tools.jackson.databind.json.JsonMapper.builder().build().readTree(
                 secondArg<String>(),
@@ -197,9 +196,8 @@ class AlpacaNewsTest @Autowired constructor(
     }
 
     @Test
-    fun `실패 배치가 후속 기사를 막지 않고 세 번 실패한 관심 종목은 헤드라인을 보낸다`() {
+    fun `실패 배치가 후속 기사를 막지 않고 세 번 실패한 빅테크 기사는 헤드라인을 보낸다`() {
         // given
-        jdbc.sql("INSERT INTO stock_watchlist (ticker, exchange, name) VALUES ('NVDA', 'NASDAQ', 'Nvidia')").update()
         service.receive(article())
         every { llm.chatNews(any(), any()) } throws IllegalStateException("Unavailable")
         // when
@@ -224,29 +222,28 @@ class AlpacaNewsTest @Autowired constructor(
     }
 
     @Test
-    fun `관심 종목은 중요도 3부터 일반 종목은 4부터 발송한다`() {
+    fun `빅테크와 거시의 중요도 4 이상만 발송한다`() {
         // given
-        jdbc.sql("INSERT INTO stock_watchlist (ticker, exchange, name) VALUES ('NVDA', 'NASDAQ', 'Nvidia')").update()
-        service.receive(article())
-        service.receive(article(2, "AAPL"))
-        every { llm.chatNews(any(), any()) } returns response(listOf(1, 2), 3)
+        service.receive(article(1, "NVDA"))
+        service.receive(article(2, "ARGX"))
+        service.receive(article(3, "ARGX"))
+        service.receive(article(4, "NVDA"))
+        every {
+            llm.chatNews(any(), any())
+        } returns """[
+            {"id":1,"importance":4,"category":"기업","summary_ko":"요약 1"},
+            {"id":2,"importance":4,"category":"기업","summary_ko":"요약 2"},
+            {"id":3,"importance":4,"category":"거시","summary_ko":"요약 3"},
+            {"id":4,"importance":3,"category":"기업","summary_ko":"요약 4"}
+        ]"""
         // when
         worker.processPending()
         // then
-        assertThat(row().status).isEqualTo("pushed")
-        assertThat(row(2).status).isEqualTo("skipped")
-    }
-
-    @Test
-    fun `지수 ETF만 겹치는 관심 종목 기사는 일반 기준을 따른다`() {
-        // given
-        jdbc.sql("INSERT INTO stock_watchlist (ticker, exchange, name) VALUES ('SPY', 'NYSE', 'S&P 500 ETF')").update()
-        service.receive(article(1, "SPY"))
-        every { llm.chatNews(any(), any()) } returns response(listOf(1), 3)
-        // when
-        worker.processPending()
-        // then
-        assertThat(row().status).isEqualTo("skipped")
+        assertThat(row(1).decisionReason).isEqualTo("bigtech:NVDA score=4")
+        assertThat(row(2).decisionReason).isEqualTo("out-of-scope score=4")
+        assertThat(row(3).decisionReason).isEqualTo("macro score=4")
+        assertThat(row(4).decisionReason).isEqualTo("importance score=3")
+        assertThat((1L..4L).map { row(it).status }).containsExactly("pushed", "skipped", "pushed", "skipped")
     }
 
     @Test
@@ -337,6 +334,17 @@ class AlpacaNewsTest @Autowired constructor(
         worker.processPending()
         // then
         verify { router.dispatchConfirmed("news", "alpaca", match { it.startsWith("news:burst:NVDA:") }, any()) }
+    }
+
+    @Test
+    fun `급증은 빅테크가 아닌 종목을 알리지 않는다`() {
+        // given
+        (1L..3L).forEach { service.receive(article(it, "ARGX")) }
+        every { llm.chatNews(any(), any()) } returns response(listOf(1, 2, 3), 3)
+        // when
+        worker.processPending()
+        // then
+        verify(exactly = 0) { router.dispatchConfirmed(any(), any(), any(), any()) }
     }
 
     @Test

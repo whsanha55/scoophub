@@ -57,17 +57,16 @@ class NewsArticleWorker(
     @Synchronized
     fun processPending() {
         processBursts()
-        val watchlist = repository.findWatchlistSymbols() - props.alpaca.indexEtfSymbols
         while (!Thread.currentThread().isInterrupted) {
             val batch = repository.findPending(clock.instant())
             if (batch.isEmpty()) break
-            processBatch(batch, watchlist)
+            processBatch(batch)
             processBursts()
         }
         processBursts()
     }
 
-    private fun processBatch(batch: List<AlpacaArticleRow>, watchlist: Set<String>) {
+    private fun processBatch(batch: List<AlpacaArticleRow>) {
         val candidates = batch.filter { article ->
             val reason = if (isStale(article)) "stale" else filter.exclusionReason(article)
             if (reason !=
@@ -96,7 +95,7 @@ class NewsArticleWorker(
                 log.info { "News LLM batch: articles=${needsAssessment.size}" }
                 assessor.assess(
                     needsAssessment,
-                    watchlist,
+                    props.alpaca.bigTechSymbols,
                     repository.findRecentPushedSummaries(clock.instant().minus(Duration.ofHours(2))),
                 )
             } catch (e: Exception) {
@@ -106,14 +105,14 @@ class NewsArticleWorker(
         }
         val pushes = mutableListOf<Pair<AlpacaArticleRow, String>>()
         for (article in candidates) {
-            val isWatchlist = article.symbols.any { it in watchlist }
+            val bigTech = article.symbols.filter { it in props.alpaca.bigTechSymbols }
             val assessment = if (article.importance != null) {
                 ArticleAssessment(article.importance, article.category.orEmpty(), article.summaryKo.orEmpty())
             } else {
                 results[article.id]
             }
             if (assessment == null) {
-                retry(article, "llm", isWatchlist)
+                retry(article, "llm", bigTech.isNotEmpty())
                 continue
             }
             if (article.importance == null) repository.saveAssessment(article.id, assessment)
@@ -121,13 +120,15 @@ class NewsArticleWorker(
                 repository.decide(article.id, "skipped", "stale", clock.instant())
             } else if (assessment.duplicate) {
                 repository.decide(article.id, "skipped", "duplicate", clock.instant())
-            } else if ((isWatchlist && assessment.importance >= 3) || assessment.importance >= 4) {
-                val reason = if (isWatchlist) {
-                    "watchlist:${article.symbols.filter {
-                        it in watchlist
-                    }.joinToString(",")} score=${assessment.importance}"
+            } else if (assessment.importance < 4) {
+                repository.decide(article.id, "skipped", "importance score=${assessment.importance}", clock.instant())
+            } else if (bigTech.isEmpty() && assessment.category != "거시") {
+                repository.decide(article.id, "skipped", "out-of-scope score=${assessment.importance}", clock.instant())
+            } else {
+                val reason = if (bigTech.isNotEmpty()) {
+                    "bigtech:${bigTech.joinToString(",")} score=${assessment.importance}"
                 } else {
-                    "importance score=${assessment.importance}"
+                    "macro score=${assessment.importance}"
                 }
                 pushes +=
                     article.copy(
@@ -136,8 +137,6 @@ class NewsArticleWorker(
                         summaryKo = assessment.summaryKo,
                     ) to
                     reason
-            } else {
-                repository.decide(article.id, "skipped", "importance score=${assessment.importance}", clock.instant())
             }
         }
         if (pushes.isNotEmpty()) {
@@ -163,11 +162,11 @@ class NewsArticleWorker(
         }
     }
 
-    private fun retry(article: AlpacaArticleRow, stage: String, isWatchlist: Boolean) {
+    private fun retry(article: AlpacaArticleRow, stage: String, isBigTech: Boolean) {
         val attempts = article.attempts + 1
         if (attempts >= 3) {
             var reason = "$stage:exhausted"
-            if (stage == "llm" && isWatchlist && !isStale(article)) {
+            if (stage == "llm" && isBigTech && !isStale(article)) {
                 val sent = router.dispatchConfirmed("news", "alpaca", key(article), card(article))
                 reason += if (sent) ":headline-pushed" else ":headline-send-failed"
             }
@@ -183,7 +182,8 @@ class NewsArticleWorker(
         val now = clock.instant()
         val since = now.minus(Duration.ofMinutes(30))
         for (symbol in repository.findBurstSymbols(since, now, props.alpaca.burstThreshold)) {
-            if (symbol in props.alpaca.burstExcludedSymbols ||
+            if (symbol !in props.alpaca.bigTechSymbols ||
+                symbol in props.alpaca.burstExcludedSymbols ||
                 repository.hasRecentBurst(symbol, now.minus(Duration.ofHours(2)))
             ) {
                 continue
