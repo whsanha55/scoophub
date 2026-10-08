@@ -23,13 +23,13 @@ GLM 옵션은 [Z.ai Thinking Mode](https://docs.z.ai/guides/capabilities/thinkin
 - 잡음과 종목/거시 정보가 없는 기사는 filtered, 15분 초과는 skipped/stale이다.
   잡음 규칙은 주가 움직임 설명(`Why Is … Stock`, `Shares of … trading higher/lower`), `Stock Market Today`, 의견 기사(`buying opportunity`, `Here Are the`)를 포함한다.
 - LLM에 최근 2시간 발송 요약(최대 30건)을 함께 넘긴다. 같은 사건으로 판정한 기사는 skipped/duplicate다.
-- 중요도 4 이상이면서 거시 카테고리이거나 빅테크 종목(`ALPACA_BIG_TECH_SYMBOLS`, 기본 M7·AVGO·TSM·AMD·ORCL·NFLX·PLTR)이 붙은 기사만 보낸다. 그 외 4점 이상은 skipped/out-of-scope다. 결과를 먼저 저장하므로 발송 재시도는 LLM을 재호출하지 않는다.
+- 중요도 4 이상이면서 거시 카테고리이거나 관심 종목(`stock_watchlist`, 나스닥100 포함)이 붙은 기사만 보낸다. 그 외 4점 이상은 skipped/out-of-scope다. 결과를 먼저 저장하므로 발송 재시도는 LLM을 재호출하지 않는다.
 - 실패 1회 후 30초, 2회 후 2분 대기하며 3회째 failed가 된다.
-- LLM 3회 실패한 빅테크 기사는 원문 헤드라인을 한 번 시도하고 failed에 결과를 기록한다.
+- LLM 3회 실패한 관심 종목 기사는 원문 헤드라인을 한 번 시도하고 failed에 결과를 기록한다.
 - 한 회차의 푸시를 카드 묶음으로 보내면서 기사별 `news:alpaca:{id}` 성공 키를 남긴다.
   뉴스는 chat당 최소 3.1초 간격으로 보내며 HTML 카드 크기를 제한한다.
   카드는 한국어 요약을 굵은 제목으로 쓰고 영어 헤드라인은 원문 링크로만 남긴다. 요약이 없으면 헤드라인을 쓴다.
-- 급증은 빅테크 종목의 최근 30분 3건 이상이다. 기본 제외 종목은 SPY/BTCUSD다.
+- 급증은 관심 종목의 최근 30분 3건 이상이다. 기본 제외 종목은 SPY/BTCUSD다.
   notify_log 성공 시각으로 실제 2시간 쿨다운을 적용하여 버킷 경계에서 다시 보내지 않는다.
 - ping은 30초 간격, pong 대기는 10초다. 인증·구독에도 10초 제한을 둔다.
   재접속 대기는 1초부터 최대 60초이며, 인증·전체 뉴스 구독을 매번 다시 수행한다.
