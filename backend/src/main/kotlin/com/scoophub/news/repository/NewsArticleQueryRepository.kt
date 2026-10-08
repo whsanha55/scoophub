@@ -123,6 +123,10 @@ class NewsArticleQueryRepository(private val jdbc: JdbcClient) {
             ).param("attempts", attempts).param("next", Timestamp.from(nextAttempt)).param("reason", reason).update()
     }
 
+    fun findRecentPushedSummaries(since: Instant): List<String> = jdbc.sql(
+        "SELECT summary_ko FROM news_article WHERE status = 'pushed' AND decided_at >= :since AND summary_ko IS NOT NULL ORDER BY decided_at DESC LIMIT 30",
+    ).param("since", Timestamp.from(since)).query(String::class.java).list().filterNotNull()
+
     fun findWatchlistSymbols(): Set<String> = jdbc.sql("SELECT ticker FROM stock_watchlist WHERE is_active = true")
         .query(String::class.java).list().filterNotNull().map { it.uppercase() }.toSet()
 
