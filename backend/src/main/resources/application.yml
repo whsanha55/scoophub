@@ -51,7 +51,7 @@ scoophub:
     worker-enabled: ${ALPACA_WORKER_ENABLED:${ALPACA_STREAM_ENABLED:false}}
     burst-threshold: ${ALPACA_BURST_THRESHOLD:3}
     burst-excluded-symbols: ${ALPACA_BURST_EXCLUDED_SYMBOLS:SPY,BTCUSD}
-    index-etf-symbols: ${ALPACA_INDEX_ETF_SYMBOLS:SPY,QQQ,DIA,IWM,VOO,VTI}
+    big-tech-symbols: ${ALPACA_BIG_TECH_SYMBOLS:AAPL,MSFT,NVDA,GOOGL,GOOG,AMZN,META,TSLA,AVGO,TSM,AMD,ORCL,NFLX,PLTR}
   llm:
     api-url: ${LLM_API_URL:https://openrouter.ai/api/v1}
     api-key: ${LLM_API_KEY:}

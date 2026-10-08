@@ -127,9 +127,6 @@ class NewsArticleQueryRepository(private val jdbc: JdbcClient) {
         "SELECT summary_ko FROM news_article WHERE status = 'pushed' AND decided_at >= :since AND summary_ko IS NOT NULL ORDER BY decided_at DESC LIMIT 30",
     ).param("since", Timestamp.from(since)).query(String::class.java).list().filterNotNull()
 
-    fun findWatchlistSymbols(): Set<String> = jdbc.sql("SELECT ticker FROM stock_watchlist WHERE is_active = true")
-        .query(String::class.java).list().filterNotNull().map { it.uppercase() }.toSet()
-
     fun findBurstSymbols(since: Instant, now: Instant, threshold: Int): List<String> = jdbc.sql(
         """
         SELECT symbol FROM news_article, LATERAL unnest(symbols) AS symbol
