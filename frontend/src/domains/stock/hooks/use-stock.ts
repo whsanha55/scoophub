@@ -10,7 +10,6 @@ import type {
   MarketStatus,
   StockAnalyzeResult,
   StockAnalysis,
-  Timeframe,
 } from "../types";
 import type { ApiResponse } from "@/shared/types";
 
@@ -19,13 +18,12 @@ export function useStockReports() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const fetchReports = useCallback(async (tickers?: string, timeframe?: Timeframe) => {
+  const fetchReports = useCallback(async (tickers?: string) => {
     setLoading(true);
     setError(null);
     try {
       const sp = new URLSearchParams();
       if (tickers) sp.set("tickers", tickers);
-      if (timeframe) sp.set("timeframe", timeframe);
       const res = await fetch(`/api/stock/report?${sp.toString()}`);
       const data: ApiResponse<StockReport[]> = await res.json();
       if (data.success && data.data) {
@@ -48,13 +46,12 @@ export function useAllStockReports() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const fetchReports = useCallback(async (summarize = true, timeframe?: Timeframe) => {
+  const fetchReports = useCallback(async (summarize = true) => {
     setLoading(true);
     setError(null);
     try {
       const sp = new URLSearchParams();
       sp.set("summarize", String(summarize));
-      if (timeframe) sp.set("timeframe", timeframe);
       const res = await fetch(`/api/stock/report/all?${sp.toString()}`);
       const data: ApiResponse<StockReportSummarized[]> = await res.json();
       if (data.success && data.data) {
@@ -62,45 +59,6 @@ export function useAllStockReports() {
       } else {
         setError(data.error?.message || "Failed to fetch reports");
       }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Unknown error");
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  return { reports, loading, error, fetchReports };
-}
-
-// #84 — 다기간(1D/1W/1M) 동시 fetch → 1D 메인 + 1W/1M signal 병합
-export function useAllStockReportsMulti() {
-  const [reports, setReports] = useState<StockReportSummarized[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const fetchReports = useCallback(async (summarize = true) => {
-    setLoading(true);
-    setError(null);
-    try {
-      const fetchOne = async (tf: Timeframe) => {
-        const res = await fetch(`/api/stock/report/all?summarize=${summarize}&timeframe=${tf}`);
-        const data: ApiResponse<StockReportSummarized[]> = await res.json();
-        return data.success && data.data ? data.data : [];
-      };
-      // allSettled — 한 timeframe fetch 실패해도 나머지 동작 (개별 reject 전체 차단 방지)
-      const settled = await Promise.allSettled([fetchOne("1D"), fetchOne("1W"), fetchOne("1M")]);
-      const val = (r: PromiseSettledResult<StockReportSummarized[]>) =>
-        r.status === "fulfilled" ? r.value : [];
-      const [d, w, m] = [val(settled[0]), val(settled[1]), val(settled[2])];
-      const wMap = new Map(w.map((r) => [r.ticker, r.signal]));
-      const mMap = new Map(m.map((r) => [r.ticker, r.signal]));
-      setReports(
-        d.map((r) => ({
-          ...r,
-          signal_1w: wMap.get(r.ticker) ?? null,
-          signal_1m: mMap.get(r.ticker) ?? null,
-        }))
-      );
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unknown error");
     } finally {

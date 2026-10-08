@@ -10,6 +10,7 @@ import com.scoophub.stock.dto.StockReport
 import com.scoophub.stock.dto.WatchlistItemIn
 import com.scoophub.stock.dto.WatchlistItemOut
 import com.scoophub.stock.dto.WatchlistUpdateIn
+import com.scoophub.stock.service.StockBacktestService
 import com.scoophub.stock.service.StockCrawlService
 import com.scoophub.stock.service.StockReportService
 import com.scoophub.stock.service.StockWatchlistService
@@ -17,7 +18,6 @@ import io.github.oshai.kotlinlogging.KotlinLogging
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.tags.Tag
 import org.springframework.dao.DataIntegrityViolationException
-import org.springframework.http.HttpStatus
 import org.springframework.web.bind.annotation.DeleteMapping
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PathVariable
@@ -27,7 +27,6 @@ import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.RestController
-import org.springframework.web.server.ResponseStatusException
 import java.time.Clock
 import java.time.ZoneOffset
 
@@ -45,6 +44,7 @@ class StockController(
     private val watchlistService: StockWatchlistService,
     private val reportService: StockReportService,
     private val crawlService: StockCrawlService,
+    private val backtestService: StockBacktestService,
     private val clock: Clock,
 ) {
 
@@ -71,14 +71,8 @@ class StockController(
     @Tag(name = "Stock")
     @Operation(summary = "종목 리포트")
     @GetMapping("/stock/report")
-    fun stockReport(
-        @RequestParam(defaultValue = "") tickers: String = "",
-        @RequestParam(defaultValue = "1D") timeframe: String = "1D",
-    ): ApiResponse<List<StockReport>> {
-        log.info { "stock_report 엔드포인트 진입 — tickers=$tickers, timeframe=$timeframe" }
-        if (timeframe !in VALID_TIMEFRAMES) {
-            throw invalidTimeframe(timeframe)
-        }
+    fun stockReport(@RequestParam(defaultValue = "") tickers: String = ""): ApiResponse<List<StockReport>> {
+        log.info { "stock_report 엔드포인트 진입 — tickers=$tickers" }
         if (tickers.isBlank()) {
             return ApiResponse.ok(emptyList(), ResponseMeta(clock.instant()))
         }
@@ -86,7 +80,7 @@ class StockController(
         if (tickerList.isEmpty()) {
             return ApiResponse.ok(emptyList(), ResponseMeta(clock.instant()))
         }
-        return ApiResponse.ok(reportService.findReports(tickerList, timeframe), ResponseMeta(clock.instant()))
+        return ApiResponse.ok(reportService.findReports(tickerList), ResponseMeta(clock.instant()))
     }
 
     @Tag(name = "Stock")
@@ -100,20 +94,22 @@ class StockController(
     @Tag(name = "Stock")
     @Operation(summary = "전체 리포트")
     @GetMapping("/stock/report/all")
-    fun stockReportAll(
-        @RequestParam(defaultValue = "false") summarize: Boolean = false,
-        @RequestParam(defaultValue = "1D") timeframe: String = "1D",
-    ): ApiResponse<List<Any>> {
-        log.info { "stock_report_all 엔드포인트 진입 — summarize=$summarize, timeframe=$timeframe" }
-        if (timeframe !in VALID_TIMEFRAMES) {
-            throw invalidTimeframe(timeframe)
-        }
+    fun stockReportAll(@RequestParam(defaultValue = "false") summarize: Boolean = false): ApiResponse<List<Any>> {
+        log.info { "stock_report_all 엔드포인트 진입 — summarize=$summarize" }
         val reports: List<Any> = if (summarize) {
-            reportService.findAllSummaries(timeframe)
+            reportService.findAllSummaries()
         } else {
-            reportService.findAll(timeframe)
+            reportService.findAll()
         }
         return ApiResponse.ok(reports, ResponseMeta(clock.instant()))
+    }
+
+    @Tag(name = "Stock")
+    @Operation(summary = "골든크로스 보유 규칙 백테스트 (관심종목 DB 캔들, 그냥 보유와 비교)")
+    @GetMapping("/stock/backtest")
+    fun backtest(@RequestParam(defaultValue = "0.001") cost: Double = 0.001): ApiResponse<BacktestResult?> {
+        log.info { "backtest 엔드포인트 진입 — cost=$cost" }
+        return ApiResponse.ok(backtestService.run(cost), ResponseMeta(clock.instant()))
     }
 
     // ── Sigma (Options IV) ───────────────────────────────────────────────────
@@ -229,7 +225,7 @@ class StockController(
     // ── Daily Report Send (on-demand) ────────────────────────────────────────
 
     @Tag(name = "Stock")
-    @Operation(summary = "일간 분석 리포트 발신")
+    @Operation(summary = "추세 전환 리포트 발신")
     @SuperOnly
     @PostMapping("/stock/report/send")
     fun sendStockReport(@RequestParam(name = "tickers") tickers: List<String>? = null): ApiResponse<Map<String, Any>> {
@@ -240,7 +236,7 @@ class StockController(
                 success = false,
                 error = ErrorDetail(
                     code = "no_data",
-                    message = "발신할 분석 데이터가 없습니다. 먼저 /crawling/stock/analyze 실행 필요.",
+                    message = "마지막 거래일에 골든·데드크로스가 난 종목이 없어 발신하지 않았습니다.",
                 ),
                 meta = ResponseMeta(clock.instant()),
             )
@@ -248,16 +244,5 @@ class StockController(
             mapOf("sent" to true, "length" to reportText.length),
             ResponseMeta(clock.instant()),
         )
-    }
-
-    // ── Helpers ──────────────────────────────────────────────────────────────
-
-    private fun invalidTimeframe(timeframe: String) = ResponseStatusException(
-        HttpStatus.BAD_REQUEST,
-        "Invalid timeframe '$timeframe'. Valid values: ['1D', '1M', '1W']",
-    )
-
-    companion object {
-        private val VALID_TIMEFRAMES = setOf("1D", "1W", "1M")
     }
 }

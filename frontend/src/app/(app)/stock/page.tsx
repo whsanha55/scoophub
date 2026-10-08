@@ -3,7 +3,7 @@
 import { useEffect } from "react";
 import Link from "next/link";
 import {
-  useAllStockReportsMulti,
+  useAllStockReports,
   useStockAnalyze,
   useStockSigmaCompute,
   useStockSync,
@@ -16,7 +16,7 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 
 export default function StockPage() {
-  const { reports, loading: reportsLoading, fetchReports } = useAllStockReportsMulti();
+  const { reports, loading: reportsLoading, fetchReports } = useAllStockReports();
   const { loading: analyzeLoading, triggerAnalyze } = useStockAnalyze();
   const { loading: sigmaComputeLoading, triggerCompute } = useStockSigmaCompute();
   const { loading: syncLoading, triggerSync } = useStockSync();

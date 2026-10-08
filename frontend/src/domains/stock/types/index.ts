@@ -1,13 +1,5 @@
-// #57 — 리포트 분석 기간 (백엔드 #147 연동)
-export type Timeframe = "1D" | "1W" | "1M";
-
-// #59 — 액션러블 레벨 (백엔드 #149 확정 스키마 정합)
-export interface ActionableLevels {
-  target_price?: number | null; // 목표가 (+1σ)
-  buy_zone?: number | null; // 매수 구간 (-1σ or BB 하단)
-  stop_loss?: number | null; // 손절가 (price - 1.5×ATR)
-  momentum_fire?: boolean; // 불타기 진입
-}
+// #251 — 50/200 이동평균 추세 상태. UNKNOWN 은 일봉 200개 미만
+export type TrendState = "GOLDEN" | "DEAD" | "UNKNOWN";
 
 // #57 — watchlist 계층 분류 (백엔드 #147 연동, optional)
 export type WatchlistGroup = "market" | "sector" | "individual";
@@ -19,18 +11,12 @@ export interface StockReport {
   change: number;
   change_rate: number;
   technical: {
-    signal: string;
-    total_score: number;
-    confidence: number;
-    market_regime: string;
-    technical_scores: Record<string, number>;
+    trend: TrendState;
+    trend_since: string | null; // 마지막 골든·데드크로스 일자
     technical_details: Record<string, number>;
   };
   data_date: string;
   is_stale: boolean;
-  // #59 — 액션러블 레벨/히트레이트/그룹 (백엔드 #149 확정 스키마 정합)
-  actionable_levels?: ActionableLevels | null;
-  hit_rate?: number | null;
   group?: string | null;
   // #82 — 단일 fetch 통합: 실시간 quote (백엔드 #168 정합)
   quote?: StockQuote | null;
@@ -42,19 +28,11 @@ export interface StockReportSummarized {
   price: number;
   change: number;
   change_rate: number;
-  signal: string;
-  total_score: number;
-  confidence: number;
-  market_regime: string;
+  trend: TrendState;
+  trend_since: string | null;
   data_date: string;
   is_stale: boolean;
-  // #59 — 액션러블 레벨/히트레이트/그룹 (백엔드 #149 확정 스키마 정합)
-  actionable_levels?: ActionableLevels | null;
-  hit_rate?: number | null;
   group?: string | null;
-  // #84 — 다기간 시그널 (1W/1M, 다기간 fetch 후 병합)
-  signal_1w?: string | null;
-  signal_1m?: string | null;
 }
 
 export interface SigmaData {

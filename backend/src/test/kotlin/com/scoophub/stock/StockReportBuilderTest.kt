@@ -14,12 +14,10 @@ import org.junit.jupiter.api.Test
 import tools.jackson.databind.json.JsonMapper
 import java.time.Clock
 import java.time.Instant
+import java.time.LocalDate
 import java.time.ZoneOffset
 
-/**
- * legacy tests/test_stock_report.py T5(ReportBuilder.run) 포팅 — repository/router 만 목킹한
- * 순수 단위 테스트(Spring 컨텍스트 없음).
- */
+/** 추세 전환 리포트 — repository/router 만 목킹한 순수 단위 테스트(Spring 컨텍스트 없음) */
 class StockReportBuilderTest {
 
     private val analysisRepository = mockk<StockAnalysisResultRepository>()
@@ -28,76 +26,61 @@ class StockReportBuilderTest {
     private val clock = Clock.fixed(Instant.parse("2024-01-05T10:15:00Z"), ZoneOffset.UTC)
     private val builder = StockReportBuilder(analysisRepository, watchlistRepository, notifyRouter, clock)
     private val jsonMapper = JsonMapper.builder().build()
+    private val lastCandle = LocalDate.parse("2024-01-04")
 
-    // price 100, σ ±10, ATR 4, 불타기 진입 → 목표 110, 손절 94 (100 - 1.5×4), 볼린저 하단 92.5
     private fun row(
         ticker: String,
-        signal: String = "BUY",
-        confidence: Double = 65.0,
-        timeframe: String = "1D",
-        price: Double = 100.0,
+        trend: TrendStateEnum = TrendStateEnum.GOLDEN,
+        trendSince: LocalDate? = lastCandle,
     ) = StockAnalysisResultEntity(
         ticker = ticker,
         exchange = "NAS",
-        timeframe = timeframe,
-        signal = signal,
-        totalScore = 3.5,
-        confidence = confidence,
-        marketRegime = "RANGING",
-        price = price,
+        timeframe = "1D",
+        trend = trend.name,
+        trendSince = trendSince,
+        candleDate = lastCandle,
+        price = 100.0,
         change = 1.0,
         changeRate = 1.2,
-        technicalScores = jsonMapper.readTree("""{"rsi": 10}"""),
-        technicalDetails = jsonMapper.readTree(
-            """{"atr": 4.0, "ema12": 99.0, "macd_histogram": 0.3, "bb_lower": 92.5,
-                "sigma_data": {"straddle": {"expected_move": 10.0}}}""",
-        ),
+        technicalDetails = jsonMapper.readTree("""{"sma50": 98.5, "sma200": 97.25}"""),
         analyzedAt = Instant.parse("2024-01-05T10:00:00Z"),
     )
 
-    private fun watchlistItem(ticker: String, group: String) =
-        StockWatchlistEntity(ticker = ticker, group = group, addedAt = Instant.parse("2024-01-01T00:00:00Z"))
-
-    private fun stubGroups(groups: Map<String, List<String>>) {
-        for (grp in listOf("market", "sector", "individual")) {
-            every { watchlistRepository.findByIsActiveAndGroupOrderByAddedAt(true, grp) } returns
-                groups[grp].orEmpty().map { watchlistItem(it, grp) }
+    private fun stub(rows: List<StockAnalysisResultEntity>) {
+        every { watchlistRepository.findByIsActiveOrderByAddedAt() } returns rows.map {
+            StockWatchlistEntity(ticker = it.ticker, addedAt = Instant.parse("2024-01-01T00:00:00Z"))
         }
-    }
-
-    private fun stubRows(rows1d: List<StockAnalysisResultEntity>) {
-        every { analysisRepository.findByTickerInAndTimeframeOrderByTotalScoreDesc(any(), "1D") } answers {
+        every { analysisRepository.findByTickerInAndTimeframeOrderByAnalyzedAtDesc(any(), "1D") } answers {
             val tickers = firstArg<List<String>>()
-            rows1d.filter { it.ticker in tickers }
+            rows.filter { it.ticker in tickers }
         }
     }
 
     @Test
-    fun `단일 메시지 리포트를 발신하고 payload_key 에 part 접미사가 없다`() {
+    fun `전환 종목이 있으면 단일 메시지를 발신하고 payload_key 에 part 접미사가 없다`() {
         // given
-        stubGroups(mapOf("individual" to listOf("AAPL")))
-        stubRows(listOf(row("AAPL")))
+        stub(listOf(row("AAPL")))
 
         // when
         val result = builder.run()
 
         // then
-        assertThat(result).isNotNull()
-        assertThat(result).contains("주식 일간 신호", "개별종목", "AAPL", "Scoophub에서 전체 보기")
+        assertThat(result).contains("주식 추세 전환", "기준일 2024-01-04", "AAPL", "Scoophub에서 전체 보기")
         val keys = mutableListOf<String>()
-        val messages = mutableListOf<NotifyMessage>()
-        verify(exactly = 1) {
-            notifyRouter.dispatch("stock", "daily-report", capture(keys), capture(messages))
-        }
-        assertThat(keys.single()).startsWith("stock:daily-report:2024-01-05") // KST 기준 날짜
-        assertThat(keys.single()).doesNotContain(":part-") // 단일 메시지는 suffix 없음
+        verify(exactly = 1) { notifyRouter.dispatch("stock", "daily-report", capture(keys), any()) }
+        assertThat(keys.single()).isEqualTo("stock:daily-report:2024-01-05")
     }
 
     @Test
-    fun `분석 데이터가 없으면 null 을 반환하고 발신하지 않는다`() {
-        // given
-        stubGroups(mapOf("individual" to listOf("AAPL")))
-        stubRows(emptyList())
+    fun `마지막 거래일에 교차한 종목이 없으면 null 을 반환하고 발신하지 않는다`() {
+        // given — 이전에 교차했거나, 교차 이력이 없거나, 판단 불가인 종목
+        stub(
+            listOf(
+                row("OLD", trendSince = LocalDate.parse("2023-11-01")),
+                row("NOCROSS", trendSince = null),
+                row("NEW", trend = TrendStateEnum.UNKNOWN, trendSince = null),
+            ),
+        )
 
         // when
         val result = builder.run()
@@ -108,90 +91,54 @@ class StockReportBuilderTest {
     }
 
     @Test
-    fun `1D 매수 매도 신호 중 신뢰도 60 이상인 종목만 고르고 1W 는 보지 않는다`() {
+    fun `골든크로스와 데드크로스를 나눠 현재가와 50일선 200일선을 표시한다`() {
         // given
-        stubGroups(mapOf("individual" to listOf("PICK", "LOWCONF", "HOLDX")))
-        stubRows(
+        stub(
             listOf(
-                row("PICK", signal = "STRONG_SELL", confidence = 60.0),
-                row("LOWCONF", signal = "BUY", confidence = 59.9),
-                row("HOLDX", signal = "HOLD", confidence = 90.0),
+                row("UPX"),
+                row("DOWNX", trend = TrendStateEnum.DEAD),
+                row("OLD", trendSince = LocalDate.parse("2023-11-01")),
             ),
         )
-
-        // when
-        val result = requireNotNull(builder.run())
-
-        // then
-        assertThat(result).contains("PICK")
-        assertThat(result).doesNotContain("LOWCONF", "HOLDX")
-        verify(exactly = 0) { analysisRepository.findByTickerInAndTimeframeOrderByTotalScoreDesc(any(), "1W") }
-    }
-
-    @Test
-    fun `매수는 목표 손절, 매도는 재진입가를 표시하고 신뢰도와 STRONG 표기는 없다`() {
-        // given
-        stubGroups(mapOf("individual" to listOf("UPX", "DOWNX")))
-        stubRows(listOf(row("UPX", signal = "STRONG_BUY", confidence = 84.0), row("DOWNX", signal = "SELL")))
 
         // when
         val result = requireNotNull(builder.run())
 
         // then
         assertThat(result).contains(
-            "🟢 매수\n<b>UPX</b> $100.00 (+1.2%)  목표 $110.00 · 손절 $94.00",
-            "🔴 매도\n<b>DOWNX</b> $100.00 (+1.2%)  재진입 $92.50",
+            "🟢 골든크로스 (50일선 ↑ 200일선)\n<b>UPX</b> $100.00 (+1.2%)  50일 $98.50 · 200일 $97.25",
+            "🔴 데드크로스 (50일선 ↓ 200일선)\n<b>DOWNX</b> $100.00 (+1.2%)  50일 $98.50 · 200일 $97.25",
         )
-        assertThat(result).doesNotContain("신뢰도", "STRONG", "84")
+        assertThat(result).doesNotContain("OLD")
     }
 
     @Test
-    fun `섹터와 개별종목을 나누고 신호 없는 그룹은 한 줄로 알린다`() {
+    fun `티커를 지정하면 그 티커만 본다`() {
         // given
-        stubGroups(
-            mapOf(
-                "market" to listOf("SPY", "QQQ"),
-                "sector" to listOf("XLK"),
-                "individual" to listOf("AAPL"),
-            ),
-        )
-        stubRows(
-            listOf(
-                row("SPY", signal = "STRONG_SELL"),
-                row("QQQ", signal = "HOLD"),
-                row("XLK", signal = "HOLD"),
-                row("AAPL", signal = "BUY"),
-            ),
-        )
+        stub(listOf(row("AAPL"), row("MSFT")))
 
         // when
-        val result = requireNotNull(builder.run())
+        val result = requireNotNull(builder.run(listOf("msft")))
 
         // then
-        assertThat(result).contains("시장: SPY SELL · QQQ HOLD")
-        assertThat(result).contains("<b>🏭 섹터</b>\n강한 신호 없음")
-        assertThat(result).contains("<b>📈 개별종목</b>\n🟢 매수\n<b>AAPL</b>")
+        assertThat(result).contains("MSFT").doesNotContain("AAPL")
     }
 
     @Test
     fun `4000자 초과 리포트는 파트별 payload_key 로 발신한다`() {
-        // given — 매수 신호 100개 → 단일 텔레그램 한도(4000자) 초과 (NotifyRouter dedup 잘림 방지 #184)
-        val tickers = (0 until 100).map { "TK%03d".format(it) }
-        stubGroups(mapOf("individual" to tickers))
-        stubRows(tickers.map { row(it) })
+        // given — 전환 100개 → 단일 텔레그램 한도(4000자) 초과 (NotifyRouter dedup 잘림 방지 #184)
+        stub((0 until 100).map { row("TK%03d".format(it)) })
 
         // when
-        val result = builder.run()
+        val full = requireNotNull(builder.run())
 
         // then
-        val full = requireNotNull(result)
         assertThat(full.length).isGreaterThan(4000)
         val keys = mutableListOf<String>()
         val messages = mutableListOf<NotifyMessage>()
         verify(atLeast = 2) {
             notifyRouter.dispatch("stock", "daily-report", capture(keys), capture(messages))
         }
-        assertThat(keys).allMatch { it.contains(":part-") }
         assertThat(keys[0]).endsWith(":part-1")
         assertThat(keys[1]).endsWith(":part-2")
         assertThat(messages).allMatch { it.text.length <= 4000 }

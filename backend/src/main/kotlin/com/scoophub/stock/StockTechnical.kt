@@ -1,12 +1,13 @@
 package com.scoophub.stock
 
 import com.scoophub.stock.vo.Candle
-import java.time.LocalDate
 
 /** legacy `stock/technical.py` — 해외 일봉 지표 (Wilder smoothing 등 수치 1:1) */
 data class TechnicalResult(
     val ma5: Double,
     val ma20: Double,
+    val sma50: Double,
+    val sma200: Double,
     val ema12: Double,
     val ema26: Double,
     val rsi14: Double,
@@ -301,6 +302,8 @@ object StockTechnical {
         return TechnicalResult(
             ma5 = ma5,
             ma20 = ma20,
+            sma50 = movingAverage(closes, 50),
+            sma200 = movingAverage(closes, 200),
             ema12 = ema(closes, 12),
             ema26 = ema(closes, 26),
             rsi14 = rsiVal,
@@ -321,97 +324,4 @@ object StockTechnical {
             obvTrendDir = obvTrendDirection(candles),
         )
     }
-
-    /** 지표별 점수 (-2 ~ +2). regime: TRENDING_UP/TRENDING_DOWN/RANGING/CHOPPY, null=중립 */
-    fun technicalScore(result: TechnicalResult, currentPrice: Double, regime: String? = null): Map<String, Int> {
-        val scores = mutableMapOf<String, Int>()
-        val isUp = regime in setOf("TRENDING_UP", "TRENDING")
-        val isDown = regime == "TRENDING_DOWN"
-
-        // MA
-        scores["ma"] = when {
-            currentPrice > result.ma5 && currentPrice > result.ma20 -> 2
-            currentPrice > result.ma5 -> 1
-            currentPrice < result.ma5 && currentPrice < result.ma20 -> -2
-            else -> -1
-        }
-
-        // RSI — regime-aware thresholds
-        scores["rsi"] = when {
-            isUp -> when {
-                result.rsi14 < 30 -> 2
-                result.rsi14 < 40 -> 1
-                result.rsi14 > 70 -> 0
-                result.rsi14 > 60 -> 1
-                else -> 0
-            }
-
-            isDown -> when {
-                result.rsi14 > 70 -> -2
-                result.rsi14 > 60 -> -1
-                result.rsi14 < 30 -> 0
-                result.rsi14 < 40 -> -1
-                else -> 0
-            }
-
-            else -> when {
-                result.rsi14 < 30 -> 2
-                result.rsi14 < 40 -> 1
-                result.rsi14 > 70 -> -2
-                result.rsi14 > 60 -> -1
-                else -> 0
-            }
-        }
-
-        // MACD
-        scores["macd"] = when {
-            result.macdHistogram > 0 && result.macdLine > result.macdSignal -> 2
-            result.macdHistogram > 0 -> 1
-            result.macdHistogram < 0 && result.macdLine < result.macdSignal -> -2
-            else -> -1
-        }
-
-        // Bollinger Bands — %B 위치 + squeeze 컨텍스트
-        val pctB = result.bbPctB
-        val isSqueeze = result.bbWidth < 0.04 // 좁은 밴드 → 돌파 대기
-        scores["bb"] = when {
-            pctB < 0.0 -> 2
-            pctB < 0.2 -> 1
-            pctB > 1.0 -> -2
-            pctB > 0.8 -> -1
-            isSqueeze && isUp && pctB > 0.5 -> 1
-            isSqueeze && isDown && pctB < 0.5 -> -1
-            else -> 0
-        }
-
-        // Stochastic
-        scores["stochastic"] = when {
-            result.stochasticK < 20 -> 2
-            result.stochasticK < 30 -> 1
-            result.stochasticK > 80 -> -2
-            result.stochasticK > 70 -> -1
-            else -> 0
-        }
-
-        // ADX — 추세 강도의 방향 확인
-        scores["adx"] = if (result.adx > 25) {
-            if (currentPrice > result.ema12) 1 else -1
-        } else {
-            0
-        }
-
-        // VWAP
-        scores["vwap"] = when {
-            currentPrice > result.vwap * 1.02 -> 2
-            currentPrice > result.vwap -> 1
-            currentPrice < result.vwap * 0.98 -> -2
-            currentPrice < result.vwap -> -1
-            else -> 0
-        }
-
-        return scores
-    }
 }
-
-/** 주간 그룹 경계 — 해당 날짜가 속한 주의 월요일(ISO) */
-internal fun mondayOf(d: LocalDate): LocalDate = d.minusDays((d.dayOfWeek.value - 1).toLong())

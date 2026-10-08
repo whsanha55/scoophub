@@ -43,7 +43,6 @@ class StockApiTest @Autowired constructor(
     fun clean() {
         listOf(
             "stock_analysis_results",
-            "stock_analysis_history",
             "stock_sigma",
             "stock_candles",
             "stock_watchlist",
@@ -197,20 +196,10 @@ class StockApiTest @Autowired constructor(
             jsonPath("$.data.length()") { value(1) }
             jsonPath("$.data[0].ticker") { value("AAPL") }
             jsonPath("$.data[0].group") { value("market") }
-            jsonPath("$.data[0].technical.signal") { value("BUY") }
+            jsonPath("$.data[0].technical.trend") { value("GOLDEN") }
+            jsonPath("$.data[0].technical.trend_since") { value("2026-10-07") }
             jsonPath("$.data[0].is_stale") { value(false) }
         }
-    }
-
-    @Test
-    fun `잘못된 timeframe 은 400 이다`() {
-        mockMvc.get("/api/stock/report") {
-            param("tickers", "AAPL")
-            param("timeframe", "5M")
-        }.andExpect { status { isBadRequest() } }
-
-        mockMvc.get("/api/stock/report/all") { param("timeframe", "5M") }
-            .andExpect { status { isBadRequest() } }
     }
 
     @Test
@@ -222,8 +211,8 @@ class StockApiTest @Autowired constructor(
         // when & then
         mockMvc.get("/api/stock/report/all") { param("summarize", "true") }.andExpect {
             jsonPath("$.data.length()") { value(2) }
-            jsonPath("$.data[0].signal") { value("BUY") }
-            jsonPath("$.data[0].total_score") { value(3.5) }
+            jsonPath("$.data[0].trend") { value("GOLDEN") }
+            jsonPath("$.data[0].trend_since") { value("2026-10-07") }
         }
     }
 
@@ -351,54 +340,43 @@ class StockApiTest @Autowired constructor(
     }
 
     @Test
-    fun `분석 실행은 DB 일봉으로 일 주 월 분석 결과와 이력을 저장한다`() {
-        // given
+    fun `분석 실행은 DB 일봉으로 일봉 추세 상태를 저장한다`() {
+        // given — 계속 오르는 650봉: 판단 가능해진 뒤 교차가 없어 trend_since 는 비어 있다
         insertWatchlist("QQQ")
         insertCandles(candles("QQQ", 650))
         every { provider.snapshots(listOf("QQQ")) } returns mapOf("QQQ" to quote(759.66))
 
-        // when & then
+        // when
         mockMvc.post("/api/crawling/stock/analyze") {
             header("Authorization", bearer)
             param("tickers", "QQQ")
         }.andExpect {
             jsonPath("$.data.ok") { value(1) }
         }
-        val timeframes = jdbcClient.sql("SELECT timeframe FROM stock_analysis_results WHERE ticker = 'QQQ'")
-            .query(String::class.java)
+
+        // then
+        val rows = jdbcClient.sql(
+            "SELECT timeframe, trend, trend_since, candle_date FROM stock_analysis_results WHERE ticker = 'QQQ'",
+        )
+            .query { rs, _ -> listOf(rs.getString(1), rs.getString(2), rs.getString(3), rs.getString(4)) }
             .list()
-        assertThat(timeframes).containsExactlyInAnyOrder("1D", "1W", "1M")
-        val historyTimeframes = jdbcClient.sql("SELECT timeframe FROM stock_analysis_history WHERE ticker = 'QQQ'")
-            .query(String::class.java)
-            .list()
-        assertThat(historyTimeframes).containsExactlyInAnyOrder("1D", "1W", "1M")
+        assertThat(rows).containsExactly(listOf("1D", "GOLDEN", null, "2028-01-10"))
     }
 
     @Test
-    fun `같은 거래일에 다시 분석하면 이력은 그날 행을 갱신한다`() {
+    fun `백테스트는 관심종목 DB 일봉으로 골든크로스 보유와 그냥 보유를 비교한다`() {
         // given
         insertWatchlist("QQQ")
-        insertCandles(candles("QQQ", 130))
-        every { provider.snapshots(listOf("QQQ")) } returns mapOf("QQQ" to quote(759.66))
-        mockMvc.post("/api/crawling/stock/analyze") {
-            header("Authorization", bearer)
-            param("tickers", "QQQ")
-        }
-        every { provider.snapshots(listOf("QQQ")) } returns mapOf("QQQ" to quote(800.0))
+        insertCandles(candles("QQQ", 650))
 
-        // when
-        mockMvc.post("/api/crawling/stock/analyze") {
-            header("Authorization", bearer)
-            param("tickers", "QQQ")
+        // when & then
+        mockMvc.get("/api/stock/backtest").andExpect {
+            jsonPath("$.data.rule") { value("golden_cross_50_200") }
+            jsonPath("$.data.cost_per_side") { value(0.001) }
+            jsonPath("$.data.tickers.length()") { value(1) }
+            jsonPath("$.data.tickers[0].ticker") { value("QQQ") }
+            jsonPath("$.data.strategy.exposure") { value(1.0) }
         }
-
-        // then
-        val prices = jdbcClient.sql(
-            "SELECT price FROM stock_analysis_history WHERE ticker = 'QQQ' AND timeframe = '1D'",
-        )
-            .query(Double::class.java)
-            .list()
-        assertThat(prices).containsExactly(800.0)
     }
 
     @Test
@@ -467,10 +445,10 @@ class StockApiTest @Autowired constructor(
         jdbcClient.sql(
             """
             INSERT INTO stock_analysis_results
-                (ticker, exchange, timeframe, signal, total_score, confidence, market_regime,
-                 price, change, change_rate, technical_scores, technical_details, analyzed_at)
-            VALUES (:ticker, 'NAS', '1D', 'BUY', 3.5, 65, 'RANGING', 100, 1, 1.2,
-                    '{"rsi": 10}'::jsonb, '{"atr": 4.0, "ema12": 99.0, "macd_histogram": 0.3}'::jsonb, now())
+                (ticker, exchange, timeframe, trend, trend_since, candle_date,
+                 price, change, change_rate, technical_details, analyzed_at)
+            VALUES (:ticker, 'NAS', '1D', 'GOLDEN', '2026-10-07', '2026-10-07', 100, 1, 1.2,
+                    '{"sma50": 98.0, "sma200": 95.0}'::jsonb, now())
             """,
         )
             .param("ticker", ticker)
