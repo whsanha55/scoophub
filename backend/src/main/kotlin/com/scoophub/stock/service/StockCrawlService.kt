@@ -22,7 +22,7 @@ class StockCrawlService(
     private val candleRepository: StockCandleRepository,
     private val clock: Clock,
 ) {
-    /** ATM straddle 기반 시그마 계산 후 저장. saved 는 저장한 만기 수 */
+    /** ATM straddle 기반 주간만기 시그마 계산 후 저장. saved 는 저장한 티커 수 */
     fun computeSigma(targetTickers: List<String>): FetchOutcome {
         val snapshotAt = clock.instant()
         val failures = mutableMapOf<String, String>()
@@ -39,35 +39,34 @@ class StockCrawlService(
                     failures[ticker] = "price unavailable"
                     continue
                 }
-                val results = StockSigma.computeSigmaFromOptions(
+                val result = StockSigma.computeSigmaFromOptions(
                     provider.optionChains(ticker),
                     ticker,
                     price,
                     snapshotAt,
                 )
-                if (results.isEmpty()) {
+                if (result == null) {
                     failures[ticker] = "no sigma computed"
+                    continue
                 }
-                for (result in results) {
-                    sigmaRepository.upsert(
-                        ticker = result.ticker,
-                        expiryDate = result.expiryDate,
-                        snapshotDate = result.snapshotDate,
-                        snapshotAt = result.snapshotAt,
-                        currentPrice = result.currentPrice,
-                        atmStrike = result.atmStrike,
-                        atmCall = result.atmCall,
-                        atmPut = result.atmPut,
-                        expectedMove = result.expectedMove,
-                        expectedMovePct = result.expectedMovePct,
-                        totalCallVolume = result.totalCallVolume,
-                        totalPutVolume = result.totalPutVolume,
-                        putCallVolumeRatio = result.putCallVolumeRatio,
-                        atmCallVolume = result.atmCallVolume,
-                        atmPutVolume = result.atmPutVolume,
-                    )
-                    saved++
-                }
+                sigmaRepository.upsert(
+                    ticker = result.ticker,
+                    expiryDate = result.expiryDate,
+                    snapshotDate = result.snapshotDate,
+                    snapshotAt = result.snapshotAt,
+                    currentPrice = result.currentPrice,
+                    atmStrike = result.atmStrike,
+                    atmCall = result.atmCall,
+                    atmPut = result.atmPut,
+                    expectedMove = result.expectedMove,
+                    expectedMovePct = result.expectedMovePct,
+                    totalCallVolume = result.totalCallVolume,
+                    totalPutVolume = result.totalPutVolume,
+                    putCallVolumeRatio = result.putCallVolumeRatio,
+                    atmCallVolume = result.atmCallVolume,
+                    atmPutVolume = result.atmPutVolume,
+                )
+                saved++
             } catch (e: Exception) {
                 log.error(e) { "Sigma compute failed for $ticker" }
                 failures[ticker] = failureReason(e)

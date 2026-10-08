@@ -50,11 +50,10 @@ class StockReportBuilder(
 
         val blocks = mutableListOf(header(groups["market"].orEmpty(), rows1d["market"].orEmpty()))
         for ((groupName, title) in listOf("sector" to "🏭 섹터", "individual" to "📈 개별종목")) {
-            val groupTickers = groups[groupName].orEmpty()
-            if (groupTickers.isEmpty()) {
+            if (groups[groupName].isNullOrEmpty()) {
                 continue
             }
-            blocks += buildSignalBlock(title, groupTickers, rows1d[groupName].orEmpty())
+            blocks += buildSignalBlock(title, rows1d[groupName].orEmpty())
         }
 
         val full = "${blocks.joinToString("\n\n")}\n\n$REPORT_LINK"
@@ -90,16 +89,10 @@ class StockReportBuilder(
         return groups
     }
 
-    /** 1D·1W 같은 방향 + 1D 신뢰도 기준 이상 종목만 매수/매도로 나눈 블록 */
-    private fun buildSignalBlock(
-        title: String,
-        tickers: List<String>,
-        rows1d: List<StockAnalysisResultEntity>,
-    ): String {
-        val auxW = auxSignalMap(tickers, "1W")
+    /** 1D 매수·매도 신호 + 신뢰도 기준 이상 종목만 매수/매도로 나눈 블록 */
+    private fun buildSignalBlock(title: String, rows1d: List<StockAnalysisResultEntity>): String {
         val picked = rows1d
-            .filter { it.price > 0 && it.confidence >= MIN_CONFIDENCE }
-            .filter { direction(it.signal) != 0 && direction(it.signal) == direction(auxW[it.ticker]) }
+            .filter { it.price > 0 && it.confidence >= MIN_CONFIDENCE && direction(it.signal) != 0 }
             .sortedByDescending { it.confidence }
         val (buys, sells) = picked.partition { direction(it.signal) > 0 }
 
@@ -116,13 +109,6 @@ class StockReportBuilder(
             sells.forEach { lines += formatSell(it) }
         }
         return lines.joinToString("\n")
-    }
-
-    private fun auxSignalMap(tickers: List<String>, timeframe: String): Map<String, String> = try {
-        analysisRepository.findByTickerInAndTimeframeOrderByTotalScoreDesc(tickers, timeframe)
-            .associate { it.ticker to it.signal }
-    } catch (e: Exception) {
-        emptyMap()
     }
 
     /** 제목 + 시장층 1D 신호 한 줄 (STRONG 구분 없이) */
@@ -159,8 +145,7 @@ class StockReportBuilder(
     }
 
     /** BUY 계열 1, SELL 계열 -1, 그 외 0 */
-    private fun direction(signal: String?): Int = when {
-        signal == null -> 0
+    private fun direction(signal: String): Int = when {
         signal.endsWith("BUY") -> 1
         signal.endsWith("SELL") -> -1
         else -> 0

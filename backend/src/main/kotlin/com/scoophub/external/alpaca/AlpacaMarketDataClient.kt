@@ -84,10 +84,10 @@ class AlpacaMarketDataClient(
         return symbols.mapNotNull { symbol -> body[symbol]?.let(::toQuote)?.let { symbol to it } }.toMap()
     }
 
-    /** 오늘(ET)부터 60일 안에 만기인 옵션 체인. 만기 오름차순 */
+    /** 오늘(ET)부터 14일 안에 만기인 옵션 체인. 만기 오름차순 */
     fun optionChains(underlying: String): List<OptionsChain> {
         val today = clock.instant().atZone(ET).toLocalDate()
-        // 시그마는 가까운 만기만 쓴다(StockSigma.MAX_EXPIRIES). 장기 만기까지 받으면 SPY 는 13페이지가 된다
+        // 시그마는 주간만기 하나만 쓴다(금요일 스냅샷이면 다음 주 금요일까지). 장기 만기까지 받으면 SPY 는 13페이지가 된다
         val contracts = paginate(arrayOf(underlying)) { builder ->
             builder.path("/v1beta1/options/snapshots/{underlying}")
                 .queryParam("expiration_date_gte", today)
@@ -194,7 +194,7 @@ class AlpacaMarketDataClient(
         private val ET: ZoneId = ZoneId.of("America/New_York")
         private val SIP_DELAY = Duration.ofMinutes(16)
         private const val HISTORY_YEARS = 2L
-        private const val OPTION_EXPIRY_WINDOW_DAYS = 60L
+        private const val OPTION_EXPIRY_WINDOW_DAYS = 14L
         private const val PAGE_LIMIT_BARS = 10_000
         private const val PAGE_LIMIT_OPTIONS = 1_000
         private const val OCC_SUFFIX_LENGTH = 15

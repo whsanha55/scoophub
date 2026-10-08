@@ -204,8 +204,6 @@ interface StockSigmaRepository : JpaRepository<StockSigmaEntity, Long> {
         @Param("atmPutVolume") atmPutVolume: Long,
     )
 
-    fun findFirstByTickerOrderBySnapshotDateDescSnapshotAtDesc(ticker: String): StockSigmaEntity?
-
     /** legacy `get_latest` — ORDER BY snapshot_date DESC, expiry_date ASC */
     fun findFirstByTickerOrderBySnapshotDateDescExpiryDateAsc(ticker: String): StockSigmaEntity?
 }
