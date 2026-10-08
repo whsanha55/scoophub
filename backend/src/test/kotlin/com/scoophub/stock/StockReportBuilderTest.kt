@@ -65,16 +65,10 @@ class StockReportBuilderTest {
         }
     }
 
-    /** 1D 행을 주고, 1W 는 weekly 맵(ticker → signal)으로 만든다. 지정 없으면 1D 와 같은 신호 */
-    private fun stubRows(rows1d: List<StockAnalysisResultEntity>, weekly: Map<String, String> = emptyMap()) {
-        every { analysisRepository.findByTickerInAndTimeframeOrderByTotalScoreDesc(any(), any()) } answers {
+    private fun stubRows(rows1d: List<StockAnalysisResultEntity>) {
+        every { analysisRepository.findByTickerInAndTimeframeOrderByTotalScoreDesc(any(), "1D") } answers {
             val tickers = firstArg<List<String>>()
-            val target = rows1d.filter { it.ticker in tickers }
-            when (secondArg<String>()) {
-                "1D" -> target
-                "1W" -> target.map { row(it.ticker, signal = weekly[it.ticker] ?: it.signal, timeframe = "1W") }
-                else -> emptyList()
-            }
+            rows1d.filter { it.ticker in tickers }
         }
     }
 
@@ -114,25 +108,24 @@ class StockReportBuilderTest {
     }
 
     @Test
-    fun `1D 1W 방향이 같고 신뢰도 60 이상인 종목만 고른다`() {
+    fun `1D 매수 매도 신호 중 신뢰도 60 이상인 종목만 고르고 1W 는 보지 않는다`() {
         // given
-        stubGroups(mapOf("individual" to listOf("PICK", "WEEKOFF", "LOWCONF", "HOLDX")))
+        stubGroups(mapOf("individual" to listOf("PICK", "LOWCONF", "HOLDX")))
         stubRows(
             listOf(
-                row("PICK", signal = "BUY"),
-                row("WEEKOFF", signal = "BUY"),
+                row("PICK", signal = "STRONG_SELL", confidence = 60.0),
                 row("LOWCONF", signal = "BUY", confidence = 59.9),
-                row("HOLDX", signal = "HOLD"),
+                row("HOLDX", signal = "HOLD", confidence = 90.0),
             ),
-            weekly = mapOf("PICK" to "STRONG_BUY", "WEEKOFF" to "SELL"),
         )
 
         // when
         val result = requireNotNull(builder.run())
 
-        // then — BUY 와 STRONG_BUY 는 같은 방향
+        // then
         assertThat(result).contains("PICK")
-        assertThat(result).doesNotContain("WEEKOFF", "LOWCONF", "HOLDX")
+        assertThat(result).doesNotContain("LOWCONF", "HOLDX")
+        verify(exactly = 0) { analysisRepository.findByTickerInAndTimeframeOrderByTotalScoreDesc(any(), "1W") }
     }
 
     @Test

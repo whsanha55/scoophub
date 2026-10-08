@@ -3,6 +3,7 @@ package com.scoophub.stock
 import com.scoophub.stock.vo.OptionQuote
 import com.scoophub.stock.vo.OptionsChain
 import io.github.oshai.kotlinlogging.KotlinLogging
+import java.time.DayOfWeek
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
@@ -34,9 +35,6 @@ data class SigmaResult(
 /** legacy `stock/sigma.py` — ATM 스트래들 가격으로 sigma(예상움직임) 계산 */
 object StockSigma {
     private val ET: ZoneId = ZoneId.of("America/New_York")
-
-    /** 티커당 저장 만기 상한 (가까운 만기부터) */
-    const val MAX_EXPIRIES = 6
 
     private fun optionPrice(opt: OptionQuote): Double {
         // bid/ask mid 우선, 없으면 lastPrice
@@ -104,26 +102,28 @@ object StockSigma {
         )
     }
 
-    /** 만기별 sigma 계산. expected_move = ATM call + ATM put. chains 는 만기 오름차순 */
+    /** 주간만기 sigma 계산. expected_move = ATM call + ATM put. chains 는 만기 오름차순 */
     fun computeSigmaFromOptions(
         chains: List<OptionsChain>,
         ticker: String,
         currentPrice: Double,
         snapshotAt: Instant,
-    ): List<SigmaResult> {
+    ): SigmaResult? {
         if (currentPrice <= 0) {
-            return emptyList()
+            return null
         }
-        if (chains.isEmpty()) {
-            log.warn { "No options chain data for $ticker" }
-            return emptyList()
+        val chain = weeklyChain(chains, snapshotAt.atZone(ET).toLocalDate()) ?: run {
+            log.warn { "No upcoming options chain for $ticker" }
+            return null
         }
-        val expiries = chains.take(MAX_EXPIRIES)
-        val results = expiries.mapNotNull { computeOne(it, ticker, currentPrice, snapshotAt) }
-        if (results.isEmpty()) {
-            log.warn { "No valid sigma computed for $ticker across ${expiries.size} expiries" }
-        }
-        return results
+        return computeOne(chain, ticker, currentPrice, snapshotAt)
+    }
+
+    /** 스냅샷 거래일 이후 가장 가까운 만기가 속한 주의 마지막 만기 (보통 금요일, 금요일 휴장이면 목요일) */
+    private fun weeklyChain(chains: List<OptionsChain>, snapshotDate: LocalDate): OptionsChain? {
+        val upcoming = chains.filter { it.expiry.isAfter(snapshotDate) }
+        val weekStart = upcoming.firstOrNull()?.expiry?.with(DayOfWeek.MONDAY) ?: return null
+        return upcoming.last { it.expiry.with(DayOfWeek.MONDAY) == weekStart }
     }
 
     const val SOURCE = "alpaca_straddle"

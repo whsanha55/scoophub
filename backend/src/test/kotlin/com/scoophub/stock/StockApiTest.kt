@@ -330,7 +330,7 @@ class StockApiTest @Autowired constructor(
         every { provider.snapshots(listOf("QQQ")) } returns mapOf("QQQ" to quote(759.66))
         every { provider.optionChains("QQQ") } returns listOf(
             OptionsChain(
-                expiry = LocalDate.parse("2026-10-09"),
+                expiry = LocalDate.now().plusWeeks(1),
                 calls = listOf(OptionQuote(strike = 760.0, bid = 4.25, ask = 4.39, lastPrice = 4.3, volume = 9675)),
                 puts = listOf(OptionQuote(strike = 760.0, bid = 4.1, ask = 4.31, lastPrice = 4.2, volume = 24456)),
             ),

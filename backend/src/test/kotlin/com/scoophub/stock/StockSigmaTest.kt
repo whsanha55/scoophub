@@ -22,7 +22,9 @@ class StockSigmaTest {
     @Test
     fun `ATM 콜 중간가와 풋 체결가로 스트래들을 계산한다`() {
         // when
-        val result = StockSigma.computeSigmaFromOptions(listOf(chain("2026-10-09")), "QQQ", 759.66, snapshotAt).single()
+        val result = requireNotNull(
+            StockSigma.computeSigmaFromOptions(listOf(chain("2026-10-09")), "QQQ", 759.66, snapshotAt),
+        )
 
         // then
         assertThat(result.atmStrike).isEqualTo(760.0)
@@ -34,15 +36,48 @@ class StockSigmaTest {
     }
 
     @Test
-    fun `가까운 만기부터 MAX_EXPIRIES 개까지만 계산한다`() {
-        // given
-        val chains = (1..8).map { chain("2026-10-%02d".format(8 + it)) }
+    fun `당일 만기를 빼고 가장 가까운 만기가 속한 주의 마지막 만기를 쓴다`() {
+        // given — 스냅샷 ET 2026-10-06(화). 당일·수·목·금·다음 주 만기
+        val chains = listOf("2026-10-06", "2026-10-07", "2026-10-08", "2026-10-09", "2026-10-16").map(::chain)
 
         // when
-        val results = StockSigma.computeSigmaFromOptions(chains, "QQQ", 759.66, snapshotAt)
+        val result = StockSigma.computeSigmaFromOptions(chains, "QQQ", 759.66, snapshotAt)
 
         // then
-        assertThat(results).hasSize(StockSigma.MAX_EXPIRIES)
-        assertThat(results.first().expiryDate).isEqualTo(LocalDate.parse("2026-10-09"))
+        assertThat(result?.expiryDate).isEqualTo(LocalDate.parse("2026-10-09"))
+    }
+
+    @Test
+    fun `금요일 휴장 주에는 목요일 만기를 쓴다`() {
+        // given
+        val chains = listOf("2026-10-07", "2026-10-08", "2026-10-16").map(::chain)
+
+        // when
+        val result = StockSigma.computeSigmaFromOptions(chains, "QQQ", 759.66, snapshotAt)
+
+        // then
+        assertThat(result?.expiryDate).isEqualTo(LocalDate.parse("2026-10-08"))
+    }
+
+    @Test
+    fun `금요일 스냅샷이면 다음 주 금요일 만기를 쓴다`() {
+        // given — ET 2026-10-09(금) 장 마감 후
+        val fridayClose = Instant.parse("2026-10-09T21:00:00Z")
+        val chains = listOf("2026-10-09", "2026-10-12", "2026-10-14", "2026-10-16").map(::chain)
+
+        // when
+        val result = StockSigma.computeSigmaFromOptions(chains, "QQQ", 759.66, fridayClose)
+
+        // then
+        assertThat(result?.expiryDate).isEqualTo(LocalDate.parse("2026-10-16"))
+    }
+
+    @Test
+    fun `다가오는 만기가 없으면 null 이다`() {
+        // when
+        val result = StockSigma.computeSigmaFromOptions(listOf(chain("2026-10-06")), "QQQ", 759.66, snapshotAt)
+
+        // then
+        assertThat(result).isNull()
     }
 }

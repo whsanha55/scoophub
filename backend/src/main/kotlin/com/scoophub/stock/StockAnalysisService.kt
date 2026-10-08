@@ -111,8 +111,8 @@ class StockAnalysisService(
     fun fetchSigmaEnrichment(ticker: String): JsonNode? {
         val sigmaData: ObjectNode = jsonMapper.createObjectNode()
 
-        // stock_sigma (ATM straddle, nearest expiry)
-        sigmaRepository.findFirstByTickerOrderBySnapshotDateDescSnapshotAtDesc(ticker)?.let { s ->
+        // stock_sigma (ATM straddle, 최신 스냅샷의 가장 가까운 만기)
+        sigmaRepository.findFirstByTickerOrderBySnapshotDateDescExpiryDateAsc(ticker)?.let { s ->
             sigmaData.set(
                 "straddle",
                 jsonMapper.createObjectNode().apply {
