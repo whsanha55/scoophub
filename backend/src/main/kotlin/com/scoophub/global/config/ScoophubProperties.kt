@@ -21,6 +21,7 @@ data class ScoophubProperties(
         val workerEnabled: Boolean = false,
         val burstThreshold: Int = 3,
         val burstExcludedSymbols: Set<String> = setOf("SPY", "BTCUSD"),
+        val indexEtfSymbols: Set<String> = setOf("SPY", "QQQ", "DIA", "IWM", "VOO", "VTI"),
     )
 
     data class Llm(val apiUrl: String, val apiKey: String, val model: String)

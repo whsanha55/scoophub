@@ -134,7 +134,7 @@ class AlpacaNewsTest @Autowired constructor(
         every { llm.chatNews(any(), any()) } answers {
             val ids = tools.jackson.databind.json.JsonMapper.builder().build().readTree(
                 secondArg<String>(),
-            ).toList().map {
+            ).path("articles").toList().map {
                 it.path("id").asLong()
             }
             response(ids)
@@ -160,11 +160,18 @@ class AlpacaNewsTest @Autowired constructor(
         // given
         service.receive(article().copy(headline = "Stocks To Watch Today"))
         service.receive(article(2, published = clock.instant().minus(Duration.ofMinutes(16))))
+        service.receive(article(3).copy(headline = "Why Is Super Micro Computer Stock Trading Higher Today?"))
+        service.receive(
+            article(4).copy(headline = "Shares of software companies are trading lower after yields spiked"),
+        )
+        service.receive(article(5).copy(headline = "Stock Market Today: S&P 500 Falls"))
+        service.receive(article(6).copy(headline = "Webull Stock Just Lost 20%. Here Are the Next 3 Catalysts"))
         // when
         worker.processPending()
         // then
         assertThat(row().status).isEqualTo("filtered")
         assertThat(row(2).decisionReason).isEqualTo("stale")
+        assertThat((3L..6L).map { row(it).status }).containsOnly("filtered")
         verify(exactly = 0) { llm.chatNews(any(), any()) }
     }
 
@@ -228,6 +235,53 @@ class AlpacaNewsTest @Autowired constructor(
         // then
         assertThat(row().status).isEqualTo("pushed")
         assertThat(row(2).status).isEqualTo("skipped")
+    }
+
+    @Test
+    fun `지수 ETF만 겹치는 관심 종목 기사는 일반 기준을 따른다`() {
+        // given
+        jdbc.sql("INSERT INTO stock_watchlist (ticker, exchange, name) VALUES ('SPY', 'NYSE', 'S&P 500 ETF')").update()
+        service.receive(article(1, "SPY"))
+        every { llm.chatNews(any(), any()) } returns response(listOf(1), 3)
+        // when
+        worker.processPending()
+        // then
+        assertThat(row().status).isEqualTo("skipped")
+    }
+
+    @Test
+    fun `카드는 한국어 요약을 굵은 제목으로 쓰고 영어 헤드라인을 뺀다`() {
+        // given
+        service.receive(article())
+        every { llm.chatNews(any(), any()) } returns response(listOf(1))
+        val cards = mutableListOf<com.scoophub.global.notify.NotifyMessage>()
+        every { router.dispatchBatch(any(), any(), any()) } answers {
+            cards += thirdArg<List<Pair<String, com.scoophub.global.notify.NotifyMessage>>>().map { it.second }
+            true
+        }
+        // when
+        worker.processPending()
+        // then
+        assertThat(cards.single().text).startsWith("<b>한국어 요약 1</b>").doesNotContain("Company event")
+            .contains("<a href=\"https://example.com/1\">원문</a>")
+    }
+
+    @Test
+    fun `최근 발송 요약을 LLM에 넘기고 중복 판정 기사는 보내지 않는다`() {
+        // given
+        service.receive(article())
+        repository.saveAssessment(1, ArticleAssessment(4, "기업", "울프스피드 국방부 대출"))
+        repository.decide(1, "pushed", "importance score=4", clock.instant())
+        service.receive(article(2))
+        every { llm.chatNews(any(), any()) } returns
+            """[{"id":2,"importance":4,"category":"기업","summary_ko":"울프스피드 대출 확정","duplicate":true}]"""
+        // when
+        worker.processPending()
+        // then
+        assertThat(row(2).status).isEqualTo("skipped")
+        assertThat(row(2).decisionReason).isEqualTo("duplicate")
+        verify { llm.chatNews(any(), match { it.contains("\"recently_sent\":[\"울프스피드 국방부 대출\"]") }) }
+        verify(exactly = 0) { router.dispatchBatch(any(), any(), any()) }
     }
 
     @Test

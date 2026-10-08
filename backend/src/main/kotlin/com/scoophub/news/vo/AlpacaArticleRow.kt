@@ -23,5 +23,10 @@ data class AlpacaArticleRow(
     val updatedAt: Instant? = null,
 )
 
-data class ArticleAssessment(val importance: Int, val category: String, val summaryKo: String)
+data class ArticleAssessment(
+    val importance: Int,
+    val category: String,
+    val summaryKo: String,
+    val duplicate: Boolean = false,
+)
 data class AlpacaArticlePage(val total: Int, val articles: List<AlpacaArticleRow>)

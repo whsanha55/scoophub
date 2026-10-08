@@ -57,7 +57,7 @@ class NewsArticleWorker(
     @Synchronized
     fun processPending() {
         processBursts()
-        val watchlist = repository.findWatchlistSymbols()
+        val watchlist = repository.findWatchlistSymbols() - props.alpaca.indexEtfSymbols
         while (!Thread.currentThread().isInterrupted) {
             val batch = repository.findPending(clock.instant())
             if (batch.isEmpty()) break
@@ -94,7 +94,11 @@ class NewsArticleWorker(
         } else {
             try {
                 log.info { "News LLM batch: articles=${needsAssessment.size}" }
-                assessor.assess(needsAssessment, watchlist)
+                assessor.assess(
+                    needsAssessment,
+                    watchlist,
+                    repository.findRecentPushedSummaries(clock.instant().minus(Duration.ofHours(2))),
+                )
             } catch (e: Exception) {
                 log.warn { "News LLM batch failed: articles=${needsAssessment.size}, type=${e.javaClass.simpleName}" }
                 emptyMap()
@@ -115,6 +119,8 @@ class NewsArticleWorker(
             if (article.importance == null) repository.saveAssessment(article.id, assessment)
             if (isStale(article)) {
                 repository.decide(article.id, "skipped", "stale", clock.instant())
+            } else if (assessment.duplicate) {
+                repository.decide(article.id, "skipped", "duplicate", clock.instant())
             } else if ((isWatchlist && assessment.importance >= 3) || assessment.importance >= 4) {
                 val reason = if (isWatchlist) {
                     "watchlist:${article.symbols.filter {
@@ -208,13 +214,13 @@ class NewsArticleWorker(
         Duration.between(article.publishedAt, clock.instant()) > Duration.ofMinutes(15)
     private fun key(article: AlpacaArticleRow): String = "news:alpaca:${article.id}"
     private fun card(article: AlpacaArticleRow): NotifyMessage {
-        val title = boundedHtml(article.headline, 600)
-        val summary = boundedHtml(article.summaryKo.orEmpty(), 900)
+        val title = article.summaryKo?.takeIf { it.isNotBlank() }?.let { boundedHtml(it, 900) }
+            ?: boundedHtml(article.headline, 600)
         val symbols = boundedHtml(article.symbols.joinToString(" · "), 250)
         val url = article.url?.takeIf { it.startsWith("https://") || it.startsWith("http://") }
             ?.let { NotifyCard.escapeHtml(it).replace("\"", "&quot;") }
             ?.takeIf { it.length <= 800 }
         val link = if (url == null) "" else " <a href=\"${url}\">원문</a>"
-        return NotifyMessage("<b>$title</b>\n$summary\n$symbols$link")
+        return NotifyMessage("<b>$title</b>\n$symbols$link")
     }
 }
