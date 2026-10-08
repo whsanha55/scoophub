@@ -44,6 +44,10 @@ class AlpacaNewsTest @Autowired constructor(
     fun clean() {
         jdbc.sql("DELETE FROM news_article").update()
         jdbc.sql("DELETE FROM notify_log WHERE payload_key LIKE 'news:%'").update()
+        jdbc.sql("DELETE FROM stock_watchlist").update()
+        jdbc.sql(
+            "INSERT INTO stock_watchlist (ticker, exchange, name) VALUES ('NVDA', 'NASDAQ', 'Nvidia'), ('AAPL', 'NASDAQ', 'Apple')",
+        ).update()
         every { router.dispatchBatch(any(), any(), any()) } returns true
         every { router.dispatchConfirmed(any(), any(), any(), any()) } returns true
     }
@@ -196,7 +200,7 @@ class AlpacaNewsTest @Autowired constructor(
     }
 
     @Test
-    fun `실패 배치가 후속 기사를 막지 않고 세 번 실패한 빅테크 기사는 헤드라인을 보낸다`() {
+    fun `실패 배치가 후속 기사를 막지 않고 세 번 실패한 관심 종목 기사는 헤드라인을 보낸다`() {
         // given
         service.receive(article())
         every { llm.chatNews(any(), any()) } throws IllegalStateException("Unavailable")
@@ -222,7 +226,7 @@ class AlpacaNewsTest @Autowired constructor(
     }
 
     @Test
-    fun `빅테크와 거시의 중요도 4 이상만 발송한다`() {
+    fun `관심 종목과 거시의 중요도 4 이상만 발송한다`() {
         // given
         service.receive(article(1, "NVDA"))
         service.receive(article(2, "ARGX"))
@@ -239,7 +243,7 @@ class AlpacaNewsTest @Autowired constructor(
         // when
         worker.processPending()
         // then
-        assertThat(row(1).decisionReason).isEqualTo("bigtech:NVDA score=4")
+        assertThat(row(1).decisionReason).isEqualTo("watchlist:NVDA score=4")
         assertThat(row(2).decisionReason).isEqualTo("out-of-scope score=4")
         assertThat(row(3).decisionReason).isEqualTo("macro score=4")
         assertThat(row(4).decisionReason).isEqualTo("importance score=3")
@@ -337,7 +341,7 @@ class AlpacaNewsTest @Autowired constructor(
     }
 
     @Test
-    fun `급증은 빅테크가 아닌 종목을 알리지 않는다`() {
+    fun `급증은 관심 종목이 아닌 종목을 알리지 않는다`() {
         // given
         (1L..3L).forEach { service.receive(article(it, "ARGX")) }
         every { llm.chatNews(any(), any()) } returns response(listOf(1, 2, 3), 3)
