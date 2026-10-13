@@ -19,6 +19,9 @@ import java.util.concurrent.TimeUnit
 
 private val log = KotlinLogging.logger {}
 
+/** 텔레그램 발송 최소 중요도(1~5). 4점까지는 알림이 많아 5점만 보낸다 (#269) */
+private const val MIN_PUSH_IMPORTANCE = 5
+
 @Component
 @DependsOnDatabaseInitialization
 class NewsArticleWorker(
@@ -121,7 +124,7 @@ class NewsArticleWorker(
                 repository.decide(article.id, "skipped", "stale", clock.instant())
             } else if (assessment.duplicate) {
                 repository.decide(article.id, "skipped", "duplicate", clock.instant())
-            } else if (assessment.importance < 4) {
+            } else if (assessment.importance < MIN_PUSH_IMPORTANCE) {
                 repository.decide(article.id, "skipped", "importance score=${assessment.importance}", clock.instant())
             } else if (watched.isEmpty() && assessment.category != "거시") {
                 repository.decide(article.id, "skipped", "out-of-scope score=${assessment.importance}", clock.instant())

@@ -75,7 +75,7 @@ class AlpacaNewsTest @Autowired constructor(
             "UPDATE news_article SET next_attempt_at = NOW() - INTERVAL '1 second' WHERE id = :id",
         ).param("id", id).update()
     }
-    private fun response(ids: List<Long>, score: Int = 4): String = ids.joinToString(",", "[", "]") {
+    private fun response(ids: List<Long>, score: Int = 5): String = ids.joinToString(",", "[", "]") {
         """{"id":$it,"importance":$score,"category":"기업","summary_ko":"한국어 요약 $it"}"""
     }
 
@@ -226,7 +226,7 @@ class AlpacaNewsTest @Autowired constructor(
     }
 
     @Test
-    fun `관심 종목과 거시의 중요도 4 이상만 발송한다`() {
+    fun `관심 종목과 거시의 중요도 5만 발송한다`() {
         // given
         service.receive(article(1, "NVDA"))
         service.receive(article(2, "ARGX"))
@@ -235,18 +235,18 @@ class AlpacaNewsTest @Autowired constructor(
         every {
             llm.chatNews(any(), any())
         } returns """[
-            {"id":1,"importance":4,"category":"기업","summary_ko":"요약 1"},
-            {"id":2,"importance":4,"category":"기업","summary_ko":"요약 2"},
-            {"id":3,"importance":4,"category":"거시","summary_ko":"요약 3"},
-            {"id":4,"importance":3,"category":"기업","summary_ko":"요약 4"}
+            {"id":1,"importance":5,"category":"기업","summary_ko":"요약 1"},
+            {"id":2,"importance":5,"category":"기업","summary_ko":"요약 2"},
+            {"id":3,"importance":5,"category":"거시","summary_ko":"요약 3"},
+            {"id":4,"importance":4,"category":"기업","summary_ko":"요약 4"}
         ]"""
         // when
         worker.processPending()
         // then
-        assertThat(row(1).decisionReason).isEqualTo("watchlist:NVDA score=4")
-        assertThat(row(2).decisionReason).isEqualTo("out-of-scope score=4")
-        assertThat(row(3).decisionReason).isEqualTo("macro score=4")
-        assertThat(row(4).decisionReason).isEqualTo("importance score=3")
+        assertThat(row(1).decisionReason).isEqualTo("watchlist:NVDA score=5")
+        assertThat(row(2).decisionReason).isEqualTo("out-of-scope score=5")
+        assertThat(row(3).decisionReason).isEqualTo("macro score=5")
+        assertThat(row(4).decisionReason).isEqualTo("importance score=4")
         assertThat((1L..4L).map { row(it).status }).containsExactly("pushed", "skipped", "pushed", "skipped")
     }
 
