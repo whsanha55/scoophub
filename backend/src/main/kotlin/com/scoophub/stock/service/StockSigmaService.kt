@@ -31,7 +31,7 @@ class StockSigmaService(private val sigmaRepository: StockSigmaRepository) {
 
     companion object {
         /** 주간 앵커는 만기 직전 주에 찍히므로 기준일보다 3주 앞까지만 보면 충분하다 */
-        private const val ANCHOR_LOOKBACK_DAYS = 21L
+        const val ANCHOR_LOOKBACK_DAYS = 21L
 
         fun toBand(row: StockSigmaEntity) = SigmaBand(
             snapshotDate = row.snapshotDate,

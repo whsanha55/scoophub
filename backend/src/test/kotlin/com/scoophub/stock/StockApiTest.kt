@@ -401,6 +401,28 @@ class StockApiTest @Autowired constructor(
     }
 
     @Test
+    fun `상세 차트는 최근 1년 일봉에 SMA 와 그날 적용되는 σ 밴드를 붙인다`() {
+        // given — 650봉(마지막 2028-01-10). 2028-01-03 앵커(1320 ± 25, 만기 01-07)
+        insertCandles(candles("QQQ", 650))
+        insertSigma("QQQ", snapshotDate = "2028-01-03", expiryDate = "2028-01-07", price = 1320.0, move = 25.0)
+
+        // when & then — 01-04 종가 1343 → (1343 - 1320) / 25 = 0.92σ, 01-07 종가 1346 → 1.04σ
+        mockMvc.get("/api/stock/chart/qqq").andExpect {
+            jsonPath("$.data.ticker") { value("QQQ") }
+            jsonPath("$.data.points.length()") { value(366) }
+            jsonPath("$.data.points[0].date") { value("2027-01-10") }
+            jsonPath("$.data.points[0].sma200") { exists() }
+            jsonPath("$.data.points[?(@.date == '2028-01-04')].sigma_position") { value(0.92) }
+            jsonPath("$.data.points[?(@.date == '2028-01-04')].sigma_upper") { value(1345.0) }
+            jsonPath("$.data.points[?(@.date == '2028-01-07')].sigma_state") { value("UPPER_BREAK") }
+            jsonPath("$.data.points[?(@.date == '2028-01-03')].sigma_state") { value(null) }
+        }
+        mockMvc.get("/api/stock/chart/NONE").andExpect {
+            jsonPath("$.data.points.length()") { value(0) }
+        }
+    }
+
+    @Test
     fun `DB 에 일봉이 없으면 분석은 에러로 집계한다`() {
         // given
         insertWatchlist("QQQ")

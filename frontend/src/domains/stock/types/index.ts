@@ -56,6 +56,25 @@ export interface SigmaBand {
   as_of: string; // σ 위치를 잰 일봉 일자
 }
 
+// #261 — 상세 차트 (최근 1년 일봉). 밴드가 없는 날은 sigma_* 가 null
+export interface StockChartPoint {
+  date: string;
+  close: number;
+  sma50: number | null;
+  sma200: number | null;
+  sigma_upper: number | null;
+  sigma_lower: number | null;
+  sigma_anchor: number | null;
+  sigma_position: number | null;
+  sigma_state: SigmaState | null;
+  cross: "GOLDEN" | "DEAD" | null; // 그날 50/200 교차로 바뀐 추세
+}
+
+export interface StockChart {
+  ticker: string;
+  points: StockChartPoint[];
+}
+
 export interface WatchlistItem {
   id: string;
   ticker: string;

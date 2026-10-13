@@ -1,9 +1,11 @@
 package com.scoophub.stock.dto
 
+import com.scoophub.stock.ChartPoint
 import com.scoophub.stock.SigmaBand
 import com.scoophub.stock.SigmaStateEnum
 import com.scoophub.stock.StockSigma
 import com.scoophub.stock.StockSigmaBand
+import com.scoophub.stock.TrendStateEnum
 import com.scoophub.stock.entity.StockCandleEntity
 import com.scoophub.stock.entity.StockSigmaEntity
 import tools.jackson.databind.JsonNode
@@ -161,3 +163,34 @@ data class SigmaSnapshotOut(
 
 /** legacy market_status 응답 data dict */
 data class MarketStatusOut(val isOpen: Boolean, val isWeekday: Boolean, val currentUtc: Instant)
+
+/** 상세 차트 (#261) — 최근 1년 일봉. 밴드가 없는 날은 sigma 필드가 null */
+data class StockChartOut(val ticker: String, val points: List<StockChartPointOut>)
+
+data class StockChartPointOut(
+    val date: LocalDate,
+    val close: Double,
+    val sma50: Double?,
+    val sma200: Double?,
+    val sigmaUpper: Double?,
+    val sigmaLower: Double?,
+    val sigmaAnchor: Double?,
+    val sigmaPosition: Double?,
+    val sigmaState: SigmaStateEnum?,
+    val cross: TrendStateEnum?,
+) {
+    companion object {
+        fun from(point: ChartPoint) = StockChartPointOut(
+            date = point.date,
+            close = point.close,
+            sma50 = point.sma50?.let { round2(it) },
+            sma200 = point.sma200?.let { round2(it) },
+            sigmaUpper = point.band?.let { round2(it.upper) },
+            sigmaLower = point.band?.let { round2(it.lower) },
+            sigmaAnchor = point.band?.anchorPrice,
+            sigmaPosition = point.position?.let { round2(it) },
+            sigmaState = point.state,
+            cross = point.cross,
+        )
+    }
+}

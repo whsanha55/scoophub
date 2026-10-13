@@ -15,6 +15,7 @@ import { TrendBadge } from "@/domains/stock/components/trend-badge";
 import { GexLadder } from "@/domains/stock/components/gex-ladder";
 import { SigmaBadge } from "@/domains/stock/components/sigma-badge";
 import { SigmaBandCard } from "@/domains/stock/components/sigma-band-card";
+import { StockChart } from "@/domains/stock/components/stock-chart";
 
 // #82 — 지표 label + 느낌표 툴팁 셀
 function IndicatorCell({ k, value }: { k: string; value: number }) {
@@ -143,6 +144,7 @@ export default function StockDetailPage() {
       </div>
 
       <SigmaBandCard sigma={report.sigma} />
+      <StockChart ticker={report.ticker} />
 
       {/* Technical Overview */}
       <Card>

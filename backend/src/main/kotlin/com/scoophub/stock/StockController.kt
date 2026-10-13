@@ -6,11 +6,13 @@ import com.scoophub.global.api.ResponseMeta
 import com.scoophub.global.auth.SuperOnly
 import com.scoophub.stock.dto.MarketStatusOut
 import com.scoophub.stock.dto.SigmaSnapshotOut
+import com.scoophub.stock.dto.StockChartOut
 import com.scoophub.stock.dto.StockReport
 import com.scoophub.stock.dto.WatchlistItemIn
 import com.scoophub.stock.dto.WatchlistItemOut
 import com.scoophub.stock.dto.WatchlistUpdateIn
 import com.scoophub.stock.service.StockBacktestService
+import com.scoophub.stock.service.StockChartService
 import com.scoophub.stock.service.StockCrawlService
 import com.scoophub.stock.service.StockReportService
 import com.scoophub.stock.service.StockWatchlistService
@@ -45,6 +47,7 @@ class StockController(
     private val reportService: StockReportService,
     private val crawlService: StockCrawlService,
     private val backtestService: StockBacktestService,
+    private val chartService: StockChartService,
     private val clock: Clock,
 ) {
 
@@ -111,6 +114,12 @@ class StockController(
         log.info { "backtest 엔드포인트 진입 — cost=$cost" }
         return ApiResponse.ok(backtestService.run(cost), ResponseMeta(clock.instant()))
     }
+
+    @Tag(name = "Stock")
+    @Operation(summary = "상세 차트 — 1년 종가, SMA50/200, 골든·데드크로스, 주간 ±1σ 밴드")
+    @GetMapping("/stock/chart/{ticker}")
+    fun stockChart(@PathVariable ticker: String): ApiResponse<StockChartOut> =
+        ApiResponse.ok(chartService.findChart(ticker.uppercase()), ResponseMeta(clock.instant()))
 
     // ── Sigma (Options IV) ───────────────────────────────────────────────────
 
