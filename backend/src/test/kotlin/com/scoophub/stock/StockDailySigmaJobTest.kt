@@ -53,14 +53,14 @@ class StockDailySigmaJobTest {
             fetchMonitor.record("stock_sync", any(), outcome)
             crawlService.computeSigma(listOf("QQQ"))
             fetchMonitor.record("stock_daily_sigma", any(), outcome)
+            analysisService.runAnalysisForTickers(listOf("QQQ"))
             gexService.computeGex(listOf("QQQ"))
             fetchMonitor.record("stock_gex", any(), outcome)
-            analysisService.runAnalysisForTickers(listOf("QQQ"))
         }
     }
 
     @Test
-    fun `GEX 단계가 예외로 실패해도 분석은 실행한다`() {
+    fun `GEX 단계가 예외로 실패해도 분석은 실행되고 잡은 예외 없이 끝난다`() {
         // given
         every { watchlistRepository.findByIsActiveOrderByAddedAt() } returns listOf(
             mockk<StockWatchlistEntity> { every { ticker } returns "QQQ" },

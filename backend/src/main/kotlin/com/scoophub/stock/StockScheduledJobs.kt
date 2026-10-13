@@ -59,7 +59,11 @@ class StockScheduledJobs {
             log.info { "Sigma (straddle): ${outcome.saved} saved for ${tickers.size} tickers" }
             fetchMonitor.record(jobId, startedAt, outcome)
 
-            // GEX 는 상세 화면 부가 정보라 실패해도 분석·발신은 계속한다 (#264)
+            // 시그마 완료 직후 분석+발신
+            val resp = analysisService.runAnalysisForTickers(tickers)
+            log.info { "Stock analyze (after sigma): ${resp.ok} ok, ${resp.errors} errors" }
+
+            // GEX 는 상세 화면 부가 정보라 분석·발신 뒤에 돌고, 실패해도 잡을 깨지 않는다 (#264)
             try {
                 val gexStartedAt = clock.instant()
                 val gexOutcome = gexService.computeGex(tickers)
@@ -68,10 +72,6 @@ class StockScheduledJobs {
             } catch (e: Exception) {
                 log.error(e) { "GEX step failed" }
             }
-
-            // 시그마 완료 직후 분석+발신
-            val resp = analysisService.runAnalysisForTickers(tickers)
-            log.info { "Stock analyze (after sigma): ${resp.ok} ok, ${resp.errors} errors" }
         }
 
         companion object {
