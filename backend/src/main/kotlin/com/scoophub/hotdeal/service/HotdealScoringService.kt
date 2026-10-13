@@ -41,47 +41,55 @@ class HotdealScoringService(
             .findAllByItemIds(candidates.mapNotNull { it.id })
             .associateByTo(mutableMapOf()) { it.item.id }
 
-        var recommended = 0
+        val evaluatedIds = mutableSetOf<Long?>()
         for (item in candidates) {
             val result = score(item, profiles) ?: continue
             existingByItemId[item.id] = upsert(item, result, existingByItemId[item.id], popular = false, now)
-            recommended++
+            evaluatedIds += item.id
         }
+        val recommended = evaluatedIds.size
+        evaluatedIds += evaluatePopularItems(candidates, existingByItemId, profiles, evaluatedIds.toSet(), now)
 
-        val popularCount = evaluatePopularItems(candidates, existingByItemId, profiles, now)
+        // 이번 평가에서 추천 조건을 벗어난 기존 항목은 숨긴다 (8.5). 피드백 이력이 걸려 있어 삭제하지 않는다.
+        val deactivated = existingByItemId
+            .filter { (itemId, feedItem) -> itemId !in evaluatedIds && feedItem.active }
+            .onEach { (_, feedItem) -> feedItem.deactivate(now) }
+            .size
         log.info {
-            "hotdeal scoring done - candidates=${candidates.size}, recommended=$recommended, popular=$popularCount"
+            "hotdeal scoring done - candidates=${candidates.size}, recommended=$recommended, " +
+                "popular=${evaluatedIds.size - recommended}, deactivated=$deactivated"
         }
     }
 
-    /** 콜드스타트: 관심 항목이 부족한 동안 인기 상위를 함께 노출한다 (8.3) */
+    /** 콜드스타트: 관심 항목이 부족한 동안 인기 상위를 함께 노출한다 (8.3). 노출한 원본 id 를 돌려준다 */
     private fun evaluatePopularItems(
         candidates: List<HotdealItemEntity>,
         existingByItemId: MutableMap<Long?, HotdealFeedItemEntity>,
         profiles: List<HotdealInterestProfileEntity>,
+        keywordRecommendedIds: Set<Long?>,
         now: Instant,
-    ): Int {
+    ): Set<Long?> {
         val interestCount = profiles.count { it.kind != ProfileKindEnum.SOURCE }
         if (interestCount >= ScoringPolicy.COLDSTART_PROFILE_MIN) {
-            return 0
+            return emptySet()
         }
         val topPopular = candidates
             .sortedByDescending(::votesOf)
             .take(ScoringPolicy.POPULAR_FEED_SIZE)
 
-        var created = 0
+        val popularIds = mutableSetOf<Long?>()
         for (item in topPopular) {
-            val existing = existingByItemId[item.id]
-            // 이미 키워드 추천된 항목은 그 이유를 유지한다.
-            if (existing != null && !existing.popular) {
+            // 이번 평가에서 키워드 추천된 항목은 그 이유를 유지한다.
+            if (item.id in keywordRecommendedIds) {
                 continue
             }
+            val existing = existingByItemId[item.id]
             val bonus = popularityBonus(item)
             val result = ScoreResult(terms = emptyList(), popularityBonus = bonus, score = bonus)
             existingByItemId[item.id] = upsert(item, result, existing, popular = true, now)
-            created++
+            popularIds += item.id
         }
-        return created
+        return popularIds
     }
 
     /** 관심 키워드·카테고리가 하나 이상 매칭되고 총점이 임계치 이상이어야 추천한다 (8.1) */

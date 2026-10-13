@@ -16,14 +16,15 @@ class HotdealTestFixtures(
     private val profileRepository: HotdealInterestProfileRepository,
 ) {
     fun clean() {
+        jdbcClient.sql("DELETE FROM hotdeal_feedback_log").update()
+        jdbcClient.sql("DELETE FROM hotdeal_feedback").update()
         jdbcClient.sql("DELETE FROM hotdeal_feed_item").update()
         jdbcClient.sql("DELETE FROM hotdeal_interest_profile").update()
         jdbcClient.sql("DELETE FROM hotdeal_item").update()
     }
 
-    fun saveProfile(kind: ProfileKindEnum, value: String, weight: Double) {
+    fun saveProfile(kind: ProfileKindEnum, value: String, weight: Double): HotdealInterestProfileEntity =
         profileRepository.save(HotdealInterestProfileEntity(kind = kind, value = value, seedWeight = weight))
-    }
 
     /** 콜드스타트 인기 노출을 끄기 위해 관심 키워드 5개를 채운다 */
     fun saveEnoughInterests(vararg excludeValues: String) {

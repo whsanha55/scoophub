@@ -1,6 +1,7 @@
 package com.scoophub.hotdeal.dto
 
 import com.scoophub.hotdeal.entity.HotdealFeedItemEntity
+import com.scoophub.hotdeal.enums.FeedbackKindEnum
 import io.swagger.v3.oas.annotations.media.Schema
 import tools.jackson.databind.JsonNode
 import java.time.Instant
@@ -34,6 +35,10 @@ data class HotdealFeedItemResponse(
     val reason: String,
     @field:Schema(description = "매칭된 관심 항목")
     val matchedTerms: List<MatchedTerm>,
+    @field:Schema(description = "추천 조건 충족 여부. false 면 재평가에서 조건을 벗어난 항목")
+    val active: Boolean,
+    @field:Schema(description = "현재 피드백 (없으면 null)", example = "LIKE")
+    val feedback: FeedbackKindEnum?,
 ) {
     data class MatchedTerm(
         @field:Schema(description = "프로필 종류", example = "KEYWORD")
@@ -45,7 +50,7 @@ data class HotdealFeedItemResponse(
     )
 
     companion object {
-        fun from(feedItem: HotdealFeedItemEntity): HotdealFeedItemResponse {
+        fun from(feedItem: HotdealFeedItemEntity, feedback: FeedbackKindEnum?): HotdealFeedItemResponse {
             val item = feedItem.item
             val extra = item.extra
             val terms = feedItem.matchedTerms
@@ -72,6 +77,8 @@ data class HotdealFeedItemResponse(
                         weight = it.path("weight").asDouble(0.0),
                     )
                 },
+                active = feedItem.active,
+                feedback = feedback,
             )
         }
 

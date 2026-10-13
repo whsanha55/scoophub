@@ -21,4 +21,11 @@ object ScoringPolicy {
     // 인기 보너스: votes * 계수, 상한 적용 (소스별 계수는 소스 확장 시 분리한다)
     const val POPULARITY_COEFFICIENT = 0.1
     const val POPULARITY_CAP = 2.0
+
+    // 피드백 학습 시 유효 가중치(seed + learned) 하한·상한 (8.2)
+    const val WEIGHT_MIN = 0.0
+    const val WEIGHT_MAX = 5.0
+
+    // 웹에서 추가한 관심 항목의 기본 seed_weight. 매칭 1개만으로 웹 임계치에 닿게 한다 (14절)
+    const val DEFAULT_SEED_WEIGHT = 3.0
 }

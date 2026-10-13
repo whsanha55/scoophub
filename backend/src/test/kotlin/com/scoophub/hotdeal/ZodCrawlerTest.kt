@@ -28,6 +28,8 @@ class ZodCrawlerTest @Autowired constructor(
 
     @BeforeEach
     fun clean() {
+        jdbcClient.sql("DELETE FROM hotdeal_feedback_log").update()
+        jdbcClient.sql("DELETE FROM hotdeal_feedback").update()
         jdbcClient.sql("DELETE FROM hotdeal_feed_item").update()
         jdbcClient.sql("DELETE FROM hotdeal_item").update()
     }
