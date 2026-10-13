@@ -3,9 +3,11 @@ package com.scoophub.stock
 import com.scoophub.global.jackson.scalar
 import com.scoophub.global.notify.NotifyMessage
 import com.scoophub.global.notify.NotifyRouter
+import com.scoophub.stock.dto.SigmaBandOut
 import com.scoophub.stock.entity.StockAnalysisResultEntity
 import com.scoophub.stock.repository.StockAnalysisResultRepository
 import com.scoophub.stock.repository.StockWatchlistRepository
+import com.scoophub.stock.service.StockSigmaService
 import io.github.oshai.kotlinlogging.KotlinLogging
 import org.springframework.stereotype.Component
 import java.time.Clock
@@ -14,28 +16,38 @@ import java.time.format.DateTimeFormatter
 
 private val log = KotlinLogging.logger {}
 
-/** 일간 추세 전환 리포트 — 마지막 거래일에 골든·데드크로스가 난 종목만 발신 (#251) */
+/**
+ * 일간 리포트 — 마지막 거래일에 골든·데드크로스가 난 종목(#251)과 주간 ±1σ 밴드를 벗어난 종목(#260)만 발신.
+ * σ 는 전환일이 아니라 그날 종가가 밴드 밖인 종목을 싣는다. 밴드는 매주 새 앵커로 바뀌어 반복은 그 주 안으로 한정된다.
+ */
 @Component
 class StockReportBuilder(
     private val analysisRepository: StockAnalysisResultRepository,
     private val watchlistRepository: StockWatchlistRepository,
+    private val sigmaService: StockSigmaService,
     private val notifyRouter: NotifyRouter,
     private val clock: Clock,
 ) {
-    /** 리포트 빌드 + 발신. 전환 종목이 없으면 null 반환(발신 스킵) */
+    /** 리포트 빌드 + 발신. 전환·σ 이탈 종목이 없으면 null 반환(발신 스킵) */
     fun run(tickers: List<String>? = null): String? {
         val targets = tickers?.map { it.uppercase() }
             ?: watchlistRepository.findByIsActiveOrderByAddedAt().map { it.ticker }
-        val changed = analysisRepository.findByTickerInAndTimeframeOrderByAnalyzedAtDesc(targets, "1D")
-            .filter { it.price > 0 && isCrossedOnLastCandle(it) }
+        val rows = analysisRepository.findByTickerInAndTimeframeOrderByAnalyzedAtDesc(targets, "1D")
+            .filter { it.price > 0 }
             .sortedBy { it.ticker }
-        if (changed.isEmpty()) {
-            log.info { "ReportBuilder.run: no trend change among ${targets.size} tickers — skip" }
+        val changed = rows.filter { isCrossedOnLastCandle(it) }
+        val sigmaByTicker = sigmaService.findCurrentBands(rows)
+        val upper = rows.filter { sigmaByTicker[it.ticker]?.state == SigmaStateEnum.UPPER_BREAK }
+            .sortedByDescending { sigmaByTicker[it.ticker]?.position }
+        val lower = rows.filter { sigmaByTicker[it.ticker]?.state == SigmaStateEnum.LOWER_BREAK }
+            .sortedBy { sigmaByTicker[it.ticker]?.position }
+        if (changed.isEmpty() && upper.isEmpty() && lower.isEmpty()) {
+            log.info { "ReportBuilder.run: no trend change or sigma break among ${targets.size} tickers — skip" }
             return null
         }
 
         val (golden, dead) = changed.partition { it.trend == TrendStateEnum.GOLDEN.name }
-        val lines = mutableListOf(header(changed.first()))
+        val lines = mutableListOf(header(rows.first()))
         if (golden.isNotEmpty()) {
             lines += ""
             lines += "🟢 골든크로스 (50일선 ↑ 200일선)"
@@ -45,6 +57,16 @@ class StockReportBuilder(
             lines += ""
             lines += "🔴 데드크로스 (50일선 ↓ 200일선)"
             dead.forEach { lines += formatRow(it) }
+        }
+        if (upper.isNotEmpty()) {
+            lines += ""
+            lines += "⬆️ +1σ 상단 돌파 (주간 밴드)"
+            upper.forEach { lines += formatSigmaRow(it, sigmaByTicker.getValue(it.ticker)) }
+        }
+        if (lower.isNotEmpty()) {
+            lines += ""
+            lines += "⬇️ −1σ 하단 이탈 (주간 밴드)"
+            lower.forEach { lines += formatSigmaRow(it, sigmaByTicker.getValue(it.ticker)) }
         }
         val full = "${lines.joinToString("\n")}\n\n$REPORT_LINK"
 
@@ -64,7 +86,7 @@ class StockReportBuilder(
 
     private fun header(row: StockAnalysisResultEntity): String {
         val nowKst = clock.instant().atZone(SEOUL).format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")) + " KST"
-        return "<b>📊 주식 추세 전환</b> — $nowKst\n기준일 ${row.candleDate}"
+        return "<b>📊 주식 추세·σ 리포트</b> — $nowKst\n기준일 ${row.candleDate}"
     }
 
     /** 현재가(변동률) + 50일선 · 200일선 */
@@ -74,6 +96,13 @@ class StockReportBuilder(
         val sma200 = row.technicalDetails.scalar("sma200")?.toDoubleOrNull()
         val smaLine = "50일 ${fmtPrice(sma50)} · 200일 ${fmtPrice(sma200)}"
         return "<b>${escapeHtml(row.ticker)}</b> ${fmtPrice(row.price)}$chg  $smaLine"
+    }
+
+    /** 현재가 + σ 위치 + 밴드 하단~상단 (앵커 주간 만기) */
+    private fun formatSigmaRow(row: StockAnalysisResultEntity, sigma: SigmaBandOut): String {
+        val position = "%+.2fσ".format(sigma.position)
+        val band = "${fmtPrice(sigma.lower)} ~ ${fmtPrice(sigma.upper)}"
+        return "<b>${escapeHtml(row.ticker)}</b> ${fmtPrice(row.price)} ($position)  밴드 $band · 만기 ${sigma.expiryDate}"
     }
 
     /** 4000자 초과 시 줄 단위 분할 */

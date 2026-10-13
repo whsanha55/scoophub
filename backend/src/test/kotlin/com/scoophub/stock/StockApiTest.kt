@@ -9,6 +9,7 @@ import com.scoophub.stock.vo.OptionQuote
 import com.scoophub.stock.vo.OptionsChain
 import com.scoophub.stock.vo.Quote
 import io.mockk.every
+import io.mockk.verify
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
@@ -100,11 +101,11 @@ class StockApiTest @Autowired constructor(
         mockMvc.put("/api/stock/watchlist/$id") {
             header("Authorization", bearer)
             contentType = MediaType.APPLICATION_JSON
-            content = """{"name": "Microsoft", "group": "market", "is_active": false}"""
+            content = """{"name": "Microsoft", "group": "bigtech_software", "is_active": false}"""
         }.andExpect {
             jsonPath("$.data.ticker") { value("MSFT") }
             jsonPath("$.data.name") { value("Microsoft") }
-            jsonPath("$.data.group") { value("market") }
+            jsonPath("$.data.group") { value("bigtech_software") }
             jsonPath("$.data.is_active") { value(false) }
         }
 
@@ -188,14 +189,14 @@ class StockApiTest @Autowired constructor(
     @Test
     fun `리포트는 관심종목 그룹을 채운다`() {
         // given
-        insertWatchlist("AAPL", group = "market")
+        insertWatchlist("AAPL", group = "bigtech_software")
         insertAnalysis("AAPL")
 
         // when & then
         mockMvc.get("/api/stock/report") { param("tickers", "aapl, ") }.andExpect {
             jsonPath("$.data.length()") { value(1) }
             jsonPath("$.data[0].ticker") { value("AAPL") }
-            jsonPath("$.data[0].group") { value("market") }
+            jsonPath("$.data[0].group") { value("bigtech_software") }
             jsonPath("$.data[0].technical.trend") { value("GOLDEN") }
             jsonPath("$.data[0].technical.trend_since") { value("2026-10-07") }
             jsonPath("$.data[0].is_stale") { value(false) }
@@ -217,31 +218,51 @@ class StockApiTest @Autowired constructor(
     }
 
     @Test
-    fun `상세 조회는 실시간 quote 를 붙이고 분석이 없으면 data 가 null 이다`() {
+    fun `리포트와 요약은 주간 앵커 기준 σ 위치와 밴드를 붙인다`() {
+        // given — 마지막 일봉 2026-10-07 종가 100. 만기 10-09 를 연 10-02 스냅샷(96 ± 4)이 앵커, 10-06 스냅샷은 앵커가 아니다
+        insertAnalysis("AAPL")
+        insertSigma("AAPL", snapshotDate = "2026-10-02", expiryDate = "2026-10-09", price = 96.0, move = 4.0)
+        insertSigma("AAPL", snapshotDate = "2026-10-06", expiryDate = "2026-10-09", price = 99.0, move = 3.0)
+
+        // when & then
+        mockMvc.get("/api/stock/report/all") { param("summarize", "true") }.andExpect {
+            jsonPath("$.data[0].sigma.position") { value(1.0) }
+            jsonPath("$.data[0].sigma.state") { value("UPPER_BREAK") }
+            jsonPath("$.data[0].sigma.upper") { value(100.0) }
+            jsonPath("$.data[0].sigma.lower") { value(92.0) }
+            jsonPath("$.data[0].sigma.anchor_price") { value(96.0) }
+            jsonPath("$.data[0].sigma.anchor_date") { value("2026-10-02") }
+            jsonPath("$.data[0].sigma.expiry_date") { value("2026-10-09") }
+            jsonPath("$.data[0].sigma.as_of") { value("2026-10-07") }
+        }
+        mockMvc.get("/api/stock/report") { param("tickers", "AAPL") }.andExpect {
+            jsonPath("$.data[0].sigma.state") { value("UPPER_BREAK") }
+        }
+    }
+
+    @Test
+    fun `상세 조회는 실시간 시세를 부르지 않고 DB 마지막 일봉을 붙이며 분석이 없으면 data 가 null 이다`() {
         // given
         insertAnalysis("AAPL")
-        every { provider.snapshots(listOf("AAPL")) } returns mapOf(
-            "AAPL" to Quote(
-                price = 101.0,
-                change = 1.0,
-                changePercent = 1.0,
-                open = 100.0,
-                high = 102.0,
-                low = 99.0,
-                volume = 0.0,
-            ),
-        )
+        jdbcClient.sql(
+            "INSERT INTO stock_candles (ticker, interval, date, open, high, low, close, volume) VALUES " +
+                "('AAPL', '1D', '2026-10-06', 99, 101, 98, 100, 1000), " +
+                "('AAPL', '1D', '2026-10-07', 100, 102, 99, 101, 2000)",
+        ).update()
 
         // when & then
         mockMvc.get("/api/stock/detail/aapl").andExpect {
             jsonPath("$.data.ticker") { value("AAPL") }
-            jsonPath("$.data.quote.price") { value(101.0) }
-            jsonPath("$.data.quote.volume") { doesNotExist() }
+            jsonPath("$.data.last_candle.date") { value("2026-10-07") }
+            jsonPath("$.data.last_candle.close") { value(101.0) }
+            jsonPath("$.data.last_candle.volume") { value(2000.0) }
+            jsonPath("$.data.quote") { doesNotExist() }
         }
         mockMvc.get("/api/stock/detail/NONE").andExpect {
             jsonPath("$.success") { value(true) }
             jsonPath("$.data") { doesNotExist() }
         }
+        verify(exactly = 0) { provider.snapshots(any()) }
     }
 
     @Test
@@ -380,6 +401,51 @@ class StockApiTest @Autowired constructor(
     }
 
     @Test
+    fun `상세 차트는 최근 1년 일봉에 SMA 와 그날 적용되는 σ 밴드를 붙인다`() {
+        // given — 650봉(마지막 2028-01-10). 2028-01-03 앵커(1320 ± 25, 만기 01-07)
+        insertCandles(candles("QQQ", 650))
+        insertSigma("QQQ", snapshotDate = "2028-01-03", expiryDate = "2028-01-07", price = 1320.0, move = 25.0)
+
+        // when & then — 01-04 종가 1343 → (1343 - 1320) / 25 = 0.92σ, 01-07 종가 1346 → 1.04σ
+        mockMvc.get("/api/stock/chart/qqq").andExpect {
+            jsonPath("$.data.ticker") { value("QQQ") }
+            jsonPath("$.data.points.length()") { value(366) }
+            jsonPath("$.data.points[0].date") { value("2027-01-10") }
+            jsonPath("$.data.points[0].sma200") { exists() }
+            jsonPath("$.data.points[?(@.date == '2028-01-04')].sigma_position") { value(0.92) }
+            jsonPath("$.data.points[?(@.date == '2028-01-04')].sigma_upper") { value(1345.0) }
+            jsonPath("$.data.points[?(@.date == '2028-01-07')].sigma_state") { value("UPPER_BREAK") }
+            jsonPath("$.data.points[?(@.date == '2028-01-03')].sigma_state") { value(null) }
+        }
+        mockMvc.get("/api/stock/chart/NONE").andExpect {
+            jsonPath("$.data.points.length()") { value(0) }
+        }
+    }
+
+    @Test
+    fun `주간 마감 표는 앵커마다 마감 σ 위치와 이후 수익률을 최근 주부터 돌려준다`() {
+        // given — 650봉(2026-04-01 700 부터 매일 +1, 마지막 2028-01-10). 2027-12-24 앵커(1330 ± 20, 만기 12-31 → 종가 1339)
+        insertCandles(candles("QQQ", 650))
+        insertSigma("QQQ", snapshotDate = "2027-12-24", expiryDate = "2027-12-31", price = 1330.0, move = 20.0)
+        insertSigma("QQQ", snapshotDate = "2027-12-31", expiryDate = "2028-01-07", price = 1339.0, move = 20.0)
+        insertSigma("QQQ", snapshotDate = "2028-01-07", expiryDate = "2028-01-14", price = 1346.0, move = 20.0)
+
+        // when & then — 01-14 주는 아직 마감 전이라 빠진다
+        mockMvc.get("/api/stock/sigma/qqq/weekly").andExpect {
+            jsonPath("$.data.length()") { value(2) }
+            jsonPath("$.data[0].expiry_date") { value("2028-01-07") }
+            jsonPath("$.data[1].anchor_date") { value("2027-12-24") }
+            jsonPath("$.data[1].close_date") { value("2027-12-31") }
+            jsonPath("$.data[1].close") { value(1339.0) }
+            jsonPath("$.data[1].sigma_position") { value(0.45) }
+            jsonPath("$.data[1].sigma_state") { value("NORMAL") }
+            jsonPath("$.data[1].return1w") { value(0.37) }
+            jsonPath("$.data[1].return2w") { value(0.75) }
+            jsonPath("$.data[1].return4w") { value(null) }
+        }
+    }
+
+    @Test
     fun `DB 에 일봉이 없으면 분석은 에러로 집계한다`() {
         // given
         insertWatchlist("QQQ")
@@ -440,6 +506,26 @@ class StockApiTest @Autowired constructor(
             .param("active", active)
             .query(Int::class.java)
             .single()
+
+    private fun insertSigma(ticker: String, snapshotDate: String, expiryDate: String, price: Double, move: Double) {
+        jdbcClient.sql(
+            """
+            INSERT INTO stock_sigma
+                (ticker, expiry_date, snapshot_date, snapshot_at, current_price, atm_strike,
+                 atm_call, atm_put, expected_move, expected_move_pct)
+            VALUES (:ticker, CAST(:expiry AS date), CAST(:snapshot AS date), now(), :price, :price,
+                    :half, :half, :move, :pct)
+            """,
+        )
+            .param("ticker", ticker)
+            .param("expiry", expiryDate)
+            .param("snapshot", snapshotDate)
+            .param("price", price)
+            .param("half", move / 2)
+            .param("move", move)
+            .param("pct", move / price * 100)
+            .update()
+    }
 
     private fun insertAnalysis(ticker: String) {
         jdbcClient.sql(

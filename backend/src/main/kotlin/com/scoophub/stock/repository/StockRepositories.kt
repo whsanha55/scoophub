@@ -79,6 +79,8 @@ interface StockCandleRepository : JpaRepository<StockCandleEntity, Int> {
     )
 
     fun findByTickerAndIntervalOrderByDate(ticker: String, interval: String): List<StockCandleEntity>
+
+    fun findFirstByTickerAndIntervalOrderByDateDesc(ticker: String, interval: String): StockCandleEntity?
 }
 
 interface StockAnalysisResultRepository : JpaRepository<StockAnalysisResultEntity, Int> {
@@ -165,4 +167,10 @@ interface StockSigmaRepository : JpaRepository<StockSigmaEntity, Long> {
 
     /** legacy `get_latest` — ORDER BY snapshot_date DESC, expiry_date ASC */
     fun findFirstByTickerOrderBySnapshotDateDescExpiryDateAsc(ticker: String): StockSigmaEntity?
+
+    /** 주간 σ 밴드 앵커 후보 — from 이후 스냅샷 */
+    fun findByTickerInAndSnapshotDateGreaterThanEqual(
+        tickers: Collection<String>,
+        from: LocalDate,
+    ): List<StockSigmaEntity>
 }

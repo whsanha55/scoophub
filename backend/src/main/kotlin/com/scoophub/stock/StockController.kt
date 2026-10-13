@@ -6,13 +6,17 @@ import com.scoophub.global.api.ResponseMeta
 import com.scoophub.global.auth.SuperOnly
 import com.scoophub.stock.dto.MarketStatusOut
 import com.scoophub.stock.dto.SigmaSnapshotOut
+import com.scoophub.stock.dto.SigmaWeekOut
+import com.scoophub.stock.dto.StockChartOut
 import com.scoophub.stock.dto.StockReport
 import com.scoophub.stock.dto.WatchlistItemIn
 import com.scoophub.stock.dto.WatchlistItemOut
 import com.scoophub.stock.dto.WatchlistUpdateIn
 import com.scoophub.stock.service.StockBacktestService
+import com.scoophub.stock.service.StockChartService
 import com.scoophub.stock.service.StockCrawlService
 import com.scoophub.stock.service.StockReportService
+import com.scoophub.stock.service.StockSigmaService
 import com.scoophub.stock.service.StockWatchlistService
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.swagger.v3.oas.annotations.Operation
@@ -45,6 +49,8 @@ class StockController(
     private val reportService: StockReportService,
     private val crawlService: StockCrawlService,
     private val backtestService: StockBacktestService,
+    private val chartService: StockChartService,
+    private val sigmaService: StockSigmaService,
     private val clock: Clock,
 ) {
 
@@ -112,6 +118,12 @@ class StockController(
         return ApiResponse.ok(backtestService.run(cost), ResponseMeta(clock.instant()))
     }
 
+    @Tag(name = "Stock")
+    @Operation(summary = "상세 차트 — 1년 종가, SMA50/200, 골든·데드크로스, 주간 ±1σ 밴드")
+    @GetMapping("/stock/chart/{ticker}")
+    fun stockChart(@PathVariable ticker: String): ApiResponse<StockChartOut> =
+        ApiResponse.ok(chartService.findChart(ticker.uppercase()), ResponseMeta(clock.instant()))
+
     // ── Sigma (Options IV) ───────────────────────────────────────────────────
 
     @Tag(name = "Stock")
@@ -119,6 +131,12 @@ class StockController(
     @GetMapping("/stock/sigma")
     fun getSigma(@RequestParam ticker: String): ApiResponse<SigmaSnapshotOut?> =
         ApiResponse.ok(reportService.findLatestSigma(ticker.uppercase()), ResponseMeta(clock.instant()))
+
+    @Tag(name = "Stock")
+    @Operation(summary = "주간 마감 후 가격 변화 — 마감 σ 위치와 +1W/+2W/+4W 수익률 (예측력 미검증)")
+    @GetMapping("/stock/sigma/{ticker}/weekly")
+    fun sigmaWeekly(@PathVariable ticker: String): ApiResponse<List<SigmaWeekOut>> =
+        ApiResponse.ok(sigmaService.findWeeklyHistory(ticker.uppercase()), ResponseMeta(clock.instant()))
 
     // ── Market Status ────────────────────────────────────────────────────────
 
@@ -225,7 +243,7 @@ class StockController(
     // ── Daily Report Send (on-demand) ────────────────────────────────────────
 
     @Tag(name = "Stock")
-    @Operation(summary = "추세 전환 리포트 발신")
+    @Operation(summary = "추세 전환·σ 돌파 리포트 발신")
     @SuperOnly
     @PostMapping("/stock/report/send")
     fun sendStockReport(@RequestParam(name = "tickers") tickers: List<String>? = null): ApiResponse<Map<String, Any>> {
@@ -236,7 +254,7 @@ class StockController(
                 success = false,
                 error = ErrorDetail(
                     code = "no_data",
-                    message = "마지막 거래일에 골든·데드크로스가 난 종목이 없어 발신하지 않았습니다.",
+                    message = "마지막 거래일에 골든·데드크로스나 ±1σ 돌파·이탈 종목이 없어 발신하지 않았습니다.",
                 ),
                 meta = ResponseMeta(clock.instant()),
             )

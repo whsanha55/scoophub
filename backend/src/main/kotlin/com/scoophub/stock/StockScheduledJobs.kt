@@ -4,6 +4,7 @@ import com.scoophub.global.schedule.ScheduledJob
 import com.scoophub.stock.repository.StockWatchlistRepository
 import com.scoophub.stock.service.StockCrawlService
 import com.scoophub.stock.service.StockFetchMonitor
+import com.scoophub.stock.service.StockGexService
 import io.github.oshai.kotlinlogging.KotlinLogging
 import org.springframework.stereotype.Component
 import tools.jackson.databind.JsonNode
@@ -30,7 +31,7 @@ class StockScheduledJobs {
     }
 
     /**
-     * 캔들 동기화 → ATM 스트래들 시그마 → 분석 파이프라인 — job_id stock_daily_sigma (KST 화-토 06:30).
+     * 캔들 동기화 → ATM 스트래들 시그마 → 행사가별 GEX → 분석 파이프라인 — job_id stock_daily_sigma (KST 화-토 06:30).
      * 분석이 DB 캔들과 최신 시그마를 읽으므로 순서를 코드로 보장한다 (#176).
      */
     @Component
@@ -39,6 +40,7 @@ class StockScheduledJobs {
         private val fetchMonitor: StockFetchMonitor,
         private val watchlistRepository: StockWatchlistRepository,
         private val analysisService: StockAnalysisService,
+        private val gexService: StockGexService,
         private val clock: Clock,
     ) : ScheduledJob {
         override val crawler = "stock"
@@ -60,11 +62,24 @@ class StockScheduledJobs {
             // 시그마 완료 직후 분석+발신
             val resp = analysisService.runAnalysisForTickers(tickers)
             log.info { "Stock analyze (after sigma): ${resp.ok} ok, ${resp.errors} errors" }
+
+            // GEX 는 상세 화면 부가 정보라 분석·발신 뒤에 돌고, 실패해도 잡을 깨지 않는다 (#264)
+            try {
+                val gexStartedAt = clock.instant()
+                val gexOutcome = gexService.computeGex(tickers)
+                log.info { "GEX: ${gexOutcome.saved} saved for ${tickers.size} tickers" }
+                fetchMonitor.record(GEX_JOB_ID, gexStartedAt, gexOutcome)
+            } catch (e: Exception) {
+                log.error(e) { "GEX step failed" }
+            }
         }
 
         companion object {
             /** 동기화 결과는 기존 stock_sync 이력에 이어 기록한다 */
             private const val SYNC_JOB_ID = "stock_sync"
+
+            /** GEX 결과는 crawl_logs 에 별도 이력으로 남긴다 */
+            private const val GEX_JOB_ID = "stock_gex"
         }
     }
 }

@@ -12,6 +12,12 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 import { ArrowLeft, RefreshCw, Info } from "lucide-react";
 import { TrendBadge } from "@/domains/stock/components/trend-badge";
+import { GexLadder } from "@/domains/stock/components/gex-ladder";
+import { SigmaBadge } from "@/domains/stock/components/sigma-badge";
+import { SigmaBandCard } from "@/domains/stock/components/sigma-band-card";
+import { StockChart } from "@/domains/stock/components/stock-chart";
+import { SigmaWeeklyTable } from "@/domains/stock/components/sigma-weekly-table";
+import { SigmaPeerChips } from "@/domains/stock/components/sigma-peer-chips";
 
 // #82 — 지표 label + 느낌표 툴팁 셀
 function IndicatorCell({ k, value }: { k: string; value: number }) {
@@ -83,7 +89,7 @@ export default function StockDetailPage() {
   }
 
   const report = detail;
-  const quote = detail.quote ?? null;
+  const candle = detail.last_candle ?? null;
 
   const changeColor =
     report.change > 0
@@ -131,12 +137,17 @@ export default function StockDetailPage() {
           </div>
         </div>
         <div className="flex items-center gap-2">
+          {report.sigma && <SigmaBadge sigma={report.sigma} />}
           <TrendBadge trend={report.technical.trend} since={report.technical.trend_since} />
           {report.is_stale && (
             <Badge variant="secondary" className="text-xs">Stale data</Badge>
           )}
         </div>
       </div>
+
+      <SigmaBandCard sigma={report.sigma} />
+      <StockChart ticker={report.ticker} />
+      <SigmaWeeklyTable ticker={report.ticker} />
 
       {/* Technical Overview */}
       <Card>
@@ -173,50 +184,45 @@ export default function StockDetailPage() {
         </CardContent>
       </Card>
 
-      {/* #82 — 실시간 Quote (detail.quote) */}
+      {/* #258 — 최근 종가 (DB 마지막 일봉, 하루 1회 수집) */}
       <Card>
         <CardHeader className="pb-2">
-          <CardTitle className="text-lg">실시간 주가</CardTitle>
+          <CardTitle className="text-lg">
+            최근 종가{candle && <span className="ml-2 text-sm font-normal text-muted-foreground">(기준일 {candle.date})</span>}
+          </CardTitle>
         </CardHeader>
         <CardContent>
-          {!quote && <p className="text-muted-foreground text-sm">실시간 quote를 불러올 수 없습니다.</p>}
-          {quote && (
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
+          {!candle && <p className="text-muted-foreground text-sm">일봉 데이터가 없습니다.</p>}
+          {candle && (
+            <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 text-sm">
               <div>
-                <span className="text-muted-foreground">현재가</span>
-                <p className="font-semibold">${quote.price.toFixed(2)}</p>
+                <span className="text-muted-foreground">종가</span>
+                <p className="font-semibold">${candle.close.toFixed(2)}</p>
               </div>
               <div>
-                <span className="text-muted-foreground">변동</span>
-                <p
-                  className={`font-semibold ${
-                    quote.change > 0
-                      ? "text-green-500"
-                      : quote.change < 0
-                        ? "text-red-500"
-                        : "text-muted-foreground"
-                  }`}
-                >
-                  {quote.change > 0 ? "+" : ""}
-                  {quote.change.toFixed(2)} ({quote.change_rate.toFixed(2)}%)
-                </p>
+                <span className="text-muted-foreground">시가</span>
+                <p className="font-semibold">${candle.open.toFixed(2)}</p>
               </div>
-              {quote.volume != null && (
-                <div>
-                  <span className="text-muted-foreground">거래량</span>
-                  <p className="font-semibold">{quote.volume.toLocaleString()}</p>
-                </div>
-              )}
-              {quote.timestamp && (
-                <div>
-                  <span className="text-muted-foreground">시각</span>
-                  <p className="font-semibold">{quote.timestamp.replace("T", " ").slice(0, 19)}</p>
-                </div>
-              )}
+              <div>
+                <span className="text-muted-foreground">고가</span>
+                <p className="font-semibold">${candle.high.toFixed(2)}</p>
+              </div>
+              <div>
+                <span className="text-muted-foreground">저가</span>
+                <p className="font-semibold">${candle.low.toFixed(2)}</p>
+              </div>
+              <div>
+                <span className="text-muted-foreground">거래량</span>
+                <p className="font-semibold">{candle.volume.toLocaleString()}</p>
+              </div>
             </div>
           )}
         </CardContent>
       </Card>
+
+      <GexLadder ticker={report.ticker} />
+
+      <SigmaPeerChips ticker={report.ticker} group={report.group} />
 
       {/* Meta */}
       <div className="text-xs text-muted-foreground">

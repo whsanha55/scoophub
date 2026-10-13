@@ -145,6 +145,61 @@ class AlpacaMarketDataClientTest @Autowired constructor(
     }
 
     @Test
+    fun `GEX 입력은 45일 안 만기와 행사가 범위로 스냅샷 감마와 Trading API OI 를 받아 심볼로 잇는다`() {
+        // given
+        server.expect(
+            requestTo(
+                org.hamcrest.Matchers.startsWith("${AlpacaMarketDataClient.BASE_URL}/v1beta1/options/snapshots/SOXX"),
+            ),
+        )
+            .andExpect(queryParam("expiration_date_lte", "2026-11-21"))
+            .andExpect(queryParam("strike_price_gte", "490.0"))
+            .andExpect(queryParam("strike_price_lte", "600.0"))
+            .andRespond(
+                withSuccess(
+                    """{"snapshots":{
+                         "SOXX261016C00550000":{"greeks":{"gamma":0.012,"delta":0.5}},
+                         "SOXX261016P00540000":{"greeks":{"gamma":0.009}},
+                         "SOXX261016P00530000":{"latestQuote":{"bp":1,"ap":1.1}}
+                       },"next_page_token":null}""",
+                    MediaType.APPLICATION_JSON,
+                ),
+            )
+        server.expect(
+            requestTo(org.hamcrest.Matchers.startsWith("https://api.alpaca.markets/v2/options/contracts")),
+        )
+            .andExpect(header("APCA-API-KEY-ID", "key"))
+            .andExpect(queryParam("underlying_symbols", "SOXX"))
+            .andExpect(queryParam("expiration_date_gte", "2026-10-07"))
+            .andExpect(queryParam("limit", "10000"))
+            .andRespond(
+                withSuccess(
+                    """{"option_contracts":[
+                         {"symbol":"SOXX261016C00550000","type":"call","strike_price":"550",
+                          "open_interest":"1200","open_interest_date":"2026-10-06"},
+                         {"symbol":"SOXX261016P00540000","type":"put","strike_price":"540",
+                          "open_interest":"800","open_interest_date":"2026-10-05"},
+                         {"symbol":"SOXX261016P00530000","type":"put","strike_price":"530",
+                          "open_interest":"500","open_interest_date":"2026-10-06"},
+                         {"symbol":"SOXX261016C00560000","type":"call","strike_price":"560"}
+                       ],"next_page_token":null}""",
+                    MediaType.APPLICATION_JSON,
+                ),
+            )
+
+        // when
+        val chain = client.gexChain("SOXX", 490.0, 600.0)
+
+        // then — 감마가 없는 530P, OI 가 없는 560C 는 빠진다
+        assertThat(chain.oiDate).isEqualTo(LocalDate.parse("2026-10-06"))
+        assertThat(chain.contracts).containsExactly(
+            com.scoophub.stock.vo.GexContract(strike = 550.0, isCall = true, gamma = 0.012, openInterest = 1200),
+            com.scoophub.stock.vo.GexContract(strike = 540.0, isCall = false, gamma = 0.009, openInterest = 800),
+        )
+        server.verify()
+    }
+
+    @Test
     fun `429 응답은 상태 코드를 담은 예외로 바꾼다`() {
         // given
         server.expect(

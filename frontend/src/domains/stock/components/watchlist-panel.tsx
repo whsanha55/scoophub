@@ -19,13 +19,8 @@ import {
 } from "@/components/ui/dialog";
 import { Plus, Trash2, Edit3 } from "lucide-react";
 import { useWatchlist } from "../hooks/use-stock";
-import type { WatchlistCreateInput, WatchlistGroup } from "../types";
-
-const GROUP_LABELS: Record<WatchlistGroup, string> = {
-  market: "시장",
-  sector: "섹터",
-  individual: "개별",
-};
+import type { WatchlistCreateInput } from "../types";
+import { DEFAULT_GROUP, WATCHLIST_GROUPS, groupLabel } from "../lib/groups";
 
 // 시스템 관리(super) 영역에서만 사용 — 관심종목(주식 테마) CRUD.
 export function WatchlistPanel() {
@@ -36,7 +31,7 @@ export function WatchlistPanel() {
     exchange: "NAS",
     name: "",
     memo: "",
-    group: "individual",
+    group: DEFAULT_GROUP,
   });
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editMemo, setEditMemo] = useState("");
@@ -48,7 +43,7 @@ export function WatchlistPanel() {
   const handleAdd = async () => {
     if (!form.ticker || !form.name) return;
     await addItem(form);
-    setForm({ ticker: "", exchange: "NAS", name: "", memo: "", group: "individual" });
+    setForm({ ticker: "", exchange: "NAS", name: "", memo: "", group: DEFAULT_GROUP });
     setOpen(false);
   };
 
@@ -95,8 +90,8 @@ export function WatchlistPanel() {
                   </Button>
                 ))}
               </div>
-              <div className="flex gap-2">
-                {(["market", "sector", "individual"] as const).map((g) => (
+              <div className="flex flex-wrap gap-2">
+                {WATCHLIST_GROUPS.map(({ key: g, label }) => (
                   <Button
                     key={g}
                     size="sm"
@@ -104,7 +99,7 @@ export function WatchlistPanel() {
                     onClick={() => setForm({ ...form, group: g })}
                     className="cursor-pointer transition-colors duration-200"
                   >
-                    {GROUP_LABELS[g]}
+                    {label}
                   </Button>
                 ))}
               </div>
@@ -147,7 +142,7 @@ export function WatchlistPanel() {
                     </Badge>
                     {item.group && (
                       <Badge variant="secondary" className="text-xs">
-                        {GROUP_LABELS[item.group]}
+                        {groupLabel(item.group)}
                       </Badge>
                     )}
                     {!item.is_active && (
@@ -159,16 +154,16 @@ export function WatchlistPanel() {
                   </span>
                   {editingId === item.id ? (
                     <div className="space-y-1 mt-1">
-                      <div className="flex gap-1">
-                        {(["market", "sector", "individual"] as const).map((g) => (
+                      <div className="flex flex-wrap gap-1">
+                        {WATCHLIST_GROUPS.map(({ key: g, label }) => (
                           <Button
                             key={g}
                             size="sm"
-                            variant={(item.group ?? "individual") === g ? "default" : "outline"}
+                            variant={(item.group ?? DEFAULT_GROUP) === g ? "default" : "outline"}
                             onClick={() => updateItem(item.id, { group: g })}
                             className="h-7 text-xs cursor-pointer transition-colors duration-200"
                           >
-                            {GROUP_LABELS[g]}
+                            {label}
                           </Button>
                         ))}
                       </div>

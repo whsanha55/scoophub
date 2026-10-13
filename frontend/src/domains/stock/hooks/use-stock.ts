@@ -10,6 +10,8 @@ import type {
   MarketStatus,
   StockAnalyzeResult,
   StockAnalysis,
+  StockChart,
+  SigmaWeek,
 } from "../types";
 import type { ApiResponse } from "@/shared/types";
 
@@ -229,7 +231,7 @@ export function useStockSync() {
   return { loading, error, triggerSync };
 }
 
-// #82 — 단일 fetch 통합: 티커 상세 (리포트 + quote)
+// #82 — 단일 fetch 통합: 티커 상세 (리포트 + 최근 종가 #258)
 export function useStockDetail() {
   const [detail, setDetail] = useState<StockReport | null>(null);
   const [loading, setLoading] = useState(false);
@@ -310,4 +312,58 @@ export function useStockReportSend() {
   }, []);
 
   return { loading, result, error, triggerSend };
+}
+
+// #261 — 상세 차트 (1년 종가 + SMA50/200 + 주간 σ 밴드)
+export function useStockChart() {
+  const [chart, setChart] = useState<StockChart | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetchChart = useCallback(async (ticker: string) => {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/stock/chart/${encodeURIComponent(ticker)}`);
+      const data: ApiResponse<StockChart> = await res.json();
+      if (data.success && data.data) {
+        setChart(data.data);
+      } else {
+        setError(data.error?.message || "Failed to fetch chart");
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unknown error");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  return { chart, loading, error, fetchChart };
+}
+
+// #262 — 주간 마감 후 가격 변화 표
+export function useSigmaWeekly() {
+  const [weeks, setWeeks] = useState<SigmaWeek[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetchWeeks = useCallback(async (ticker: string) => {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/stock/sigma/${encodeURIComponent(ticker)}/weekly`);
+      const data: ApiResponse<SigmaWeek[]> = await res.json();
+      if (data.success && data.data) {
+        setWeeks(data.data);
+      } else {
+        setError(data.error?.message || "Failed to fetch weekly sigma");
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unknown error");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  return { weeks, loading, error, fetchWeeks };
 }

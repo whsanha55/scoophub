@@ -1,52 +1,54 @@
 package com.scoophub.stock.service
 
-import com.scoophub.external.alpaca.AlpacaMarketDataClient
+import com.scoophub.stock.dto.LastCandleOut
 import com.scoophub.stock.dto.SigmaSnapshotOut
-import com.scoophub.stock.dto.StockQuoteOut
 import com.scoophub.stock.dto.StockReport
 import com.scoophub.stock.dto.StockSummary
 import com.scoophub.stock.dto.TechnicalOut
 import com.scoophub.stock.entity.StockAnalysisResultEntity
 import com.scoophub.stock.repository.StockAnalysisResultRepository
+import com.scoophub.stock.repository.StockCandleRepository
 import com.scoophub.stock.repository.StockSigmaRepository
 import com.scoophub.stock.repository.StockWatchlistRepository
-import io.github.oshai.kotlinlogging.KotlinLogging
 import org.springframework.stereotype.Service
 import java.time.Clock
 import java.time.Duration
 
-private val log = KotlinLogging.logger {}
-
 /** legacy `stock/router.py` 리포트 조회 — 분석 결과 + group */
 @Service
 class StockReportService(
-    private val provider: AlpacaMarketDataClient,
     private val watchlistRepository: StockWatchlistRepository,
     private val analysisRepository: StockAnalysisResultRepository,
     private val sigmaRepository: StockSigmaRepository,
+    private val candleRepository: StockCandleRepository,
+    private val sigmaService: StockSigmaService,
     private val clock: Clock,
 ) {
     fun findReports(tickers: List<String>): List<StockReport> =
-        analysisRepository.findByTickerInAndTimeframeOrderByAnalyzedAtDesc(tickers, TIMEFRAME).map { buildReport(it) }
+        buildReports(analysisRepository.findByTickerInAndTimeframeOrderByAnalyzedAtDesc(tickers, TIMEFRAME))
 
-    /** 1D 분석 + 실시간 quote. 분석이 없으면 null */
+    /** 1D 분석 + DB 마지막 일봉. 분석이 없으면 null. 시세는 하루 1회 배치 수집분만 쓴다 (#258) */
     fun findDetail(ticker: String): StockReport? {
-        val row = analysisRepository.findByTickerInAndTimeframeOrderByAnalyzedAtDesc(listOf(ticker), TIMEFRAME)
-            .firstOrNull()
-            ?: return null
-        val report = buildReport(row)
-        attachQuote(report, ticker)
+        val rows = analysisRepository.findByTickerInAndTimeframeOrderByAnalyzedAtDesc(listOf(ticker), TIMEFRAME)
+            .take(1)
+        val report = buildReports(rows).firstOrNull() ?: return null
+        report.lastCandle = candleRepository.findFirstByTickerAndIntervalOrderByDateDesc(ticker, TIMEFRAME)
+            ?.let { LastCandleOut.from(it) }
         return report
     }
 
-    fun findAll(): List<StockReport> =
-        analysisRepository.findByTimeframeOrderByAnalyzedAtDesc(TIMEFRAME).map { buildReport(it) }
+    fun findAll(): List<StockReport> = buildReports(analysisRepository.findByTimeframeOrderByAnalyzedAtDesc(TIMEFRAME))
 
-    fun findAllSummaries(): List<StockSummary> = analysisRepository.findByTimeframeOrderByAnalyzedAtDesc(TIMEFRAME)
-        .map { StockSummary.from(buildReport(it)) }
+    fun findAllSummaries(): List<StockSummary> = findAll().map { StockSummary.from(it) }
 
     fun findLatestSigma(ticker: String): SigmaSnapshotOut? =
         sigmaRepository.findFirstByTickerOrderBySnapshotDateDescExpiryDateAsc(ticker)?.let { SigmaSnapshotOut.from(it) }
+
+    /** σ 밴드는 티커마다 따로 읽지 않고 한 번에 조회한다 */
+    private fun buildReports(rows: List<StockAnalysisResultEntity>): List<StockReport> {
+        val sigmaByTicker = sigmaService.findCurrentBands(rows)
+        return rows.map { buildReport(it).apply { sigma = sigmaByTicker[it.ticker] } }
+    }
 
     /** `_analysis_row_to_report` + group 매핑 */
     private fun buildReport(row: StockAnalysisResultEntity): StockReport {
@@ -69,27 +71,6 @@ class StockReportService(
             report.group = it
         }
         return report
-    }
-
-    /** 실시간 quote. 실패 시 quote=None, 나머지 정상 (legacy /stock/detail) */
-    private fun attachQuote(report: StockReport, ticker: String) {
-        try {
-            val q = provider.snapshots(listOf(ticker))[ticker] ?: return
-            if (q.price != 0.0) {
-                report.quote = StockQuoteOut(
-                    price = q.price,
-                    change = q.change,
-                    changeRate = q.changePercent,
-                    volume = q.volume.takeIf { it != 0.0 },
-                    high = q.high.takeIf { it != 0.0 },
-                    low = q.low.takeIf { it != 0.0 },
-                    open = q.open.takeIf { it != 0.0 },
-                    timestamp = clock.instant(),
-                )
-            }
-        } catch (e: Exception) {
-            log.warn { "quote fetch failed for $ticker: ${e.message}" }
-        }
     }
 
     companion object {

@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { TrendingUp, TrendingDown, Minus } from "lucide-react";
 import type { StockReportSummarized } from "../types";
 import { TrendBadge } from "./trend-badge";
+import { SigmaBadge } from "./sigma-badge";
 
 function ChangeIcon({ change }: { change: number }) {
   if (change > 0) return <TrendingUp className="h-4 w-4 text-green-500" />;
@@ -30,7 +31,10 @@ export function StockReportCard({ report }: { report: StockReportSummarized }) {
               {report.exchange}
             </span>
           </CardTitle>
-          <TrendBadge trend={report.trend} since={report.trend_since} />
+          <div className="flex flex-wrap items-center justify-end gap-1">
+            {report.sigma && <SigmaBadge sigma={report.sigma} />}
+            <TrendBadge trend={report.trend} since={report.trend_since} />
+          </div>
         </div>
       </CardHeader>
       <CardContent className="space-y-2">

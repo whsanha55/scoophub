@@ -21,7 +21,7 @@ class StockWatchlistEntity(
     val name: String = "",
     val memo: String? = null,
     var isActive: Boolean = true,
-    /** V14 — market/sector/individual */
+    /** V39 — 테마 그룹 키(etf_index, semiconductor 등). individual 은 미분류 */
     var group: String = "individual",
     @Column(insertable = false, updatable = false)
     val addedAt: Instant,

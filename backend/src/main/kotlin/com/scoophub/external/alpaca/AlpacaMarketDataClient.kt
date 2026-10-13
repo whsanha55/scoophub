@@ -4,6 +4,8 @@ import com.scoophub.global.config.ScoophubProperties
 import com.scoophub.global.jackson.elements
 import com.scoophub.global.jackson.scalar
 import com.scoophub.stock.vo.Candle
+import com.scoophub.stock.vo.GexChain
+import com.scoophub.stock.vo.GexContract
 import com.scoophub.stock.vo.OptionQuote
 import com.scoophub.stock.vo.OptionsChain
 import com.scoophub.stock.vo.Quote
@@ -28,24 +30,17 @@ private val log = KotlinLogging.logger {}
 /** 시세 조회 실패. statusCode 는 HTTP 응답이 없으면 null */
 class AlpacaMarketDataException(val statusCode: Int?, message: String) : RuntimeException(message)
 
-/** Alpaca Market Data REST — 일봉, 스냅샷, 옵션 체인 스냅샷 */
+/** Alpaca Market Data REST — 일봉, 스냅샷, 옵션 체인 스냅샷. GEX 용 open interest 만 Trading API */
 @Component
 class AlpacaMarketDataClient(
     props: ScoophubProperties,
     restClientBuilder: RestClient.Builder,
     private val clock: Clock,
 ) {
-    private val restClient = restClientBuilder
-        .baseUrl(BASE_URL)
-        .defaultHeader("APCA-API-KEY-ID", props.alpaca.apiKey)
-        .defaultHeader("APCA-API-SECRET-KEY", props.alpaca.apiSecret)
-        .defaultStatusHandler(HttpStatusCode::isError) { request, response ->
-            val status = response.statusCode.value()
-            val body = response.body.readAllBytes().decodeToString().take(200)
-            log.warn { "alpaca ${request.uri.path} HTTP $status: $body" }
-            throw AlpacaMarketDataException(status, "HTTP $status $body")
-        }
-        .build()
+    private val restClient = buildClient(restClientBuilder.clone(), BASE_URL, props)
+
+    /** open interest 는 시세 API 에 없어 Trading API 에서 받는다. 키 종류(paper/live)에 따라 베이스 URL 이 다르다 */
+    private val tradingClient = buildClient(restClientBuilder.clone(), props.alpaca.tradingUrl, props)
 
     /** 최근 10년 split 조정 일봉. 응답에 없는 심볼은 결과에서 빠진다 */
     fun dailyBars(symbols: List<String>): Map<String, List<Candle>> {
@@ -58,7 +53,7 @@ class AlpacaMarketDataClient(
         // 무료 플랜은 최근 15분 SIP 조회가 막힌다. 기본 IEX feed 는 거래량이 통합 거래량의 일부라 SIP 를 쓴다.
         val end = now.minus(SIP_DELAY).truncatedTo(ChronoUnit.SECONDS)
         val result = mutableMapOf<String, MutableList<Candle>>()
-        paginate(emptyArray()) { builder ->
+        paginate(restClient, emptyArray()) { builder ->
             builder.path("/v2/stocks/bars")
                 .queryParam("symbols", symbols.joinToString(","))
                 .queryParam("timeframe", "1Day")
@@ -80,7 +75,8 @@ class AlpacaMarketDataClient(
         if (symbols.isEmpty()) {
             return emptyMap()
         }
-        val body = get { it.path("/v2/stocks/snapshots").queryParam("symbols", symbols.joinToString(",")).build() }
+        val body =
+            get(restClient) { it.path("/v2/stocks/snapshots").queryParam("symbols", symbols.joinToString(",")).build() }
         return symbols.mapNotNull { symbol -> body[symbol]?.let(::toQuote)?.let { symbol to it } }.toMap()
     }
 
@@ -88,7 +84,7 @@ class AlpacaMarketDataClient(
     fun optionChains(underlying: String): List<OptionsChain> {
         val today = clock.instant().atZone(ET).toLocalDate()
         // 시그마는 주간만기 하나만 쓴다(금요일 스냅샷이면 다음 주 금요일까지). 장기 만기까지 받으면 SPY 는 13페이지가 된다
-        val contracts = paginate(arrayOf(underlying)) { builder ->
+        val contracts = paginate(restClient, arrayOf(underlying)) { builder ->
             builder.path("/v1beta1/options/snapshots/{underlying}")
                 .queryParam("expiration_date_gte", today)
                 .queryParam("expiration_date_lte", today.plusDays(OPTION_EXPIRY_WINDOW_DAYS))
@@ -109,12 +105,60 @@ class AlpacaMarketDataClient(
             }
     }
 
-    private fun paginate(uriVariables: Array<Any>, request: (UriBuilder) -> UriBuilder): List<JsonNode> {
+    /**
+     * GEX 입력 — 오늘(ET)부터 45일 안 만기, [minStrike, maxStrike] 행사가의 감마(시세 스냅샷)와 open interest(Trading API).
+     * 45일이면 월물 1~2개와 주간물이 들어가 감마 대부분을 덮는다. 더 늘리면 SPY·QQQ 처럼 매일 만기가 있는 종목의
+     * 스냅샷 페이지가 늘어 Basic 플랜 분당 200콜 한도에 부담이 된다. 감마나 OI 가 없는 계약은 뺀다.
+     */
+    fun gexChain(underlying: String, minStrike: Double, maxStrike: Double): GexChain {
+        val today = clock.instant().atZone(ET).toLocalDate()
+        val lastExpiry = today.plusDays(GEX_EXPIRY_WINDOW_DAYS)
+        val gammas = paginate(restClient, arrayOf(underlying)) { builder ->
+            builder.path("/v1beta1/options/snapshots/{underlying}")
+                .queryParam("expiration_date_gte", today)
+                .queryParam("expiration_date_lte", lastExpiry)
+                .queryParam("strike_price_gte", minStrike)
+                .queryParam("strike_price_lte", maxStrike)
+                .queryParam("limit", PAGE_LIMIT_OPTIONS)
+        }.flatMap { page ->
+            page["snapshots"]?.properties()?.mapNotNull { (symbol, snapshot) ->
+                snapshot["greeks"]?.get("gamma")?.takeIf { it.isNumber }?.let { symbol to it.asDouble() }
+            }.orEmpty()
+        }.toMap()
+        val contracts = paginate(tradingClient, emptyArray()) { builder ->
+            builder.path("/v2/options/contracts")
+                .queryParam("underlying_symbols", underlying)
+                .queryParam("expiration_date_gte", today)
+                .queryParam("expiration_date_lte", lastExpiry)
+                .queryParam("strike_price_gte", minStrike)
+                .queryParam("strike_price_lte", maxStrike)
+                .queryParam("limit", PAGE_LIMIT_CONTRACTS)
+        }.flatMap { page -> page["option_contracts"].elements() }
+        val withOi = contracts.filter { it.scalar("open_interest") != null }
+        return GexChain(
+            oiDate = withOi.mapNotNull { it.scalar("open_interest_date")?.let(LocalDate::parse) }.maxOrNull(),
+            contracts = withOi.mapNotNull { c ->
+                val gamma = c.scalar("symbol")?.let(gammas::get) ?: return@mapNotNull null
+                GexContract(
+                    strike = c.scalar("strike_price")?.toDoubleOrNull() ?: return@mapNotNull null,
+                    isCall = c.scalar("type") == "call",
+                    gamma = gamma,
+                    openInterest = c.scalar("open_interest")?.toLongOrNull() ?: return@mapNotNull null,
+                )
+            },
+        )
+    }
+
+    private fun paginate(
+        client: RestClient,
+        uriVariables: Array<Any>,
+        request: (UriBuilder) -> UriBuilder,
+    ): List<JsonNode> {
         val pages = mutableListOf<JsonNode>()
         var pageToken: String? = null
         do {
             val token = pageToken
-            val page = get { builder ->
+            val page = get(client) { builder ->
                 request(builder).apply { token?.let { queryParam("page_token", it) } }.build(*uriVariables)
             }
             pages.add(page)
@@ -123,8 +167,8 @@ class AlpacaMarketDataClient(
         return pages
     }
 
-    private fun get(uri: (UriBuilder) -> URI): JsonNode = try {
-        restClient.get().uri(uri).retrieve().body(JsonNode::class.java)
+    private fun get(client: RestClient, uri: (UriBuilder) -> URI): JsonNode = try {
+        client.get().uri(uri).retrieve().body(JsonNode::class.java)
             ?: throw AlpacaMarketDataException(null, "empty response")
     } catch (e: RestClientException) {
         log.warn { "alpaca request failed: ${e.message}" }
@@ -189,6 +233,19 @@ class AlpacaMarketDataClient(
         val quote: OptionQuote,
     )
 
+    private fun buildClient(builder: RestClient.Builder, baseUrl: String, props: ScoophubProperties): RestClient =
+        builder
+            .baseUrl(baseUrl)
+            .defaultHeader("APCA-API-KEY-ID", props.alpaca.apiKey)
+            .defaultHeader("APCA-API-SECRET-KEY", props.alpaca.apiSecret)
+            .defaultStatusHandler(HttpStatusCode::isError) { request, response ->
+                val status = response.statusCode.value()
+                val body = response.body.readAllBytes().decodeToString().take(200)
+                log.warn { "alpaca ${request.uri.path} HTTP $status: $body" }
+                throw AlpacaMarketDataException(status, "HTTP $status $body")
+            }
+            .build()
+
     companion object {
         const val BASE_URL = "https://data.alpaca.markets"
         private val ET: ZoneId = ZoneId.of("America/New_York")
@@ -197,6 +254,8 @@ class AlpacaMarketDataClient(
         private const val OPTION_EXPIRY_WINDOW_DAYS = 14L
         private const val PAGE_LIMIT_BARS = 10_000
         private const val PAGE_LIMIT_OPTIONS = 1_000
+        private const val GEX_EXPIRY_WINDOW_DAYS = 45L
+        private const val PAGE_LIMIT_CONTRACTS = 10_000
         private const val OCC_SUFFIX_LENGTH = 15
         private val OCC_DATE = DateTimeFormatter.ofPattern("yyMMdd")
     }
