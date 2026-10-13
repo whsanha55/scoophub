@@ -166,7 +166,7 @@ class AlpacaMarketDataClientTest @Autowired constructor(
                 ),
             )
         server.expect(
-            requestTo(org.hamcrest.Matchers.startsWith("https://paper-api.alpaca.markets/v2/options/contracts")),
+            requestTo(org.hamcrest.Matchers.startsWith("https://api.alpaca.markets/v2/options/contracts")),
         )
             .andExpect(header("APCA-API-KEY-ID", "key"))
             .andExpect(queryParam("underlying_symbols", "SOXX"))
