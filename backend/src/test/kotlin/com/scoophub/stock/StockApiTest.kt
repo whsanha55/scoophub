@@ -101,11 +101,11 @@ class StockApiTest @Autowired constructor(
         mockMvc.put("/api/stock/watchlist/$id") {
             header("Authorization", bearer)
             contentType = MediaType.APPLICATION_JSON
-            content = """{"name": "Microsoft", "group": "market", "is_active": false}"""
+            content = """{"name": "Microsoft", "group": "bigtech_software", "is_active": false}"""
         }.andExpect {
             jsonPath("$.data.ticker") { value("MSFT") }
             jsonPath("$.data.name") { value("Microsoft") }
-            jsonPath("$.data.group") { value("market") }
+            jsonPath("$.data.group") { value("bigtech_software") }
             jsonPath("$.data.is_active") { value(false) }
         }
 
@@ -189,14 +189,14 @@ class StockApiTest @Autowired constructor(
     @Test
     fun `리포트는 관심종목 그룹을 채운다`() {
         // given
-        insertWatchlist("AAPL", group = "market")
+        insertWatchlist("AAPL", group = "bigtech_software")
         insertAnalysis("AAPL")
 
         // when & then
         mockMvc.get("/api/stock/report") { param("tickers", "aapl, ") }.andExpect {
             jsonPath("$.data.length()") { value(1) }
             jsonPath("$.data[0].ticker") { value("AAPL") }
-            jsonPath("$.data[0].group") { value("market") }
+            jsonPath("$.data[0].group") { value("bigtech_software") }
             jsonPath("$.data[0].technical.trend") { value("GOLDEN") }
             jsonPath("$.data[0].technical.trend_since") { value("2026-10-07") }
             jsonPath("$.data[0].is_stale") { value(false) }

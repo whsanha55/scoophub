@@ -1,8 +1,10 @@
 // #251 — 50/200 이동평균 추세 상태. UNKNOWN 은 일봉 200개 미만
 export type TrendState = "GOLDEN" | "DEAD" | "UNKNOWN";
 
-// #57 — watchlist 계층 분류 (백엔드 #147 연동, optional)
-export type WatchlistGroup = "market" | "sector" | "individual";
+import type { WatchlistGroup } from "../lib/groups";
+
+// #259 — 테마 그룹 키·라벨은 lib/groups.ts 한 곳에 둔다
+export type { WatchlistGroup };
 
 export interface StockReport {
   ticker: string;
@@ -63,7 +65,7 @@ export interface WatchlistItem {
   memo: string;
   added_at: string;
   is_active: boolean;
-  // #57 — 계층 분류 (백엔드 #147 연동, optional)
+  // #259 — 테마 그룹 (optional)
   group?: WatchlistGroup;
 }
 
@@ -72,14 +74,14 @@ export interface WatchlistCreateInput {
   exchange: string;
   name: string;
   memo?: string;
-  // #57 — 계층 분류 (optional)
+  // #259 — 테마 그룹 (optional)
   group?: WatchlistGroup;
 }
 
 export interface WatchlistUpdateInput {
   memo?: string;
   is_active?: boolean;
-  // #57 — 계층 분류 (optional)
+  // #259 — 테마 그룹 (optional)
   group?: WatchlistGroup;
 }
 

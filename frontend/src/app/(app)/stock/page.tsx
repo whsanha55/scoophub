@@ -11,6 +11,7 @@ import {
   useStockReportSend,
 } from "@/domains/stock/hooks/use-stock";
 import { StockReportCard } from "@/domains/stock/components/stock-report-card";
+import { groupByTheme } from "@/domains/stock/lib/groups";
 import { CrawlTriggerButton } from "@/shared/components/crawl-trigger-button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -90,15 +91,25 @@ export default function StockPage() {
           리포트가 없습니다. 시스템 관리에서 Watchlist에 종목을 추가하고 분석을 실행하세요.
         </div>
       ) : (
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {reports.map((report) => (
-            <Link
-              key={report.ticker}
-              href={`/stock/${report.ticker}`}
-              className="block"
-            >
-              <StockReportCard report={report} />
-            </Link>
+        <div className="space-y-8">
+          {groupByTheme(reports).map((section) => (
+            <section key={section.key} className="space-y-3">
+              <h2 className="flex items-baseline gap-2 text-lg font-semibold">
+                {section.label}
+                <span className="text-sm font-normal text-muted-foreground">{section.items.length}</span>
+              </h2>
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                {section.items.map((report) => (
+                  <Link
+                    key={report.ticker}
+                    href={`/stock/${report.ticker}`}
+                    className="block"
+                  >
+                    <StockReportCard report={report} />
+                  </Link>
+                ))}
+              </div>
+            </section>
           ))}
         </div>
       )}
