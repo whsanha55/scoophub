@@ -89,12 +89,12 @@ Vite SPA, 정적 Bearer 인증은 쓰지 않는다.
 │                                                      │
 │  CrawlRunner (crawl_config 스케줄)                    │
 │    └─ 핫딜 Crawler (zod, fmkorea, arca)              │
-│       → raw_item 저장 / 최신 메타데이터 갱신           │
+│       → hotdeal_item 저장 / 최신 메타데이터 갱신       │
 │       → 추천 평가 트리거                               │
 │                                                      │
 │  ScoringService                                      │
 │    └─ 관심도 프로필 대조                              │
-│       → 추천 후보 평가 → feed_item 저장               │
+│       → 추천 후보 평가 → hotdeal_feed_item 저장       │
 │                                                      │
 │  REST API (/api/hotdeal/* , @SuperOnly)              │
 │    ├─ 추천 피드 조회                                  │
@@ -199,11 +199,11 @@ v1에서는 별도 북마크를 만들지 않는다.
 중복 제거, 재평가, 피드백 연결에 컬럼과 제약조건이 필요하기 때문이다.
 
 아래는 논리 모델 초안이다. 실제 타입과 인덱스는 마이그레이션 작성 시 확정한다.
-테이블 이름 충돌을 피하려고 `hotdeal_` 접두어를 쓰는 방안은 M1 마이그레이션 작성 시 결정한다.
+테이블 이름에는 `hotdeal_` 접두어를 붙인다. scoophub의 `feed_*`(뉴스 등) 테이블과 구분하기 위해서다.
 
 ```sql
 -- 수집 원본
-raw_item (
+hotdeal_item (
   id,
   source,                 -- ZOD | FMKOREA | ARCA
   provider,               -- 실제 공급자 구분 (없으면 source와 같은 값)
@@ -222,7 +222,7 @@ raw_item (
 )
 
 -- 관심도 프로필
-interest_profile (
+hotdeal_interest_profile (
   id,
   kind,                   -- KEYWORD | CATEGORY | SOURCE
   value,
@@ -233,7 +233,7 @@ interest_profile (
 )
 
 -- 웹 추천 결과
-feed_item (
+hotdeal_feed_item (
   id,
   raw_item_id,
   score,
@@ -247,7 +247,7 @@ feed_item (
 )
 
 -- 현재 피드백 상태
-item_feedback (
+hotdeal_feedback (
   id,
   feed_item_id,
   kind,                   -- LIKE | DISLIKE
@@ -258,7 +258,7 @@ item_feedback (
 )
 
 -- 피드백 변경 및 학습 이력
-feedback_log (
+hotdeal_feedback_log (
   id,
   feedback_event_id,
   feed_item_id,
@@ -274,7 +274,7 @@ feedback_log (
 )
 
 -- 단일 사용자 알림 설정
-notification_settings (
+hotdeal_notify_settings (
   id,
   telegram_enabled,
   score_threshold,
@@ -379,7 +379,7 @@ score(item)
 
 - 점수 조건을 통과한 추천 후보에만 적용해 호출량을 제한한다.
 - 입력: 제목·카테고리·소스, 매칭된 관심 키워드, 등록된 제외 키워드·설명.
-- 출력: 관련 여부·제외 여부와 짧은 사유. 결과는 `feed_item.judgment`에 저장한다.
+- 출력: 관련 여부·제외 여부와 짧은 사유. 결과는 `hotdeal_feed_item.judgment`에 저장한다.
 - 관련 없음 또는 제외로 판정된 항목은 기본 피드에서 숨기고,
   숨긴 항목 필터에서 사유와 함께 확인한다.
 - 콜드스타트 인기 노출 항목(매칭 키워드 없음)은 제외 여부만 판정한다.
@@ -391,11 +391,11 @@ score(item)
 
 프로필이 바뀌어도 과거 항목이 반영되도록 신선도 기간 내 항목을 다시 평가한다.
 
-- 대상: 신선도 기간(10절) 안의 `raw_item` 전체.
-  임계치 미달로 `feed_item`이 없던 항목도 포함한다.
+- 대상: 신선도 기간(10절) 안의 `hotdeal_item` 전체.
+  임계치 미달로 `hotdeal_feed_item`이 없던 항목도 포함한다.
 - 키워드 추가·삭제, 가중치 수동 변경 시: 즉시 재평가한다.
 - 피드백 학습에 의한 가중치 변화: 다음 수집 주기에 몰아서 재평가한다.
-- 새로 임계치를 넘은 항목은 `feed_item`을 생성한다.
+- 새로 임계치를 넘은 항목은 `hotdeal_feed_item`을 생성한다.
 - 임계치 아래로 내려간 항목은 삭제하지 않고 기본 피드에서만 숨긴다.
   이미 피드백한 항목은 점수와 관계없이 유지한다.
 - 재평가로 LLM 판정 입력이 바뀐 항목만 재판정한다 (8.4).
@@ -430,7 +430,7 @@ v1에서는 Telegram 피드백 버튼 없이 시작한다.
 ### 9.3. 발송 신뢰성
 
 - 같은 항목은 `notify_log`의 (route, payload key) 성공 기록으로 중복 발송을 막는다.
-  payload key는 `feed_item` 식별자로 한다.
+  payload key는 `hotdeal_feed_item` 식별자로 한다.
 - 확실한 실패와 결과 불명확 상태를 구분한다.
 - 결과가 불명확한 상태는 자동 재발송하지 않는다.
 
@@ -570,7 +570,8 @@ feedforge에서 M1까지 구현한 코드(`main` 2d87eff)를 이관 원본으로
 ### 완료된 결정
 
 - feedforge를 scoophub로 합친다 (#271)
-- 저장 구조: `crawl_data`가 아닌 전용 테이블
+- 저장 구조: `crawl_data`가 아닌 전용 테이블, 이름은 `hotdeal_` 접두어
+- M1 관찰 모드: 핫딜 크롤은 기존 크롤 완료 알림(`CrawlNotifyDispatcher`)에서 제외
 - 인증: scoophub Google OAuth + `@SuperOnly` (feedforge 정적 Bearer 인증 폐기)
 - 프런트엔드: scoophub Next.js (feedforge Vite SPA 폐기)
 - 알림: `NotifyRouter` 재사용 (`notification_delivery` 미생성)
