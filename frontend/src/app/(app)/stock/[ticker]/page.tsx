@@ -17,6 +17,7 @@ import { SigmaBadge } from "@/domains/stock/components/sigma-badge";
 import { SigmaBandCard } from "@/domains/stock/components/sigma-band-card";
 import { StockChart } from "@/domains/stock/components/stock-chart";
 import { SigmaWeeklyTable } from "@/domains/stock/components/sigma-weekly-table";
+import { SigmaPeerChips } from "@/domains/stock/components/sigma-peer-chips";
 
 // #82 — 지표 label + 느낌표 툴팁 셀
 function IndicatorCell({ k, value }: { k: string; value: number }) {
@@ -220,6 +221,8 @@ export default function StockDetailPage() {
       </Card>
 
       <GexLadder ticker={report.ticker} />
+
+      <SigmaPeerChips ticker={report.ticker} group={report.group} />
 
       {/* Meta */}
       <div className="text-xs text-muted-foreground">
