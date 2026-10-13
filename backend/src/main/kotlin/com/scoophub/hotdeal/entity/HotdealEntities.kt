@@ -1,0 +1,109 @@
+package com.scoophub.hotdeal.entity
+
+import com.scoophub.hotdeal.enums.HotdealSourceEnum
+import com.scoophub.hotdeal.enums.ProfileKindEnum
+import jakarta.persistence.Column
+import jakarta.persistence.Entity
+import jakarta.persistence.EnumType
+import jakarta.persistence.Enumerated
+import jakarta.persistence.FetchType
+import jakarta.persistence.GeneratedValue
+import jakarta.persistence.GenerationType
+import jakarta.persistence.Id
+import jakarta.persistence.JoinColumn
+import jakarta.persistence.ManyToOne
+import jakarta.persistence.Table
+import org.hibernate.annotations.JdbcTypeCode
+import org.hibernate.type.SqlTypes
+import tools.jackson.databind.JsonNode
+import java.time.Instant
+
+/** V42 hotdeal_item — 조회 전용. 저장은 HotdealItemQueryRepository.upsert 가 담당한다 */
+@Entity
+@Table(name = "hotdeal_item")
+class HotdealItemEntity(
+    @Enumerated(EnumType.STRING)
+    val source: HotdealSourceEnum,
+    val provider: String,
+    val sourceKey: String,
+    val category: String?,
+    val title: String,
+    val url: String,
+    @JdbcTypeCode(SqlTypes.JSON)
+    val extra: JsonNode,
+    val itemAt: Instant,
+) {
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    var id: Long? = null
+        protected set
+}
+
+/** V43 hotdeal_interest_profile — 유효 가중치는 seed_weight + learned_weight */
+@Entity
+@Table(name = "hotdeal_interest_profile")
+class HotdealInterestProfileEntity(
+    @Enumerated(EnumType.STRING)
+    val kind: ProfileKindEnum,
+    val value: String,
+    seedWeight: Double,
+    learnedWeight: Double = 0.0,
+) {
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    var id: Long? = null
+        protected set
+
+    var seedWeight: Double = seedWeight
+        protected set
+
+    var learnedWeight: Double = learnedWeight
+        protected set
+
+    val effectiveWeight: Double
+        get() = seedWeight + learnedWeight
+}
+
+/** V43 hotdeal_feed_item — 웹 추천 결과 */
+@Entity
+@Table(name = "hotdeal_feed_item")
+class HotdealFeedItemEntity(
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "hotdeal_item_id", nullable = false, unique = true)
+    val item: HotdealItemEntity,
+    score: Double,
+    matchedTerms: JsonNode,
+    popular: Boolean,
+    val scoringVersion: String,
+    val recommendedAt: Instant,
+    evaluatedAt: Instant,
+    val expiresAt: Instant?,
+) {
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    var id: Long? = null
+        protected set
+
+    var score: Double = score
+        protected set
+
+    /** 추천 이유·매칭 항목·당시 가중치·인기 보너스 */
+    @JdbcTypeCode(SqlTypes.JSON)
+    var matchedTerms: JsonNode = matchedTerms
+        protected set
+
+    @Column(nullable = false)
+    var popular: Boolean = popular
+        protected set
+
+    var evaluatedAt: Instant = evaluatedAt
+        protected set
+
+    // 재평가 시 점수와 근거만 갱신한다. 최초 추천 시각은 유지한다.
+    fun updateEvaluation(score: Double, matchedTerms: JsonNode, popular: Boolean, evaluatedAt: Instant) {
+        this.score = score
+        this.matchedTerms = matchedTerms
+        this.popular = popular
+        this.evaluatedAt = evaluatedAt
+    }
+}
