@@ -81,6 +81,13 @@ interface StockCandleRepository : JpaRepository<StockCandleEntity, Int> {
     fun findByTickerAndIntervalOrderByDate(ticker: String, interval: String): List<StockCandleEntity>
 
     fun findFirstByTickerAndIntervalOrderByDateDesc(ticker: String, interval: String): StockCandleEntity?
+
+    fun findByTickerInAndIntervalAndDateBetween(
+        tickers: Collection<String>,
+        interval: String,
+        from: LocalDate,
+        to: LocalDate,
+    ): List<StockCandleEntity>
 }
 
 interface StockAnalysisResultRepository : JpaRepository<StockAnalysisResultEntity, Int> {
