@@ -26,7 +26,9 @@ scoophub/
 │   ├── NEWS.md          # 실시간 뉴스 운영 안내
 │   └── src/main/resources/db/migration/
 ├── frontend/            # 웹 대시보드
-├── docs/convention/     # 개발 규칙
+├── docs/
+│   ├── HOTDEAL_PLAN.md  # 핫딜·관심도 추천 피드 계획 (진행 중)
+│   └── convention/      # 개발 규칙
 └── deploy.sh            # 백엔드 → 프론트엔드 배포
 ```
 
