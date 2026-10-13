@@ -83,10 +83,11 @@ class SystemConfigAndScheduleTest @Autowired constructor(
 
     // ── schedules ──────────────────────────────────────────────────────
 
+    // seed 14종에서 V19 로 1행, V22 news, V23 kal_bonus, V24·V26 정리, V30 추가, V33 정리, V42 hotdeal_zod 추가
     @Test
-    fun `전체 스케줄 조회 — seed 14종(V19 로 1행, V22 news, V23 kal_bonus, V24·V26 정리, V30 추가, V33 정리), 미등록 잡은 paused=null`() {
+    fun `전체 스케줄 조회 — seed 11행, 미등록 잡은 paused=null`() {
         mockMvc.get("/api/schedules").andExpect {
-            jsonPath("$.data.length()") { value(10) }
+            jsonPath("$.data.length()") { value(11) }
             jsonPath("$.data[0].job_id") { exists() }
             jsonPath("$.data[0].schedule_type") { exists() }
             jsonPath("$.data[0].next_run_time") { doesNotExist() } // null

@@ -80,6 +80,15 @@ class CrawlNotifyDispatcherTest {
     }
 
     @Test
+    fun `핫딜 크롤은 수집 건수 카드를 보내지 않는다`() {
+        // when
+        dispatcher().dispatch("hotdeal_zod", "", result)
+
+        // then
+        verify(exactly = 0) { router.dispatch(any(), any(), any(), any()) }
+    }
+
+    @Test
     fun `신규 0건은 스킵`() {
         // when
         dispatcher().dispatch("hacker_news", "", CrawlResult(itemsFetched = 5, itemsNew = 0))

@@ -37,7 +37,7 @@ class CrawlNotifyDispatcher(
 
     /**
      * 크롤 결과 발신.
-     * - 토큰 미설정 / stock / 신규 0건 → 스킵
+     * - 토큰 미설정 / stock / hotdeal_* / 신규 0건 → 스킵
      * - weather → 매일 KST 7시+ 1회 (동일 날짜 재발신 방지)
      * - enrich null → 스킵 (0건/필터)
      * - payloadKey 미지정 → 빈 키 (매 run 발신)
@@ -58,6 +58,10 @@ class CrawlNotifyDispatcher(
             return
         }
         if (category == "stock") { // 보류 — 별도 티켓
+            return
+        }
+        // 핫딜은 수집 건수가 아니라 추천 점수로 골라 보낸다 (docs/HOTDEAL_PLAN.md 9절)
+        if (category.startsWith("hotdeal_")) {
             return
         }
         if (result.itemsNew <= 0) {
