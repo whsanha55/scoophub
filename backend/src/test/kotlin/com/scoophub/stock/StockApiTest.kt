@@ -218,6 +218,29 @@ class StockApiTest @Autowired constructor(
     }
 
     @Test
+    fun `리포트와 요약은 주간 앵커 기준 σ 위치와 밴드를 붙인다`() {
+        // given — 마지막 일봉 2026-10-07 종가 100. 만기 10-09 를 연 10-02 스냅샷(96 ± 4)이 앵커, 10-06 스냅샷은 앵커가 아니다
+        insertAnalysis("AAPL")
+        insertSigma("AAPL", snapshotDate = "2026-10-02", expiryDate = "2026-10-09", price = 96.0, move = 4.0)
+        insertSigma("AAPL", snapshotDate = "2026-10-06", expiryDate = "2026-10-09", price = 99.0, move = 3.0)
+
+        // when & then
+        mockMvc.get("/api/stock/report/all") { param("summarize", "true") }.andExpect {
+            jsonPath("$.data[0].sigma.position") { value(1.0) }
+            jsonPath("$.data[0].sigma.state") { value("UPPER_BREAK") }
+            jsonPath("$.data[0].sigma.upper") { value(100.0) }
+            jsonPath("$.data[0].sigma.lower") { value(92.0) }
+            jsonPath("$.data[0].sigma.anchor_price") { value(96.0) }
+            jsonPath("$.data[0].sigma.anchor_date") { value("2026-10-02") }
+            jsonPath("$.data[0].sigma.expiry_date") { value("2026-10-09") }
+            jsonPath("$.data[0].sigma.as_of") { value("2026-10-07") }
+        }
+        mockMvc.get("/api/stock/report") { param("tickers", "AAPL") }.andExpect {
+            jsonPath("$.data[0].sigma.state") { value("UPPER_BREAK") }
+        }
+    }
+
+    @Test
     fun `상세 조회는 실시간 시세를 부르지 않고 DB 마지막 일봉을 붙이며 분석이 없으면 data 가 null 이다`() {
         // given
         insertAnalysis("AAPL")
@@ -438,6 +461,26 @@ class StockApiTest @Autowired constructor(
             .param("active", active)
             .query(Int::class.java)
             .single()
+
+    private fun insertSigma(ticker: String, snapshotDate: String, expiryDate: String, price: Double, move: Double) {
+        jdbcClient.sql(
+            """
+            INSERT INTO stock_sigma
+                (ticker, expiry_date, snapshot_date, snapshot_at, current_price, atm_strike,
+                 atm_call, atm_put, expected_move, expected_move_pct)
+            VALUES (:ticker, CAST(:expiry AS date), CAST(:snapshot AS date), now(), :price, :price,
+                    :half, :half, :move, :pct)
+            """,
+        )
+            .param("ticker", ticker)
+            .param("expiry", expiryDate)
+            .param("snapshot", snapshotDate)
+            .param("price", price)
+            .param("half", move / 2)
+            .param("move", move)
+            .param("pct", move / price * 100)
+            .update()
+    }
 
     private fun insertAnalysis(ticker: String) {
         jdbcClient.sql(

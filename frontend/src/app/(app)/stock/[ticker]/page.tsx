@@ -13,6 +13,8 @@ import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip
 import { ArrowLeft, RefreshCw, Info } from "lucide-react";
 import { TrendBadge } from "@/domains/stock/components/trend-badge";
 import { GexLadder } from "@/domains/stock/components/gex-ladder";
+import { SigmaBadge } from "@/domains/stock/components/sigma-badge";
+import { SigmaBandCard } from "@/domains/stock/components/sigma-band-card";
 
 // #82 — 지표 label + 느낌표 툴팁 셀
 function IndicatorCell({ k, value }: { k: string; value: number }) {
@@ -132,12 +134,15 @@ export default function StockDetailPage() {
           </div>
         </div>
         <div className="flex items-center gap-2">
+          {report.sigma && <SigmaBadge sigma={report.sigma} />}
           <TrendBadge trend={report.technical.trend} since={report.technical.trend_since} />
           {report.is_stale && (
             <Badge variant="secondary" className="text-xs">Stale data</Badge>
           )}
         </div>
       </div>
+
+      <SigmaBandCard sigma={report.sigma} />
 
       {/* Technical Overview */}
       <Card>

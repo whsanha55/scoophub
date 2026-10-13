@@ -225,7 +225,7 @@ class StockController(
     // ── Daily Report Send (on-demand) ────────────────────────────────────────
 
     @Tag(name = "Stock")
-    @Operation(summary = "추세 전환 리포트 발신")
+    @Operation(summary = "추세 전환·σ 돌파 리포트 발신")
     @SuperOnly
     @PostMapping("/stock/report/send")
     fun sendStockReport(@RequestParam(name = "tickers") tickers: List<String>? = null): ApiResponse<Map<String, Any>> {
@@ -236,7 +236,7 @@ class StockController(
                 success = false,
                 error = ErrorDetail(
                     code = "no_data",
-                    message = "마지막 거래일에 골든·데드크로스가 난 종목이 없어 발신하지 않았습니다.",
+                    message = "마지막 거래일에 골든·데드크로스나 ±1σ 돌파·이탈 종목이 없어 발신하지 않았습니다.",
                 ),
                 meta = ResponseMeta(clock.instant()),
             )

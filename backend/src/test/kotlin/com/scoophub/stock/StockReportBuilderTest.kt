@@ -2,10 +2,12 @@ package com.scoophub.stock
 
 import com.scoophub.global.notify.NotifyMessage
 import com.scoophub.global.notify.NotifyRouter
+import com.scoophub.stock.dto.SigmaBandOut
 import com.scoophub.stock.entity.StockAnalysisResultEntity
 import com.scoophub.stock.entity.StockWatchlistEntity
 import com.scoophub.stock.repository.StockAnalysisResultRepository
 import com.scoophub.stock.repository.StockWatchlistRepository
+import com.scoophub.stock.service.StockSigmaService
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
@@ -17,14 +19,16 @@ import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneOffset
 
-/** 추세 전환 리포트 — repository/router 만 목킹한 순수 단위 테스트(Spring 컨텍스트 없음) */
+/** 추세 전환·σ 리포트 — repository/service/router 만 목킹한 순수 단위 테스트(Spring 컨텍스트 없음) */
 class StockReportBuilderTest {
 
     private val analysisRepository = mockk<StockAnalysisResultRepository>()
     private val watchlistRepository = mockk<StockWatchlistRepository>()
+    private val sigmaService = mockk<StockSigmaService>()
     private val notifyRouter = mockk<NotifyRouter>(relaxUnitFun = true)
     private val clock = Clock.fixed(Instant.parse("2024-01-05T10:15:00Z"), ZoneOffset.UTC)
-    private val builder = StockReportBuilder(analysisRepository, watchlistRepository, notifyRouter, clock)
+    private val builder =
+        StockReportBuilder(analysisRepository, watchlistRepository, sigmaService, notifyRouter, clock)
     private val jsonMapper = JsonMapper.builder().build()
     private val lastCandle = LocalDate.parse("2024-01-04")
 
@@ -46,7 +50,19 @@ class StockReportBuilderTest {
         analyzedAt = Instant.parse("2024-01-05T10:00:00Z"),
     )
 
-    private fun stub(rows: List<StockAnalysisResultEntity>) {
+    private fun sigma(position: Double) = SigmaBandOut.of(
+        SigmaBand(
+            snapshotDate = LocalDate.parse("2023-12-29"),
+            expiryDate = LocalDate.parse("2024-01-05"),
+            anchorPrice = 100.0 - position * 4.0,
+            expectedMove = 4.0,
+        ),
+        close = 100.0,
+        asOf = lastCandle,
+    )
+
+    private fun stub(rows: List<StockAnalysisResultEntity>, sigmas: Map<String, SigmaBandOut> = emptyMap()) {
+        every { sigmaService.findCurrentBands(any()) } returns sigmas
         every { watchlistRepository.findByIsActiveOrderByAddedAt() } returns rows.map {
             StockWatchlistEntity(ticker = it.ticker, addedAt = Instant.parse("2024-01-01T00:00:00Z"))
         }
@@ -65,7 +81,7 @@ class StockReportBuilderTest {
         val result = builder.run()
 
         // then
-        assertThat(result).contains("주식 추세 전환", "기준일 2024-01-04", "AAPL", "Scoophub에서 전체 보기")
+        assertThat(result).contains("주식 추세·σ 리포트", "기준일 2024-01-04", "AAPL", "Scoophub에서 전체 보기")
         val keys = mutableListOf<String>()
         verify(exactly = 1) { notifyRouter.dispatch("stock", "daily-report", capture(keys), any()) }
         assertThat(keys.single()).isEqualTo("stock:daily-report:2024-01-05")
@@ -110,6 +126,26 @@ class StockReportBuilderTest {
             "🔴 데드크로스 (50일선 ↓ 200일선)\n<b>DOWNX</b> $100.00 (+1.2%)  50일 $98.50 · 200일 $97.25",
         )
         assertThat(result).doesNotContain("OLD")
+    }
+
+    @Test
+    fun `교차가 없어도 ±1σ 밴드를 벗어난 종목이 있으면 돌파와 이탈을 나눠 발신한다`() {
+        // given — 크로스는 예전에 났고, 오늘 종가가 밴드 밖이거나 안이다
+        val old = LocalDate.parse("2023-11-01")
+        stub(
+            listOf(row("UP", trendSince = old), row("DOWN", trendSince = old), row("FLAT", trendSince = old)),
+            mapOf("UP" to sigma(1.25), "DOWN" to sigma(-1.5), "FLAT" to sigma(0.4)),
+        )
+
+        // when
+        val result = requireNotNull(builder.run())
+
+        // then
+        assertThat(result).contains(
+            "⬆️ +1σ 상단 돌파 (주간 밴드)\n<b>UP</b> $100.00 (+1.25σ)  밴드 $91.00 ~ $99.00 · 만기 2024-01-05",
+            "⬇️ −1σ 하단 이탈 (주간 밴드)\n<b>DOWN</b> $100.00 (-1.50σ)  밴드 $102.00 ~ $110.00 · 만기 2024-01-05",
+        )
+        assertThat(result).doesNotContain("FLAT", "골든크로스")
     }
 
     @Test

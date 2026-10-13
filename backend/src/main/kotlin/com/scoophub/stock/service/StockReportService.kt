@@ -21,30 +21,34 @@ class StockReportService(
     private val analysisRepository: StockAnalysisResultRepository,
     private val sigmaRepository: StockSigmaRepository,
     private val candleRepository: StockCandleRepository,
+    private val sigmaService: StockSigmaService,
     private val clock: Clock,
 ) {
     fun findReports(tickers: List<String>): List<StockReport> =
-        analysisRepository.findByTickerInAndTimeframeOrderByAnalyzedAtDesc(tickers, TIMEFRAME).map { buildReport(it) }
+        buildReports(analysisRepository.findByTickerInAndTimeframeOrderByAnalyzedAtDesc(tickers, TIMEFRAME))
 
     /** 1D 분석 + DB 마지막 일봉. 분석이 없으면 null. 시세는 하루 1회 배치 수집분만 쓴다 (#258) */
     fun findDetail(ticker: String): StockReport? {
-        val row = analysisRepository.findByTickerInAndTimeframeOrderByAnalyzedAtDesc(listOf(ticker), TIMEFRAME)
-            .firstOrNull()
-            ?: return null
-        val report = buildReport(row)
+        val rows = analysisRepository.findByTickerInAndTimeframeOrderByAnalyzedAtDesc(listOf(ticker), TIMEFRAME)
+            .take(1)
+        val report = buildReports(rows).firstOrNull() ?: return null
         report.lastCandle = candleRepository.findFirstByTickerAndIntervalOrderByDateDesc(ticker, TIMEFRAME)
             ?.let { LastCandleOut.from(it) }
         return report
     }
 
-    fun findAll(): List<StockReport> =
-        analysisRepository.findByTimeframeOrderByAnalyzedAtDesc(TIMEFRAME).map { buildReport(it) }
+    fun findAll(): List<StockReport> = buildReports(analysisRepository.findByTimeframeOrderByAnalyzedAtDesc(TIMEFRAME))
 
-    fun findAllSummaries(): List<StockSummary> = analysisRepository.findByTimeframeOrderByAnalyzedAtDesc(TIMEFRAME)
-        .map { StockSummary.from(buildReport(it)) }
+    fun findAllSummaries(): List<StockSummary> = findAll().map { StockSummary.from(it) }
 
     fun findLatestSigma(ticker: String): SigmaSnapshotOut? =
         sigmaRepository.findFirstByTickerOrderBySnapshotDateDescExpiryDateAsc(ticker)?.let { SigmaSnapshotOut.from(it) }
+
+    /** σ 밴드는 티커마다 따로 읽지 않고 한 번에 조회한다 */
+    private fun buildReports(rows: List<StockAnalysisResultEntity>): List<StockReport> {
+        val sigmaByTicker = sigmaService.findCurrentBands(rows)
+        return rows.map { buildReport(it).apply { sigma = sigmaByTicker[it.ticker] } }
+    }
 
     /** `_analysis_row_to_report` + group 매핑 */
     private fun buildReport(row: StockAnalysisResultEntity): StockReport {

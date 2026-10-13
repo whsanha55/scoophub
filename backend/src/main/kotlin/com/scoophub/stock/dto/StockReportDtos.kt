@@ -1,11 +1,17 @@
 package com.scoophub.stock.dto
 
+import com.scoophub.stock.SigmaBand
+import com.scoophub.stock.SigmaStateEnum
 import com.scoophub.stock.StockSigma
+import com.scoophub.stock.StockSigmaBand
 import com.scoophub.stock.entity.StockCandleEntity
 import com.scoophub.stock.entity.StockSigmaEntity
 import tools.jackson.databind.JsonNode
 import java.time.Instant
 import java.time.LocalDate
+import kotlin.math.roundToLong
+
+private fun round2(v: Double): Double = (v * 100).roundToLong() / 100.0
 
 /** legacy `schemas.py` TechnicalOut — 매수·매도 점수 대신 50/200 추세 상태 (#251) */
 data class TechnicalOut(val trend: String, val trendSince: LocalDate?, val technicalDetails: JsonNode)
@@ -43,6 +49,7 @@ data class StockReport(
     val dataDate: Instant? = null,
     val isStale: Boolean? = null,
     var lastCandle: LastCandleOut? = null,
+    var sigma: SigmaBandOut? = null,
 )
 
 /** legacy `schemas.py` StockSummary — /stock/report/all summarize=true 요약 */
@@ -57,6 +64,7 @@ data class StockSummary(
     val group: String? = null,
     val dataDate: Instant? = null,
     val isStale: Boolean? = null,
+    val sigma: SigmaBandOut? = null,
 ) {
     companion object {
         fun from(report: StockReport) = StockSummary(
@@ -70,7 +78,40 @@ data class StockSummary(
             group = report.group,
             dataDate = report.dataDate,
             isStale = report.isStale,
+            sigma = report.sigma,
         )
+    }
+}
+
+/** 주간 σ 밴드 위치 (#260). asOf 종가가 anchorDate 앵커 밴드에서 몇 σ 인지 */
+data class SigmaBandOut(
+    val position: Double,
+    val state: SigmaStateEnum,
+    val upper: Double,
+    val lower: Double,
+    val anchorPrice: Double,
+    val anchorDate: LocalDate,
+    val expiryDate: LocalDate,
+    val expectedMove: Double,
+    val expectedMovePct: Double,
+    val asOf: LocalDate,
+) {
+    companion object {
+        fun of(band: SigmaBand, close: Double, asOf: LocalDate): SigmaBandOut {
+            val position = band.position(close)
+            return SigmaBandOut(
+                position = round2(position),
+                state = StockSigmaBand.state(position),
+                upper = round2(band.upper),
+                lower = round2(band.lower),
+                anchorPrice = band.anchorPrice,
+                anchorDate = band.snapshotDate,
+                expiryDate = band.expiryDate,
+                expectedMove = band.expectedMove,
+                expectedMovePct = round2(band.expectedMove / band.anchorPrice * 100),
+                asOf = asOf,
+            )
+        }
     }
 }
 

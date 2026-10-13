@@ -22,6 +22,8 @@ export interface StockReport {
   group?: string | null;
   // #258 — 상세 조회에만 채워지는 DB 마지막 일봉 (실시간 시세 호출 제거)
   last_candle?: LastCandle | null;
+  // #260 — 주간 σ 밴드 위치. 적용 밴드가 없으면 null
+  sigma?: SigmaBand | null;
 }
 
 export interface StockReportSummarized {
@@ -35,26 +37,23 @@ export interface StockReportSummarized {
   data_date: string;
   is_stale: boolean;
   group?: string | null;
+  sigma?: SigmaBand | null;
 }
 
-export interface SigmaData {
-  ticker: string;
-  current_price: number;
-  expiry_date: string;
-  atm_strike: number;
-  atm_call: number;
-  atm_put: number;
+// #260 — 주간 σ 밴드. 앵커 = 주간 만기를 연 스냅샷 종가, 1σ = expected move
+export type SigmaState = "NORMAL" | "UPPER_BREAK" | "LOWER_BREAK";
+
+export interface SigmaBand {
+  position: number; // (종가 - 앵커) / expected_move
+  state: SigmaState;
+  upper: number;
+  lower: number;
+  anchor_price: number;
+  anchor_date: string; // 앵커 스냅샷 거래일
+  expiry_date: string; // 주간 마감(만기)
   expected_move: number;
   expected_move_pct: number;
-  snapshot_date: string;
-  snapshot_at: string;
-  source: string;
-  total_call_volume: number;
-  total_put_volume: number;
-  put_call_volume_ratio: number;
-  atm_call_volume: number;
-  atm_put_volume: number;
-  created_at: string;
+  as_of: string; // σ 위치를 잰 일봉 일자
 }
 
 export interface WatchlistItem {
