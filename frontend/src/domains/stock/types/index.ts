@@ -18,8 +18,8 @@ export interface StockReport {
   data_date: string;
   is_stale: boolean;
   group?: string | null;
-  // #82 — 단일 fetch 통합: 실시간 quote (백엔드 #168 정합)
-  quote?: StockQuote | null;
+  // #258 — 상세 조회에만 채워지는 DB 마지막 일봉 (실시간 시세 호출 제거)
+  last_candle?: LastCandle | null;
 }
 
 export interface StockReportSummarized {
@@ -96,19 +96,14 @@ export interface StockAnalyzeResult {
   results: { ticker: string; status: string; detail?: string }[];
 }
 
-// #44 — 분석 / 실시간 quote
-export interface StockQuote {
-  ticker: string;
-  price: number;
-  change: number;
-  change_rate: number;
-  volume?: number;
-  high?: number;
-  low?: number;
-  open?: number;
-  prev_close?: number;
-  timestamp?: string;
-  source?: string;
+// #258 — 최근 종가 (하루 1회 수집한 마지막 일봉)
+export interface LastCandle {
+  date: string;
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+  volume: number;
 }
 
 export interface StockAnalysis {

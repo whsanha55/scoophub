@@ -9,6 +9,7 @@ import com.scoophub.stock.vo.OptionQuote
 import com.scoophub.stock.vo.OptionsChain
 import com.scoophub.stock.vo.Quote
 import io.mockk.every
+import io.mockk.verify
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
@@ -217,31 +218,28 @@ class StockApiTest @Autowired constructor(
     }
 
     @Test
-    fun `상세 조회는 실시간 quote 를 붙이고 분석이 없으면 data 가 null 이다`() {
+    fun `상세 조회는 실시간 시세를 부르지 않고 DB 마지막 일봉을 붙이며 분석이 없으면 data 가 null 이다`() {
         // given
         insertAnalysis("AAPL")
-        every { provider.snapshots(listOf("AAPL")) } returns mapOf(
-            "AAPL" to Quote(
-                price = 101.0,
-                change = 1.0,
-                changePercent = 1.0,
-                open = 100.0,
-                high = 102.0,
-                low = 99.0,
-                volume = 0.0,
-            ),
-        )
+        jdbcClient.sql(
+            "INSERT INTO stock_candles (ticker, interval, date, open, high, low, close, volume) VALUES " +
+                "('AAPL', '1D', '2026-10-06', 99, 101, 98, 100, 1000), " +
+                "('AAPL', '1D', '2026-10-07', 100, 102, 99, 101, 2000)",
+        ).update()
 
         // when & then
         mockMvc.get("/api/stock/detail/aapl").andExpect {
             jsonPath("$.data.ticker") { value("AAPL") }
-            jsonPath("$.data.quote.price") { value(101.0) }
-            jsonPath("$.data.quote.volume") { doesNotExist() }
+            jsonPath("$.data.last_candle.date") { value("2026-10-07") }
+            jsonPath("$.data.last_candle.close") { value(101.0) }
+            jsonPath("$.data.last_candle.volume") { value(2000.0) }
+            jsonPath("$.data.quote") { doesNotExist() }
         }
         mockMvc.get("/api/stock/detail/NONE").andExpect {
             jsonPath("$.success") { value(true) }
             jsonPath("$.data") { doesNotExist() }
         }
+        verify(exactly = 0) { provider.snapshots(any()) }
     }
 
     @Test

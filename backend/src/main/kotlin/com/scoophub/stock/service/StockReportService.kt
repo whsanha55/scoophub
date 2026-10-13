@@ -1,41 +1,39 @@
 package com.scoophub.stock.service
 
-import com.scoophub.external.alpaca.AlpacaMarketDataClient
+import com.scoophub.stock.dto.LastCandleOut
 import com.scoophub.stock.dto.SigmaSnapshotOut
-import com.scoophub.stock.dto.StockQuoteOut
 import com.scoophub.stock.dto.StockReport
 import com.scoophub.stock.dto.StockSummary
 import com.scoophub.stock.dto.TechnicalOut
 import com.scoophub.stock.entity.StockAnalysisResultEntity
 import com.scoophub.stock.repository.StockAnalysisResultRepository
+import com.scoophub.stock.repository.StockCandleRepository
 import com.scoophub.stock.repository.StockSigmaRepository
 import com.scoophub.stock.repository.StockWatchlistRepository
-import io.github.oshai.kotlinlogging.KotlinLogging
 import org.springframework.stereotype.Service
 import java.time.Clock
 import java.time.Duration
 
-private val log = KotlinLogging.logger {}
-
 /** legacy `stock/router.py` 리포트 조회 — 분석 결과 + group */
 @Service
 class StockReportService(
-    private val provider: AlpacaMarketDataClient,
     private val watchlistRepository: StockWatchlistRepository,
     private val analysisRepository: StockAnalysisResultRepository,
     private val sigmaRepository: StockSigmaRepository,
+    private val candleRepository: StockCandleRepository,
     private val clock: Clock,
 ) {
     fun findReports(tickers: List<String>): List<StockReport> =
         analysisRepository.findByTickerInAndTimeframeOrderByAnalyzedAtDesc(tickers, TIMEFRAME).map { buildReport(it) }
 
-    /** 1D 분석 + 실시간 quote. 분석이 없으면 null */
+    /** 1D 분석 + DB 마지막 일봉. 분석이 없으면 null. 시세는 하루 1회 배치 수집분만 쓴다 (#258) */
     fun findDetail(ticker: String): StockReport? {
         val row = analysisRepository.findByTickerInAndTimeframeOrderByAnalyzedAtDesc(listOf(ticker), TIMEFRAME)
             .firstOrNull()
             ?: return null
         val report = buildReport(row)
-        attachQuote(report, ticker)
+        report.lastCandle = candleRepository.findFirstByTickerAndIntervalOrderByDateDesc(ticker, TIMEFRAME)
+            ?.let { LastCandleOut.from(it) }
         return report
     }
 
@@ -69,27 +67,6 @@ class StockReportService(
             report.group = it
         }
         return report
-    }
-
-    /** 실시간 quote. 실패 시 quote=None, 나머지 정상 (legacy /stock/detail) */
-    private fun attachQuote(report: StockReport, ticker: String) {
-        try {
-            val q = provider.snapshots(listOf(ticker))[ticker] ?: return
-            if (q.price != 0.0) {
-                report.quote = StockQuoteOut(
-                    price = q.price,
-                    change = q.change,
-                    changeRate = q.changePercent,
-                    volume = q.volume.takeIf { it != 0.0 },
-                    high = q.high.takeIf { it != 0.0 },
-                    low = q.low.takeIf { it != 0.0 },
-                    open = q.open.takeIf { it != 0.0 },
-                    timestamp = clock.instant(),
-                )
-            }
-        } catch (e: Exception) {
-            log.warn { "quote fetch failed for $ticker: ${e.message}" }
-        }
     }
 
     companion object {

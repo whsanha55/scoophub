@@ -229,7 +229,7 @@ export function useStockSync() {
   return { loading, error, triggerSync };
 }
 
-// #82 — 단일 fetch 통합: 티커 상세 (리포트 + quote)
+// #82 — 단일 fetch 통합: 티커 상세 (리포트 + 최근 종가 #258)
 export function useStockDetail() {
   const [detail, setDetail] = useState<StockReport | null>(null);
   const [loading, setLoading] = useState(false);

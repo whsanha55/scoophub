@@ -1,6 +1,7 @@
 package com.scoophub.stock.dto
 
 import com.scoophub.stock.StockSigma
+import com.scoophub.stock.entity.StockCandleEntity
 import com.scoophub.stock.entity.StockSigmaEntity
 import tools.jackson.databind.JsonNode
 import java.time.Instant
@@ -9,20 +10,28 @@ import java.time.LocalDate
 /** legacy `schemas.py` TechnicalOut — 매수·매도 점수 대신 50/200 추세 상태 (#251) */
 data class TechnicalOut(val trend: String, val trendSince: LocalDate?, val technicalDetails: JsonNode)
 
-/** legacy `schemas.py` StockQuoteOut — /stock/detail 실시간 시세 */
-data class StockQuoteOut(
-    val price: Double,
-    val change: Double,
-    val changeRate: Double,
-    val volume: Double? = null,
-    val high: Double? = null,
-    val low: Double? = null,
-    val open: Double? = null,
-    val source: String = "alpaca",
-    val timestamp: Instant? = null,
-)
+/** /stock/detail 최근 종가 — DB 마지막 일봉 (#258, 실시간 시세 호출 제거) */
+data class LastCandleOut(
+    val date: LocalDate,
+    val open: Double,
+    val high: Double,
+    val low: Double,
+    val close: Double,
+    val volume: Double,
+) {
+    companion object {
+        fun from(row: StockCandleEntity) = LastCandleOut(
+            date = row.date,
+            open = row.open,
+            high = row.high,
+            low = row.low,
+            close = row.close,
+            volume = row.volume,
+        )
+    }
+}
 
-/** legacy `schemas.py` StockReport — group/quote enrichment 로 var */
+/** legacy `schemas.py` StockReport — group/lastCandle enrichment 로 var */
 data class StockReport(
     val ticker: String,
     val exchange: String,
@@ -33,7 +42,7 @@ data class StockReport(
     var group: String? = null,
     val dataDate: Instant? = null,
     val isStale: Boolean? = null,
-    var quote: StockQuoteOut? = null,
+    var lastCandle: LastCandleOut? = null,
 )
 
 /** legacy `schemas.py` StockSummary — /stock/report/all summarize=true 요약 */
