@@ -75,6 +75,21 @@ export interface StockChart {
   points: StockChartPoint[];
 }
 
+// #262 — 주간 마감 후 가격 변화. return_nw 는 마감 종가 대비 5N 거래일 뒤 수익률(%), 아직 없으면 null
+export interface SigmaWeek {
+  anchor_date: string;
+  anchor_price: number;
+  expected_move: number;
+  expiry_date: string;
+  close_date: string;
+  close: number;
+  sigma_position: number;
+  sigma_state: SigmaState;
+  return1w: number | null;
+  return2w: number | null;
+  return4w: number | null;
+}
+
 export interface WatchlistItem {
   id: string;
   ticker: string;

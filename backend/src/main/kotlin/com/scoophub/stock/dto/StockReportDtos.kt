@@ -3,6 +3,7 @@ package com.scoophub.stock.dto
 import com.scoophub.stock.ChartPoint
 import com.scoophub.stock.SigmaBand
 import com.scoophub.stock.SigmaStateEnum
+import com.scoophub.stock.SigmaWeek
 import com.scoophub.stock.StockSigma
 import com.scoophub.stock.StockSigmaBand
 import com.scoophub.stock.TrendStateEnum
@@ -191,6 +192,37 @@ data class StockChartPointOut(
             sigmaPosition = point.position?.let { round2(it) },
             sigmaState = point.state,
             cross = point.cross,
+        )
+    }
+}
+
+/** 주간 마감 후 가격 변화 (#262). return_nw 는 마감 종가 대비 N주(5N 거래일) 뒤 종가 수익률(%) */
+data class SigmaWeekOut(
+    val anchorDate: LocalDate,
+    val anchorPrice: Double,
+    val expectedMove: Double,
+    val expiryDate: LocalDate,
+    val closeDate: LocalDate,
+    val close: Double,
+    val sigmaPosition: Double,
+    val sigmaState: SigmaStateEnum,
+    val return1w: Double?,
+    val return2w: Double?,
+    val return4w: Double?,
+) {
+    companion object {
+        fun from(week: SigmaWeek) = SigmaWeekOut(
+            anchorDate = week.band.snapshotDate,
+            anchorPrice = week.band.anchorPrice,
+            expectedMove = week.band.expectedMove,
+            expiryDate = week.band.expiryDate,
+            closeDate = week.closeDate,
+            close = week.close,
+            sigmaPosition = round2(week.position),
+            sigmaState = week.state,
+            return1w = week.return1w?.let { round2(it) },
+            return2w = week.return2w?.let { round2(it) },
+            return4w = week.return4w?.let { round2(it) },
         )
     }
 }

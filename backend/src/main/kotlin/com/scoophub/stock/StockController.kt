@@ -6,6 +6,7 @@ import com.scoophub.global.api.ResponseMeta
 import com.scoophub.global.auth.SuperOnly
 import com.scoophub.stock.dto.MarketStatusOut
 import com.scoophub.stock.dto.SigmaSnapshotOut
+import com.scoophub.stock.dto.SigmaWeekOut
 import com.scoophub.stock.dto.StockChartOut
 import com.scoophub.stock.dto.StockReport
 import com.scoophub.stock.dto.WatchlistItemIn
@@ -15,6 +16,7 @@ import com.scoophub.stock.service.StockBacktestService
 import com.scoophub.stock.service.StockChartService
 import com.scoophub.stock.service.StockCrawlService
 import com.scoophub.stock.service.StockReportService
+import com.scoophub.stock.service.StockSigmaService
 import com.scoophub.stock.service.StockWatchlistService
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.swagger.v3.oas.annotations.Operation
@@ -48,6 +50,7 @@ class StockController(
     private val crawlService: StockCrawlService,
     private val backtestService: StockBacktestService,
     private val chartService: StockChartService,
+    private val sigmaService: StockSigmaService,
     private val clock: Clock,
 ) {
 
@@ -128,6 +131,12 @@ class StockController(
     @GetMapping("/stock/sigma")
     fun getSigma(@RequestParam ticker: String): ApiResponse<SigmaSnapshotOut?> =
         ApiResponse.ok(reportService.findLatestSigma(ticker.uppercase()), ResponseMeta(clock.instant()))
+
+    @Tag(name = "Stock")
+    @Operation(summary = "주간 마감 후 가격 변화 — 마감 σ 위치와 +1W/+2W/+4W 수익률 (예측력 미검증)")
+    @GetMapping("/stock/sigma/{ticker}/weekly")
+    fun sigmaWeekly(@PathVariable ticker: String): ApiResponse<List<SigmaWeekOut>> =
+        ApiResponse.ok(sigmaService.findWeeklyHistory(ticker.uppercase()), ResponseMeta(clock.instant()))
 
     // ── Market Status ────────────────────────────────────────────────────────
 

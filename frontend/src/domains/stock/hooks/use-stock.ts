@@ -11,6 +11,7 @@ import type {
   StockAnalyzeResult,
   StockAnalysis,
   StockChart,
+  SigmaWeek,
 } from "../types";
 import type { ApiResponse } from "@/shared/types";
 
@@ -338,4 +339,31 @@ export function useStockChart() {
   }, []);
 
   return { chart, loading, error, fetchChart };
+}
+
+// #262 — 주간 마감 후 가격 변화 표
+export function useSigmaWeekly() {
+  const [weeks, setWeeks] = useState<SigmaWeek[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetchWeeks = useCallback(async (ticker: string) => {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/stock/sigma/${encodeURIComponent(ticker)}/weekly`);
+      const data: ApiResponse<SigmaWeek[]> = await res.json();
+      if (data.success && data.data) {
+        setWeeks(data.data);
+      } else {
+        setError(data.error?.message || "Failed to fetch weekly sigma");
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unknown error");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  return { weeks, loading, error, fetchWeeks };
 }

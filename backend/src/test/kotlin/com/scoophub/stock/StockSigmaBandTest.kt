@@ -1,11 +1,12 @@
 package com.scoophub.stock
 
+import com.scoophub.stock.vo.Candle
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.within
 import org.junit.jupiter.api.Test
 import java.time.LocalDate
 
-/** 주간 σ 밴드 — 앵커 선택, 적용 구간, 위치·상태 (#260) */
+/** 주간 σ 밴드 — 앵커 선택, 적용 구간, 위치·상태 (#260), 주간 마감 후 수익률 (#262) */
 class StockSigmaBandTest {
 
     private fun d(s: String) = LocalDate.parse(s)
@@ -89,5 +90,57 @@ class StockSigmaBandTest {
         assertThat(StockSigmaBand.state(0.99)).isEqualTo(SigmaStateEnum.NORMAL)
         assertThat(StockSigmaBand.state(-0.99)).isEqualTo(SigmaStateEnum.NORMAL)
         assertThat(StockSigmaBand.state(-1.0)).isEqualTo(SigmaStateEnum.LOWER_BREAK)
+    }
+
+    private fun candles(from: String, closes: List<Double>, skip: Set<String> = emptySet()) = closes
+        .mapIndexed { i, close -> Candle("QQQ", "1D", d(from).plusDays(i.toLong()), close, close, close, close, 0.0) }
+        .filter { it.date.toString() !in skip }
+
+    @Test
+    fun `주간 마감 종가의 σ 위치와 이후 5·10·20 거래일 수익률을 계산한다`() {
+        // given — 10-01 부터 매일 1씩 오르는 종가. 10-02 앵커(100 ± 4) → 10-09 마감 108
+        val history = StockSigmaBand.weeklyHistory(
+            listOf(snap("2026-10-02", "2026-10-09", price = 100.0, move = 4.0)),
+            candles("2026-10-01", (0 until 40).map { 100.0 + it }),
+        )
+
+        // when
+        val week = history.single()
+
+        // then
+        assertThat(week.closeDate).isEqualTo(d("2026-10-09"))
+        assertThat(week.close).isEqualTo(108.0)
+        assertThat(week.position).isCloseTo(2.0, within(1e-9))
+        assertThat(week.state).isEqualTo(SigmaStateEnum.UPPER_BREAK)
+        assertThat(week.return1w).isCloseTo(5.0 / 108 * 100, within(1e-9))
+        assertThat(week.return2w).isCloseTo(10.0 / 108 * 100, within(1e-9))
+        assertThat(week.return4w).isCloseTo(20.0 / 108 * 100, within(1e-9))
+    }
+
+    @Test
+    fun `이후 일봉이 모자라면 수익률은 비우고 아직 마감 전인 주는 뺀다`() {
+        // given — 마지막 일봉 10-16. 10-09 마감 주는 +1W 만 있고, 10-23 마감 주는 아직 진행 중
+        val history = StockSigmaBand.weeklyHistory(
+            listOf(snap("2026-10-02", "2026-10-09"), snap("2026-10-16", "2026-10-23")),
+            candles("2026-10-01", (0 until 16).map { 100.0 + it }),
+        )
+
+        // when & then
+        assertThat(history.map { it.band.expiryDate }).containsExactly(d("2026-10-09"))
+        assertThat(history.single().return1w).isNotNull()
+        assertThat(history.single().return2w).isNull()
+        assertThat(history.single().return4w).isNull()
+    }
+
+    @Test
+    fun `만기일이 휴장이면 만기 전 마지막 일봉을 마감으로 쓰고 최근 주가 먼저 온다`() {
+        // given — 10-09 휴장
+        val history = StockSigmaBand.weeklyHistory(
+            listOf(snap("2026-10-02", "2026-10-09"), snap("2026-10-09", "2026-10-16", price = 110.0)),
+            candles("2026-10-01", (0 until 30).map { 100.0 + it }, skip = setOf("2026-10-09")),
+        )
+
+        // when & then
+        assertThat(history.map { it.closeDate }).containsExactly(d("2026-10-16"), d("2026-10-08"))
     }
 }

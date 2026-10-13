@@ -423,6 +423,29 @@ class StockApiTest @Autowired constructor(
     }
 
     @Test
+    fun `주간 마감 표는 앵커마다 마감 σ 위치와 이후 수익률을 최근 주부터 돌려준다`() {
+        // given — 650봉(2026-04-01 700 부터 매일 +1, 마지막 2028-01-10). 2027-12-24 앵커(1330 ± 20, 만기 12-31 → 종가 1339)
+        insertCandles(candles("QQQ", 650))
+        insertSigma("QQQ", snapshotDate = "2027-12-24", expiryDate = "2027-12-31", price = 1330.0, move = 20.0)
+        insertSigma("QQQ", snapshotDate = "2027-12-31", expiryDate = "2028-01-07", price = 1339.0, move = 20.0)
+        insertSigma("QQQ", snapshotDate = "2028-01-07", expiryDate = "2028-01-14", price = 1346.0, move = 20.0)
+
+        // when & then — 01-14 주는 아직 마감 전이라 빠진다
+        mockMvc.get("/api/stock/sigma/qqq/weekly").andExpect {
+            jsonPath("$.data.length()") { value(2) }
+            jsonPath("$.data[0].expiry_date") { value("2028-01-07") }
+            jsonPath("$.data[1].anchor_date") { value("2027-12-24") }
+            jsonPath("$.data[1].close_date") { value("2027-12-31") }
+            jsonPath("$.data[1].close") { value(1339.0) }
+            jsonPath("$.data[1].sigma_position") { value(0.45) }
+            jsonPath("$.data[1].sigma_state") { value("NORMAL") }
+            jsonPath("$.data[1].return1w") { value(0.37) }
+            jsonPath("$.data[1].return2w") { value(0.75) }
+            jsonPath("$.data[1].return4w") { value(null) }
+        }
+    }
+
+    @Test
     fun `DB 에 일봉이 없으면 분석은 에러로 집계한다`() {
         // given
         insertWatchlist("QQQ")
