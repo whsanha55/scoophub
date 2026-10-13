@@ -17,6 +17,8 @@ data class ScoophubProperties(
         val apiKey: String = "",
         val apiSecret: String = "",
         val streamUrl: String = "wss://stream.data.alpaca.markets/v1beta1/news",
+        /** Trading API(옵션 계약 open interest). live 키면 https://api.alpaca.markets */
+        val tradingUrl: String = "https://paper-api.alpaca.markets",
         val streamEnabled: Boolean = false,
         val workerEnabled: Boolean = false,
         val burstThreshold: Int = 3,

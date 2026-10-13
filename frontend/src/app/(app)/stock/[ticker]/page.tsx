@@ -12,6 +12,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 import { ArrowLeft, RefreshCw, Info } from "lucide-react";
 import { TrendBadge } from "@/domains/stock/components/trend-badge";
+import { GexLadder } from "@/domains/stock/components/gex-ladder";
 
 // #82 — 지표 label + 느낌표 툴팁 셀
 function IndicatorCell({ k, value }: { k: string; value: number }) {
@@ -217,6 +218,8 @@ export default function StockDetailPage() {
           )}
         </CardContent>
       </Card>
+
+      <GexLadder ticker={report.ticker} />
 
       {/* Meta */}
       <div className="text-xs text-muted-foreground">
