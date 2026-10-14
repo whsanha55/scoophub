@@ -281,16 +281,7 @@ hotdeal_feedback_log (
   UNIQUE(feedback_event_id, profile_id)
 )
 
--- 단일 사용자 알림 설정
-hotdeal_notify_settings (
-  id,
-  telegram_enabled,
-  score_threshold,
-  daily_limit,
-  quiet_hours_start,
-  quiet_hours_end,
-  timezone
-)
+-- 알림 설정은 테이블 대신 crawl_config('hotdeal_notify').params 로 둔다 (9.1)
 ```
 
 feedforge 계획의 `notification_delivery`는 만들지 않는다.
@@ -413,14 +404,16 @@ score(item)
 
 ### 9.1. 기본 정책
 
-- 발송은 `NotifyRouter`에 맡긴다. 핫딜 추천용 (category, purpose) 라우트를 `notify_route`에 등록한다.
-- 웹 추천보다 높은 별도 알림 임계치를 쓴다.
-- 하루 3~5개 수준에서 시작하고 운영 결과에 따라 조정한다.
-- 일일 상한은 설정된 시간대 기준으로 계산한다.
-- 조용한 시간에는 발송하지 않는다.
-- 웹에서 이미 피드백한 항목은 발송 후보에서 제외한다.
-- 품절·종료·오래된 핫딜은 발송하지 않는다.
-- 최초 수집에서 과거 항목을 대량 발송하지 않는다.
+- 발송은 `NotifyRouter`에 맡긴다. 라우트는 (category `hotdeal`, purpose `recommend`)이고,
+  없으면 `AutoTopicProvisioner`가 기본 chat 에 토픽을 만든다.
+- 설정은 `crawl_config('hotdeal_notify')`로 관리한다 (시스템 관리 화면에서 수정).
+  `enabled`(기본 false), `score_threshold`(5.0), `daily_limit`(5), `quiet_start`~`quiet_end`(23:00~08:00),
+  `timezone`(Asia/Seoul), `max_age_hours`(6), `web_url`(메시지의 피드 링크, 비우면 생략).
+- 배포 직후 알림이 몰리지 않도록 기본은 꺼 둔다. 관찰 모드 결과를 보고 켠다.
+- 대상: 피드백 없음, 판정(8.4) 통과, 콜드스타트 인기 항목 아님, 아직 안 보냄, 게시 `max_age_hours` 이내,
+  점수 `score_threshold` 이상. 점수 높은 순으로 오늘 남은 상한만큼 보낸다.
+- 일일 상한은 설정된 시간대의 0시부터 센다. 조용한 시간에는 보내지 않는다 (자정을 넘기는 구간 허용).
+- 수집 주기마다 수집 → 재평가 → 판정 → 알림 순서로 실행한다.
 
 ### 9.2. 메시지 구성
 
@@ -437,17 +430,13 @@ v1에서는 Telegram 피드백 버튼 없이 시작한다.
 
 ### 9.3. 발송 신뢰성
 
-- 같은 항목은 `notify_log`의 (route, payload key) 성공 기록으로 중복 발송을 막는다.
-  payload key는 `hotdeal_feed_item` 식별자로 한다.
-- 확실한 실패와 결과 불명확 상태를 구분한다.
-- 결과가 불명확한 상태는 자동 재발송하지 않는다.
+- 발송 성공이 확인된 항목만 `hotdeal_feed_item.notified_at`을 남긴다. 하루 상한과 재발송 방지에 쓴다.
+- 실패한 항목은 기록하지 않아 다음 주기에 다시 후보가 된다.
+- 같은 항목의 성공 재발송은 `notify_log`의 (route, payload key `hotdeal:{feed_item_id}`) 확인으로 막힌다.
+  발송은 성공했는데 `notified_at` 기록이 실패해도 중복 발송되지 않는다.
 
 Telegram 발송과 DB 저장을 하나의 원자적 트랜잭션으로 묶을 수 없으므로,
 외부 발송의 정확히 한 번 실행을 보장한다고 표현하지 않는다.
-
-개인용 v1에서는 일부 누락보다 중복 알림을 피하는 정책을 우선한다.
-현재 `NotifyRouter`는 error 상태를 재시도 대상으로 본다.
-결과 불명확 상태를 구분해야 하면 M4에서 보완한다.
 
 ## 10. 중복 및 신선도 정책
 
@@ -584,7 +573,7 @@ feedforge에서 M1까지 구현한 코드(`main` 2d87eff)를 이관 원본으로
 - M1 관찰 모드: 핫딜 크롤은 기존 크롤 완료 알림(`CrawlNotifyDispatcher`)에서 제외
 - 인증: scoophub Google OAuth + `@SuperOnly` (feedforge 정적 Bearer 인증 폐기)
 - 프런트엔드: scoophub Next.js (feedforge Vite SPA 폐기)
-- 알림: `NotifyRouter` 재사용 (`notification_delivery` 미생성)
+- 알림: `NotifyRouter` 재사용 (`notification_delivery`·알림 설정 테이블 미생성, 설정은 crawl_config, 기본 꺼짐)
 - 관련성·제외 판정: LLM 사용 (8.4절)
 - 재평가: 신선도 기간 내 항목 대상 (8.5절)
 - 종자 프로필: 없이 시작 (8.3절 콜드스타트)

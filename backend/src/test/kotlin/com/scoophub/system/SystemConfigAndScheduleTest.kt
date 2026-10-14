@@ -27,9 +27,9 @@ class SystemConfigAndScheduleTest @Autowired constructor(
     // ── config ─────────────────────────────────────────────────────────
 
     @Test
-    fun `전체 config 조회 — seed 6종(V26 reddit 정리)`() {
+    fun `전체 config 조회 — seed 6종(V26 reddit 정리) + V47 hotdeal_notify`() {
         mockMvc.get("/api/config").andExpect {
-            jsonPath("$.data.length()") { value(6) }
+            jsonPath("$.data.length()") { value(7) }
             jsonPath("$.data[0].crawler") { exists() }
             jsonPath("$.data[0].params") { exists() }
         }

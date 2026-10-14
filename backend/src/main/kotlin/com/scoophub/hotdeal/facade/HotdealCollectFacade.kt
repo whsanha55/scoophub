@@ -9,12 +9,13 @@ import org.springframework.stereotype.Component
 
 private val log = KotlinLogging.logger {}
 
-/** 소스별 크롤러 공통 흐름: 목록 받기 → hotdeal_item 저장 → 추천 재평가 → 관련성·제외 판정 */
+/** 소스별 크롤러 공통 흐름: 목록 받기 → hotdeal_item 저장 → 추천 재평가 → 관련성·제외 판정 → 추천 알림 */
 @Component
 class HotdealCollectFacade(
     private val itemService: HotdealItemService,
     private val scoringService: HotdealScoringService,
     private val judgmentFacade: HotdealJudgmentFacade,
+    private val notifyFacade: HotdealNotifyFacade,
 ) {
 
     fun collect(source: String, fetch: () -> List<HotdealItemUpsert>): CrawlResult {
@@ -30,10 +31,11 @@ class HotdealCollectFacade(
         }
         val itemsNew = itemService.saveAll(items)
 
-        // 수집 주기마다 신선도 기간 내 항목을 몰아서 재평가·판정한다 (8.4, 8.5). 실패해도 수집 결과는 남긴다.
+        // 수집 주기마다 신선도 기간 내 항목을 몰아서 재평가·판정·알림한다 (8.4, 8.5, 9). 실패해도 수집 결과는 남긴다.
         val errors = listOfNotNull(
             runStep("scoring") { scoringService.evaluateRecentItems() },
             runStep("judgment") { judgmentFacade.judgePending() },
+            runStep("notify") { notifyFacade.notifyRecommendations() },
         )
         return CrawlResult(itemsFetched = items.size, itemsNew = itemsNew, errors = errors)
     }

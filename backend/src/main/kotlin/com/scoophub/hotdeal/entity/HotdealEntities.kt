@@ -149,6 +149,14 @@ class HotdealFeedItemEntity(
         this.evaluatedAt = evaluatedAt
     }
 
+    /** V47 — Telegram 추천 알림 발송 시각. 한 번 보낸 항목은 다시 보내지 않는다 (9.1) */
+    var notifiedAt: Instant? = null
+        protected set
+
+    fun markNotified(notifiedAt: Instant) {
+        this.notifiedAt = notifiedAt
+    }
+
     fun applyJudgment(judgment: JsonNode, judgedOut: Boolean) {
         this.judgment = judgment
         this.judgedOut = judgedOut
