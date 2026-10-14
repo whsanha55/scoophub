@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import {
   Newspaper,
   TrendingUp,
+  Tag,
   Cloud,
   Flame,
   Wrench,
@@ -52,13 +53,14 @@ const techTrendItems = [
 const navItems = [
   { title: "뉴스", href: "/news", icon: Newspaper },
   { title: "주식", href: "/stock", icon: TrendingUp },
+  { title: "핫딜", href: "/hotdeal", icon: Tag },
   { title: "날씨", href: "/weather", icon: Cloud },
   { title: "시스템 관리", href: "/system", icon: Wrench },
 ];
 
 function AppSidebar() {
   const pathname = usePathname();
-  // 비로그인(user=null)은 '시스템 관리'만 숨김. 나머지 항목은 노출.
+  // 비로그인(user=null)은 '시스템 관리'를 숨김. '핫딜'은 개인 추천 피드라 관리자에게만 노출.
   const { user } = useAuth();
   // 현재 경로가 그룹 하위면 항상 펼침. 그 외는 사용자 토글 존중.
   const isGroupActive = techTrendItems.some((item) =>
@@ -66,9 +68,11 @@ function AppSidebar() {
   );
   const [userOpen, setUserOpen] = useState(false);
   const groupOpen = isGroupActive || userOpen;
-  const visibleNavItems = navItems.filter(
-    (item) => item.href !== "/system" || user,
-  );
+  const visibleNavItems = navItems.filter((item) => {
+    if (item.href === "/system") return Boolean(user);
+    if (item.href === "/hotdeal") return Boolean(user?.is_super);
+    return true;
+  });
 
   return (
     <Sidebar>
