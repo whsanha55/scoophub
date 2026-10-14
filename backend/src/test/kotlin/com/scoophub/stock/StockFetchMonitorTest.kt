@@ -12,6 +12,7 @@ import com.scoophub.stock.repository.StockWatchlistRepository
 import com.scoophub.stock.service.StockCrawlService
 import com.scoophub.stock.service.StockFetchMonitor
 import com.scoophub.stock.vo.FetchOutcome
+import com.scoophub.stock.vo.Quote
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.slot
@@ -31,7 +32,7 @@ class StockFetchMonitorTest {
 
     private fun givenPreviousLog(status: CrawlStatusEnum?) {
         every {
-            crawlLogRepository.findByCrawlerAndCrawlerDetailOrderByStartedAtDesc("stock", "stock_sync", any())
+            crawlLogRepository.findByCrawlerAndCrawlerDetailOrderByStartedAtDesc("stock", any(), any())
         } returns
             listOfNotNull(status?.let { log(it) })
         every { crawlLogRepository.save(capture(savedLog)) } answers { savedLog.captured }
@@ -118,6 +119,27 @@ class StockFetchMonitorTest {
         // then
         assertThat(savedLog.captured.status).isEqualTo(CrawlStatusEnum.SUCCESS)
         assertThat(savedLog.captured.errorMessage).isNull()
+        verify(exactly = 0) { notifyRouter.dispatch(any(), any(), any(), any()) }
+    }
+
+    @Test
+    fun `옵션 가격이 없어 시그마를 못 구한 종목은 실패로 세지 않는다`() {
+        // given
+        givenPreviousLog(CrawlStatusEnum.PARTIAL)
+        val provider = mockk<AlpacaMarketDataClient>()
+        every { provider.snapshots(listOf("XLC")) } returns
+            mapOf("XLC" to Quote(112.4, 0.0, 0.0, 112.0, 113.0, 111.0, 1000.0))
+        every { provider.optionChains("XLC") } returns emptyList()
+        val crawlService = StockCrawlService(provider, mockk(), mockk(), mockk(), clock)
+
+        // when
+        val outcome = crawlService.computeSigma(listOf("XLC"))
+        monitor.record("stock_daily_sigma", clock.instant(), outcome)
+
+        // then
+        assertThat(outcome.saved).isZero()
+        assertThat(outcome.failures).isEmpty()
+        assertThat(savedLog.captured.status).isEqualTo(CrawlStatusEnum.SUCCESS)
         verify(exactly = 0) { notifyRouter.dispatch(any(), any(), any(), any()) }
     }
 }
