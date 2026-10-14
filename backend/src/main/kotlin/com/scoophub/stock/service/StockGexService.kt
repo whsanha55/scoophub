@@ -49,8 +49,9 @@ class StockGexService(
                     maxStrike = spot * (1 + StockGex.STRIKE_RANGE),
                 )
                 val result = StockGex.compute(chain.contracts, spot)
+                // 미결제약정·감마가 있는 계약이 없는 건 데이터가 없는 것이라 실패로 세지 않는다
                 if (result == null) {
-                    failures[ticker] = "no gex computed"
+                    log.info { "GEX skipped for $ticker: no usable options" }
                     return@forEachIndexed
                 }
                 gexRepository.upsert(

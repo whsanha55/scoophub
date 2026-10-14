@@ -70,4 +70,18 @@ class StockGexServiceTest {
         assertThat(outcome.saved).isZero()
         assertThat(outcome.failures).containsEntry("NONE", "price unavailable").containsEntry("SOXX", "HTTP 403")
     }
+
+    @Test
+    fun `미결제약정이나 감마가 있는 계약이 없으면 실패로 세지 않고 건너뛴다`() {
+        // given
+        every { provider.snapshots(listOf("XLC")) } returns mapOf("XLC" to quote(112.0))
+        every { provider.gexChain("XLC", any(), any()) } returns GexChain(oiDate = null, contracts = emptyList())
+
+        // when
+        val outcome = service.computeGex(listOf("XLC"))
+
+        // then
+        assertThat(outcome.saved).isZero()
+        assertThat(outcome.failures).isEmpty()
+    }
 }
