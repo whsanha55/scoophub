@@ -45,8 +45,9 @@ class StockCrawlService(
                     price,
                     snapshotAt,
                 )
+                // 만기·ATM 호가가 없는 건 데이터가 없는 것이라 실패로 세지 않는다
                 if (result == null) {
-                    failures[ticker] = "no sigma computed"
+                    log.info { "Sigma skipped for $ticker: no usable options" }
                     continue
                 }
                 sigmaRepository.upsert(
