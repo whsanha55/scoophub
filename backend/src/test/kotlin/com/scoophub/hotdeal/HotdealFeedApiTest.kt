@@ -1,6 +1,8 @@
 package com.scoophub.hotdeal
 
+import com.ninjasquad.springmockk.MockkBean
 import com.scoophub.TestcontainersConfiguration
+import com.scoophub.external.llm.LlmClient
 import com.scoophub.global.auth.JwtService
 import com.scoophub.hotdeal.enums.ProfileKindEnum
 import com.scoophub.hotdeal.repository.HotdealInterestProfileRepository
@@ -33,6 +35,10 @@ class HotdealFeedApiTest @Autowired constructor(
     itemService: HotdealItemService,
     profileRepository: HotdealInterestProfileRepository,
 ) {
+    // 판정 단계가 실제 LLM 을 부르지 않게 막는다. 스텁 없는 호출은 예외라 대체 판정으로 처리된다
+    @MockkBean
+    private lateinit var llm: LlmClient
+
     private val fixtures = HotdealTestFixtures(jdbcClient, itemService, profileRepository)
     private val superBearer by lazy { "Bearer ${jwtService.create("admin@test.com", true)}" }
     private val userBearer by lazy { "Bearer ${jwtService.create("user@test.com", false)}" }

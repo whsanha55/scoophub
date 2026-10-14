@@ -6,9 +6,10 @@ import {
   formatRelativeTime,
   nextFeedback,
   sourceLabel,
+  stepWeight,
 } from "../src/domains/hotdeal/lib/feed.ts";
 
-const item = (id, feedback = null, active = true) => ({ id, feedback, active });
+const item = (id, feedback = null, active = true, hidden_reason = null) => ({ id, feedback, active, hidden_reason });
 
 test("가격은 원 단위로 쉼표를 넣고 0원은 무료, null 은 빈 문자열", () => {
   assert.equal(formatPrice(149000), "149,000원");
@@ -52,4 +53,17 @@ test("숨긴 항목에서 취소하면 빠지고, 좋아요 목록에서 좋아�
   assert.deepEqual(applyFeedback([item(1, "DISLIKE")], 1, null, "hidden"), []);
   assert.deepEqual(applyFeedback([item(1, "LIKE")], 1, null, "liked"), []);
   assert.deepEqual(applyFeedback([item(1, "LIKE")], 1, "DISLIKE", "liked"), []);
+});
+
+test("판정에서 숨겨진 항목은 기본 피드가 아니라 숨긴 항목에 속하고, 좋아요하면 기본 피드로 온다", () => {
+  const judged = item(1, null, true, "제외 키워드(중고)");
+  assert.deepEqual(applyFeedback([judged], 1, null, "default"), []);
+  assert.equal(applyFeedback([judged], 1, "LIKE", "hidden").length, 0);
+  assert.equal(applyFeedback([judged], 1, "LIKE", "default").length, 1);
+});
+
+test("가중치는 0.5 단위로 0~5 안에서만 바뀐다", () => {
+  assert.equal(stepWeight(3, 1), 3.5);
+  assert.equal(stepWeight(0.2, -1), 0);
+  assert.equal(stepWeight(4.8, 1), 5);
 });

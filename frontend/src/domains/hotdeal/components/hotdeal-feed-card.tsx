@@ -40,6 +40,7 @@ export function HotdealFeedCard({ item, onFeedback }: HotdealFeedCardProps) {
         <div className="flex flex-wrap items-center gap-1.5 text-sm">
           <Badge variant={item.popular ? "secondary" : "outline"}>{item.reason || "추천"}</Badge>
           {!item.active && <Badge variant="outline">추천 조건 벗어남</Badge>}
+          {item.hidden_reason && <Badge variant="destructive">숨김: {item.hidden_reason}</Badge>}
           {item.votes > 0 && <span className="text-muted-foreground">추천 {item.votes}</span>}
           <span className="text-xs text-muted-foreground" title="추천 점수">
             점수 {item.score.toFixed(1)}

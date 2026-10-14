@@ -37,19 +37,31 @@ export function nextFeedback(
 }
 
 // 피드백 변경 후에도 현재 필터에 남는지. 서버 필터 규칙과 맞춘다.
-// default: 싫어요 제외(좋아요는 추천 조건과 무관하게 유지, 피드백 없으면 active 만)
+// default: 좋아요는 항상 유지, 피드백 없으면 추천 활성이고 판정에서 숨겨지지 않은 항목
+// hidden: 싫어요 + 피드백 없이 판정에서 숨겨진 항목
 export function belongsToFilter(
-  item: Pick<HotdealFeedItem, "active" | "feedback">,
+  item: Pick<HotdealFeedItem, "active" | "feedback" | "hidden_reason">,
   filter: FeedFilter,
 ): boolean {
+  const judgedOut = item.hidden_reason !== null;
   switch (filter) {
     case "hidden":
-      return item.feedback === "DISLIKE";
+      return item.feedback === "DISLIKE" || (item.feedback === null && item.active && judgedOut);
     case "liked":
       return item.feedback === "LIKE";
     default:
-      return item.feedback === "LIKE" || (item.feedback === null && item.active);
+      return item.feedback === "LIKE" || (item.feedback === null && item.active && !judgedOut);
   }
+}
+
+// 수동 가중치 조정 단위와 범위 (서버 0~5 와 맞춘다)
+export const WEIGHT_STEP = 0.5;
+export const WEIGHT_MIN = 0;
+export const WEIGHT_MAX = 5;
+
+export function stepWeight(current: number, direction: 1 | -1): number {
+  const next = Math.round((current + direction * WEIGHT_STEP) * 10) / 10;
+  return Math.min(WEIGHT_MAX, Math.max(WEIGHT_MIN, next));
 }
 
 // 피드백을 화면에 즉시 반영한다. 필터에서 벗어난 항목은 목록에서 뺀다.

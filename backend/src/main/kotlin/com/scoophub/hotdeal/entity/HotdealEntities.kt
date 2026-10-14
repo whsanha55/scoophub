@@ -76,6 +76,14 @@ class HotdealInterestProfileEntity(
         learnedWeight = after - seedWeight
         return after - before
     }
+
+    fun changeSeedWeight(seedWeight: Double) {
+        this.seedWeight = seedWeight
+    }
+
+    fun resetLearned() {
+        learnedWeight = 0.0
+    }
 }
 
 /** V43 hotdeal_feed_item — 웹 추천 결과 */
@@ -126,10 +134,24 @@ class HotdealFeedItemEntity(
         this.active = true
     }
 
+    /** V46 — LLM 관련성·제외 판정 (relevant, excluded, reason, status, model, input_hash, judged_at) */
+    @JdbcTypeCode(SqlTypes.JSON)
+    var judgment: JsonNode? = null
+        protected set
+
+    /** V46 — 관련 없음 또는 제외 판정이면 true. 기본 피드에서 숨긴다 */
+    var judgedOut: Boolean = false
+        protected set
+
     /** 추천 조건을 벗어나면 삭제하지 않고 숨긴다 (8.5) */
     fun deactivate(evaluatedAt: Instant) {
         this.active = false
         this.evaluatedAt = evaluatedAt
+    }
+
+    fun applyJudgment(judgment: JsonNode, judgedOut: Boolean) {
+        this.judgment = judgment
+        this.judgedOut = judgedOut
     }
 }
 

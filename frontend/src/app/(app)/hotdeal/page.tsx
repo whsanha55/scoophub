@@ -28,7 +28,7 @@ const SORTS: { value: FeedSort; label: string }[] = [
 const EMPTY_MESSAGES: Record<FeedFilter, string> = {
   default: "추천 항목이 없습니다. 관심 키워드를 추가해 보세요",
   liked: "좋아요한 항목이 없습니다",
-  hidden: "숨긴 항목이 없습니다",
+  hidden: "숨긴 항목이 없습니다. 관심 없음을 누르거나 관련 없다고 판정된 항목이 여기 모입니다",
 };
 
 export default function HotdealPage() {
@@ -86,8 +86,10 @@ function HotdealFeed() {
       <HotdealProfileManager
         profiles={profiles.profiles}
         error={profiles.error}
-        onAdd={async (value) => handleProfileChange(await profiles.addProfile("KEYWORD", value))}
+        onAdd={async (kind, value) => handleProfileChange(await profiles.addProfile(kind, value))}
         onDelete={async (id) => handleProfileChange(await profiles.deleteProfile(id))}
+        onChangeWeight={async (id, weight) => handleProfileChange(await profiles.changeWeight(id, weight))}
+        onResetLearned={async () => handleProfileChange(await profiles.resetLearned())}
       />
 
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">

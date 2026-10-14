@@ -69,7 +69,7 @@ class HotdealScoringService(
         keywordRecommendedIds: Set<Long?>,
         now: Instant,
     ): Set<Long?> {
-        val interestCount = profiles.count { it.kind != ProfileKindEnum.SOURCE }
+        val interestCount = profiles.count { it.kind.isInterest }
         if (interestCount >= ScoringPolicy.COLDSTART_PROFILE_MIN) {
             return emptySet()
         }

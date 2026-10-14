@@ -14,6 +14,11 @@ data class HotdealProfileCreateRequest(
     val seedWeight: Double? = null,
 )
 
+data class HotdealProfileWeightRequest(
+    @field:Schema(description = "수동 가중치 (0~5)", example = "3.5")
+    val seedWeight: Double,
+)
+
 data class HotdealProfileResponse(
     @field:Schema(description = "프로필 ID", example = "1")
     val id: Long,

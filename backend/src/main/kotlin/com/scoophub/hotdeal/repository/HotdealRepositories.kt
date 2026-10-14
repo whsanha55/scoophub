@@ -7,6 +7,7 @@ import com.scoophub.hotdeal.entity.HotdealInterestProfileEntity
 import com.scoophub.hotdeal.entity.HotdealItemEntity
 import com.scoophub.hotdeal.enums.FeedbackKindEnum
 import com.scoophub.hotdeal.enums.ProfileKindEnum
+import com.scoophub.hotdeal.vo.ItemProfileDeltaRow
 import com.scoophub.hotdeal.vo.ProfileDeltaRow
 import org.springframework.data.domain.Page
 import org.springframework.data.domain.Pageable
@@ -28,26 +29,43 @@ interface HotdealFeedItemRepository : JpaRepository<HotdealFeedItemEntity, Long>
     fun findAllByItemIds(itemIds: Collection<Long>): List<HotdealFeedItemEntity>
 
     /**
-     * 기본 피드: 피드백 없는 추천 활성 항목 + 좋아요한 항목(점수와 무관하게 유지).
+     * 기본 피드: 피드백 없는 추천 활성 항목 중 판정 통과 항목 + 좋아요한 항목(점수·판정과 무관하게 유지).
      * 싫어요 항목은 제외한다. 피드백은 항목당 1건이다.
      */
     @Query(
         value = """
             SELECT f FROM HotdealFeedItemEntity f JOIN FETCH f.item
             LEFT JOIN HotdealFeedbackEntity b ON b.feedItem = f
-            WHERE (b.id IS NULL AND f.active = true)
+            WHERE (b.id IS NULL AND f.active = true AND f.judgedOut = false)
                OR b.kind = com.scoophub.hotdeal.enums.FeedbackKindEnum.LIKE
         """,
         countQuery = """
             SELECT COUNT(f) FROM HotdealFeedItemEntity f
             LEFT JOIN HotdealFeedbackEntity b ON b.feedItem = f
-            WHERE (b.id IS NULL AND f.active = true)
+            WHERE (b.id IS NULL AND f.active = true AND f.judgedOut = false)
                OR b.kind = com.scoophub.hotdeal.enums.FeedbackKindEnum.LIKE
         """,
     )
     fun findDefaultFeed(pageable: Pageable): Page<HotdealFeedItemEntity>
 
-    /** 피드백 종류별 모아보기 (DISLIKE = 숨긴 항목, LIKE = 좋아요 목록) */
+    /** 숨긴 항목: 싫어요한 항목 + 피드백 없이 관련 없음·제외로 판정된 추천 항목 */
+    @Query(
+        value = """
+            SELECT f FROM HotdealFeedItemEntity f JOIN FETCH f.item
+            LEFT JOIN HotdealFeedbackEntity b ON b.feedItem = f
+            WHERE b.kind = com.scoophub.hotdeal.enums.FeedbackKindEnum.DISLIKE
+               OR (b.id IS NULL AND f.active = true AND f.judgedOut = true)
+        """,
+        countQuery = """
+            SELECT COUNT(f) FROM HotdealFeedItemEntity f
+            LEFT JOIN HotdealFeedbackEntity b ON b.feedItem = f
+            WHERE b.kind = com.scoophub.hotdeal.enums.FeedbackKindEnum.DISLIKE
+               OR (b.id IS NULL AND f.active = true AND f.judgedOut = true)
+        """,
+    )
+    fun findHiddenFeed(pageable: Pageable): Page<HotdealFeedItemEntity>
+
+    /** 좋아요 목록 */
     @Query(
         value = """
             SELECT f FROM HotdealFeedItemEntity f JOIN FETCH f.item
@@ -59,6 +77,10 @@ interface HotdealFeedItemRepository : JpaRepository<HotdealFeedItemEntity, Long>
         """,
     )
     fun findFeedByFeedbackKind(kind: FeedbackKindEnum, pageable: Pageable): Page<HotdealFeedItemEntity>
+
+    /** 판정 후보: 신선도 기간 안의 추천 활성 항목 */
+    @Query("SELECT f FROM HotdealFeedItemEntity f JOIN FETCH f.item WHERE f.active = true AND f.expiresAt > :now")
+    fun findActiveWithItem(now: Instant): List<HotdealFeedItemEntity>
 }
 
 interface HotdealFeedbackRepository : JpaRepository<HotdealFeedbackEntity, Long> {
@@ -82,4 +104,15 @@ interface HotdealFeedbackLogRepository : JpaRepository<HotdealFeedbackLogEntity,
         """,
     )
     fun sumDeltaByProfile(feedItemId: Long): List<ProfileDeltaRow>
+
+    /** 모든 항목·프로필별 현재 학습 효과. 학습값 초기화 때 보정 로그를 남기는 데 쓴다 */
+    @Query(
+        """
+        SELECT l.feedItemId AS feedItemId, l.profileId AS profileId, SUM(l.delta) AS delta
+        FROM HotdealFeedbackLogEntity l
+        WHERE l.profileId IS NOT NULL
+        GROUP BY l.feedItemId, l.profileId
+        """,
+    )
+    fun sumDeltaByItemAndProfile(): List<ItemProfileDeltaRow>
 }

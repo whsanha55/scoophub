@@ -10,6 +10,8 @@ import com.scoophub.hotdeal.dto.HotdealFeedbackRequest
 import com.scoophub.hotdeal.dto.HotdealFeedbackResponse
 import com.scoophub.hotdeal.dto.HotdealProfileCreateRequest
 import com.scoophub.hotdeal.dto.HotdealProfileResponse
+import com.scoophub.hotdeal.dto.HotdealProfileWeightRequest
+import com.scoophub.hotdeal.facade.HotdealProfileFacade
 import com.scoophub.hotdeal.service.HotdealFeedService
 import com.scoophub.hotdeal.service.HotdealFeedbackService
 import com.scoophub.hotdeal.service.HotdealProfileService
@@ -17,6 +19,7 @@ import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.tags.Tag
 import org.springframework.web.bind.annotation.DeleteMapping
 import org.springframework.web.bind.annotation.GetMapping
+import org.springframework.web.bind.annotation.PatchMapping
 import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.PutMapping
@@ -33,6 +36,7 @@ class HotdealController(
     private val feedService: HotdealFeedService,
     private val feedbackService: HotdealFeedbackService,
     private val profileService: HotdealProfileService,
+    private val profileFacade: HotdealProfileFacade,
     private val clock: Clock,
 ) {
 
@@ -84,11 +88,11 @@ class HotdealController(
     }
 
     @Tag(name = "Hotdeal")
-    @Operation(summary = "관심도 프로필 추가 (추가 즉시 재평가)")
+    @Operation(summary = "관심도 프로필 추가 (kind: KEYWORD | CATEGORY | SOURCE | EXCLUDE, 추가 즉시 재평가)")
     @SuperOnly
     @PostMapping("/api/hotdeal/profiles")
     fun createProfile(@RequestBody body: HotdealProfileCreateRequest): ApiResponse<HotdealProfileResponse> {
-        val profile = profileService.create(body.kind, body.value, body.seedWeight)
+        val profile = profileFacade.create(body.kind, body.value, body.seedWeight)
         return ApiResponse.ok(HotdealProfileResponse.from(profile), ResponseMeta(clock.instant()))
     }
 
@@ -97,8 +101,30 @@ class HotdealController(
     @SuperOnly
     @DeleteMapping("/api/hotdeal/profiles/{profile_id}")
     fun deleteProfile(@PathVariable("profile_id") profileId: Long): ApiResponse<Map<String, Long>> {
-        profileService.delete(profileId)
+        profileFacade.delete(profileId)
         return ApiResponse.ok(mapOf("deleted" to profileId), ResponseMeta(clock.instant()))
+    }
+
+    @Tag(name = "Hotdeal")
+    @Operation(summary = "관심도 프로필 수동 가중치 변경 (변경 즉시 재평가)")
+    @SuperOnly
+    @PatchMapping("/api/hotdeal/profiles/{profile_id}")
+    fun changeProfileWeight(
+        @PathVariable("profile_id") profileId: Long,
+        @RequestBody body: HotdealProfileWeightRequest,
+    ): ApiResponse<HotdealProfileResponse> {
+        val profile = profileFacade.changeSeedWeight(profileId, body.seedWeight)
+        return ApiResponse.ok(HotdealProfileResponse.from(profile), ResponseMeta(clock.instant()))
+    }
+
+    @Tag(name = "Hotdeal")
+    @Operation(summary = "피드백 학습값 초기화 (피드백 상태는 유지)")
+    @SuperOnly
+    @PostMapping("/api/hotdeal/profiles/reset-learned")
+    fun resetLearned(): ApiResponse<List<HotdealProfileResponse>> {
+        profileFacade.resetLearned()
+        val profiles = profileService.findAll().map { HotdealProfileResponse.from(it) }
+        return ApiResponse.ok(profiles, ResponseMeta(clock.instant(), total = profiles.size))
     }
 
     @Tag(name = "Hotdeal Crawling")

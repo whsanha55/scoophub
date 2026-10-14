@@ -136,7 +136,37 @@ export function useHotdealProfiles() {
     }
   }, []);
 
-  return { profiles, error, fetchProfiles, addProfile, deleteProfile };
+  const changeWeight = useCallback(async (id: number, seedWeight: number): Promise<boolean> => {
+    setError(null);
+    try {
+      const updated = await request<HotdealProfile>(
+        `/api/hotdeal/profiles/${id}`,
+        jsonInit("PATCH", { seed_weight: seedWeight }),
+        "가중치 변경 실패",
+      );
+      setProfiles((prev) => prev.map((p) => (p.id === id ? updated : p)));
+      return true;
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "가중치 변경 실패");
+      return false;
+    }
+  }, []);
+
+  // 피드백으로 쌓인 학습값만 0 으로 되돌린다. 피드백 상태는 유지된다.
+  const resetLearned = useCallback(async (): Promise<boolean> => {
+    setError(null);
+    try {
+      setProfiles(
+        await request<HotdealProfile[]>("/api/hotdeal/profiles/reset-learned", jsonInit("POST"), "학습값 초기화 실패"),
+      );
+      return true;
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "학습값 초기화 실패");
+      return false;
+    }
+  }, []);
+
+  return { profiles, error, fetchProfiles, addProfile, deleteProfile, changeWeight, resetLearned };
 }
 
 export function useHotdealCrawl() {

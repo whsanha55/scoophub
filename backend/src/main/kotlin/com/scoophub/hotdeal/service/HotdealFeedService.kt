@@ -19,7 +19,7 @@ class HotdealFeedService(
     data class FeedPage(val items: List<HotdealFeedItemResponse>, val total: Long)
 
     /**
-     * filter: default(싫어요 제외 추천 피드) | hidden(싫어요한 항목) | liked(좋아요한 항목).
+     * filter: default(싫어요·판정 제외 추천 피드) | hidden(싫어요 + 관련 없음·제외 판정) | liked(좋아요).
      * page 는 1부터
      */
     fun findFeed(sort: String, filter: String, limit: Int, page: Int): FeedPage {
@@ -29,7 +29,7 @@ class HotdealFeedService(
         }
         val pageable = PageRequest.of(page - 1, limit, feedSort.sort)
         val result = when (filter) {
-            FILTER_HIDDEN -> feedItemRepository.findFeedByFeedbackKind(FeedbackKindEnum.DISLIKE, pageable)
+            FILTER_HIDDEN -> feedItemRepository.findHiddenFeed(pageable)
             FILTER_LIKED -> feedItemRepository.findFeedByFeedbackKind(FeedbackKindEnum.LIKE, pageable)
             else -> feedItemRepository.findDefaultFeed(pageable)
         }

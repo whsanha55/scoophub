@@ -5,7 +5,7 @@ import com.scoophub.external.zod.ZodDeal
 import com.scoophub.global.crawl.CrawlResult
 import com.scoophub.global.crawl.Crawler
 import com.scoophub.hotdeal.enums.HotdealSourceEnum
-import com.scoophub.hotdeal.service.HotdealCollectService
+import com.scoophub.hotdeal.facade.HotdealCollectFacade
 import com.scoophub.hotdeal.vo.HotdealItemUpsert
 import org.springframework.stereotype.Component
 
@@ -14,10 +14,10 @@ import org.springframework.stereotype.Component
  * 2026-10 기준 Cloudflare 봇 차단(403)으로 스케줄은 꺼 두었다 (V42). 차단이 풀리면 crawl_schedule 에서 켠다.
  */
 @Component
-class ZodCrawler(private val client: ZodClient, private val collectService: HotdealCollectService) : Crawler {
+class ZodCrawler(private val client: ZodClient, private val collectFacade: HotdealCollectFacade) : Crawler {
     override val name = "hotdeal_zod"
 
-    override fun fetch(): CrawlResult = collectService.collect(name) { client.deals().map { it.toUpsert() } }
+    override fun fetch(): CrawlResult = collectFacade.collect(name) { client.deals().map { it.toUpsert() } }
 
     private fun ZodDeal.toUpsert() = HotdealItemUpsert(
         source = HotdealSourceEnum.ZOD,

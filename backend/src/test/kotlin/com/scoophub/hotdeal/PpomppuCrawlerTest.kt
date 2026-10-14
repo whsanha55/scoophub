@@ -2,6 +2,7 @@ package com.scoophub.hotdeal
 
 import com.ninjasquad.springmockk.MockkBean
 import com.scoophub.TestcontainersConfiguration
+import com.scoophub.external.llm.LlmClient
 import com.scoophub.external.ppomppu.PpomppuClient
 import com.scoophub.external.ppomppu.PpomppuDeal
 import com.scoophub.global.crawl.CrawlRunner
@@ -27,6 +28,10 @@ class PpomppuCrawlerTest @Autowired constructor(
     itemService: HotdealItemService,
     profileRepository: HotdealInterestProfileRepository,
 ) {
+    // 판정 단계가 실제 LLM 을 부르지 않게 막는다. 스텁 없는 호출은 예외라 대체 판정으로 처리된다
+    @MockkBean
+    private lateinit var llm: LlmClient
+
     private val fixtures = HotdealTestFixtures(jdbcClient, itemService, profileRepository)
 
     @MockkBean

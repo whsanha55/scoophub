@@ -39,6 +39,8 @@ data class HotdealFeedItemResponse(
     val active: Boolean,
     @field:Schema(description = "현재 피드백 (없으면 null)", example = "LIKE")
     val feedback: FeedbackKindEnum?,
+    @field:Schema(description = "관련 없음·제외 판정 사유 (판정에서 숨겨진 항목만)", example = "제외 키워드(중고)")
+    val hiddenReason: String?,
 ) {
     data class MatchedTerm(
         @field:Schema(description = "프로필 종류", example = "KEYWORD")
@@ -79,6 +81,11 @@ data class HotdealFeedItemResponse(
                 },
                 active = feedItem.active,
                 feedback = feedback,
+                hiddenReason = if (feedItem.judgedOut) {
+                    feedItem.judgment?.scalar("reason")?.ifBlank { null } ?: "관련 없음"
+                } else {
+                    null
+                },
             )
         }
 
