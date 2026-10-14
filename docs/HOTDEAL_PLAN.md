@@ -1,6 +1,7 @@
 # 핫딜 · 관심도 기반 추천 피드 계획
 
-> 상태: 이관 진행 중 — 에픽 [#271](https://github.com/whsanha55/scoophub/issues/271)
+> 상태: M0~M4 구현 완료, 머지 전 — 에픽 [#271](https://github.com/whsanha55/scoophub/issues/271), PR [#273](https://github.com/whsanha55/scoophub/pull/273).
+> 진행 현황은 16절.
 >
 > 별도 저장소 [feedforge](https://github.com/whsanha55/feedforge)(`docs/PLAN.md` v2)로 시작한 계획을
 > scoophub로 합쳤다. scoophub에 이미 있는 수집·알림·LLM·인증·UI 구성은 그대로 재사용하고,
@@ -598,3 +599,77 @@ feedforge에서 M1까지 구현한 코드(`main` 2d87eff)를 이관 원본으로
 무반응은 부정 평가로 처리하지 않으며, 실제 사용 의견을 함께 확인한다.
 
 추천 만족도가 낮다면 소스 확장보다 매칭·중복·신선도·알림 정책을 먼저 개선한다.
+
+## 16. 진행 현황 (2026-10-14)
+
+에픽 브랜치 `feat/hotdeal-epic` 에 모아 PR #273 하나로 머지한다.
+
+### 16.1. 단계별 결과
+
+| 단계 | 상태 | 내용 |
+|---|---|---|
+| 1. 계획 문서 이관 | 완료 | 이 문서 |
+| 2. 핫딜 수집 | 완료 | 뽐뿌 RSS 15분 주기. 알구더는 Cloudflare 403 으로 스케줄만 끔 (5절) |
+| 3. 스코어링·추천 피드 API | 완료 | 키워드·카테고리·소스 가중치 + 인기 보너스, 콜드스타트 인기 노출 |
+| 4. 웹 피드·피드백 | 완료 | 좋아요·싫어요·취소 학습, 관심 키워드 온보딩, `/hotdeal` 화면 |
+| 5. 설정·LLM 판정 | 완료 | 관련성·제외 판정, 제외 키워드, 가중치 −/+, 학습값 초기화. 카테고리 가중치는 뽐뿌에 카테고리가 없어 보류 |
+| 6. 알림 | 완료 | Telegram 선택 알림. 기본 꺼짐 (9절) |
+| 7. 소스 확장 | 보류 | 뽐뿌 하나로 유용성을 먼저 검증한다 (15절). 후보: 클리앙 알뜰구매, 기존 GitHub·HN 개인화 |
+
+### 16.2. 추가된 구성
+
+DB (Flyway)
+
+| 버전 | 내용 |
+|---|---|
+| V42 | `hotdeal_item`, 알구더 스케줄(꺼짐) |
+| V43 | `hotdeal_interest_profile`, `hotdeal_feed_item` |
+| V44 | `hotdeal_feedback`, `hotdeal_feedback_log`, `hotdeal_feed_item.active` |
+| V45 | 뽐뿌 스케줄 (15분) |
+| V46 | 프로필 kind `EXCLUDE`, `hotdeal_feed_item.judgment`·`judged_out` |
+| V47 | `hotdeal_feed_item.notified_at`, `crawl_config('hotdeal_notify')` |
+
+API (모두 `@SuperOnly`)
+
+| 메서드 | 경로 | 용도 |
+|---|---|---|
+| GET | `/api/hotdeal/feed?sort=recommended\|latest&filter=default\|hidden\|liked&limit&page` | 추천 피드 |
+| PUT / DELETE | `/api/hotdeal/feed/{id}/feedback` | 좋아요·싫어요 / 취소 |
+| GET / POST | `/api/hotdeal/profiles` | 관심·제외 키워드 목록 / 추가 (즉시 재평가) |
+| PATCH / DELETE | `/api/hotdeal/profiles/{id}` | 수동 가중치(0~5) / 삭제 (즉시 재평가) |
+| POST | `/api/hotdeal/profiles/reset-learned` | 학습값 초기화 |
+| POST | `/api/crawling/hotdeal-ppomppu`, `/api/crawling/hotdeal-zod` | 수동 수집 |
+
+백엔드 구조: `hotdeal/` 아래 Controller·Crawler, `facade/`(수집·판정·알림·프로필 변경처럼 외부 호출을 트랜잭션 밖에서 묶는 흐름),
+`service/`, `repository/`, `entity/`, `dto/`, `vo/`. 외부 클라이언트는 `external/ppomppu`, `external/zod`.
+
+프런트엔드: `app/(app)/hotdeal`, `domains/hotdeal`. 사이드바 "핫딜" 메뉴는 관리자에게만 보인다.
+
+### 16.3. 정한 기본값 (관찰 후 조정)
+
+| 항목 | 값 |
+|---|---|
+| 웹 추천 임계치 | 3.0 |
+| 웹에서 추가한 키워드 기본 가중치 | 3.0 |
+| 피드백 학습 폭 | 좋아요 +0.5, 싫어요 −0.5 (매칭 항목에 나눠 적용) |
+| 유효 가중치 범위 | 0 ~ 5 |
+| 신선도 기간 | 72시간 |
+| LLM 판정 | 수집 주기당 최대 40건, 20건씩 배치 |
+| 알림 | 점수 5.0 이상, 하루 5건, 23:00~08:00 조용한 시간, 게시 6시간 이내 |
+
+### 16.4. 검증
+
+- 백엔드 `./gradlew check` 통과 (핫딜 테스트 69개 포함).
+- 프런트엔드 lint·typecheck·테스트 29개·build 통과.
+- 일회용 Postgres 와 실제 뽐뿌 RSS 로 수집 → 추천 → 피드백·제외 키워드·가중치 조정을 화면에서 확인.
+- LLM 판정과 Telegram 발송은 목으로만 검증했다. 실제 LLM·Telegram 으로는 아직 돌려보지 않았다.
+
+### 16.5. 남은 일
+
+- [ ] #273 전체 diff 리뷰 후 머지
+- [ ] 운영 배포 후 확인: 뽐뿌 수집 로그(`crawl_logs`), 첫 LLM 판정 결과, 피드 화면
+- [ ] 관찰 후 `hotdeal_notify.enabled` 켜기 (시스템 관리 화면) 와 `web_url` 설정
+- [ ] 뽐뿌 `hits` 세 번째 값을 추천수로 본 가정 확인
+- [ ] 7단계(소스 확장) 결정
+- [ ] 운영 배포 후 feedforge 저장소 아카이브 (사용자가 직접)
+
