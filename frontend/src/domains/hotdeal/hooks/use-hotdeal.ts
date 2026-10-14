@@ -140,5 +140,5 @@ export function useHotdealProfiles() {
 }
 
 export function useHotdealCrawl() {
-  return useCrawlTrigger("hotdeal-zod", "알구더 크롤 실패");
+  return useCrawlTrigger("hotdeal-ppomppu", "뽐뿌 크롤 실패");
 }

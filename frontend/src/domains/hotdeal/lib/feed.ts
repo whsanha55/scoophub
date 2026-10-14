@@ -2,8 +2,7 @@ import type { FeedFilter, FeedbackKind, HotdealFeedItem } from "../types";
 
 const SOURCE_LABELS: Record<string, string> = {
   ZOD: "알구더",
-  FMKOREA: "FM코리아",
-  ARCA: "아카라이브",
+  PPOMPPU: "뽐뿌",
 };
 
 export function sourceLabel(source: string): string {

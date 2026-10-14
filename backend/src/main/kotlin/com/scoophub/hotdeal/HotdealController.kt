@@ -29,6 +29,7 @@ import java.time.Clock
 class HotdealController(
     private val crawlRunner: CrawlRunner,
     private val zodCrawler: ZodCrawler,
+    private val ppomppuCrawler: PpomppuCrawler,
     private val feedService: HotdealFeedService,
     private val feedbackService: HotdealFeedbackService,
     private val profileService: HotdealProfileService,
@@ -99,6 +100,12 @@ class HotdealController(
         profileService.delete(profileId)
         return ApiResponse.ok(mapOf("deleted" to profileId), ResponseMeta(clock.instant()))
     }
+
+    @Tag(name = "Hotdeal Crawling")
+    @Operation(summary = "뽐뿌 핫딜 RSS 크롤 수동 실행")
+    @SuperOnly
+    @PostMapping("/api/crawling/hotdeal-ppomppu")
+    fun triggerPpomppuCrawl(): ApiResponse<CrawlTriggerData> = crawlRunner.trigger(ppomppuCrawler, "뽐뿌")
 
     @Tag(name = "Hotdeal Crawling")
     @Operation(summary = "알구더 핫딜 크롤 수동 실행")

@@ -27,6 +27,7 @@ test("상대 시간은 분·시간·일 단위로 표시하고 잘못된 값은 
 
 test("소스 코드는 한국어 이름으로, 모르는 값은 그대로", () => {
   assert.equal(sourceLabel("ZOD"), "알구더");
+  assert.equal(sourceLabel("PPOMPPU"), "뽐뿌");
   assert.equal(sourceLabel("NEW"), "NEW");
 });
 

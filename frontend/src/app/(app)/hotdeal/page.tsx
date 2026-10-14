@@ -80,7 +80,7 @@ function HotdealFeed() {
     <div className="space-y-6">
       <div className="flex items-center justify-between gap-2">
         <h1 className="text-2xl font-bold">핫딜</h1>
-        <CrawlTriggerButton onClick={handleCrawl} loading={crawlLoading} label="알구더 수집" />
+        <CrawlTriggerButton onClick={handleCrawl} loading={crawlLoading} label="뽐뿌 수집" />
       </div>
 
       <HotdealProfileManager
