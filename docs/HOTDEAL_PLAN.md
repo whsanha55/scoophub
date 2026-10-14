@@ -40,7 +40,7 @@ Telegram은 추천 항목 전체를 전달하는 수단이 아니라,
 
 feedforge 고유 기능 중 새로 만드는 것:
 
-1. 핫딜 소스 수집 (알구더 → FM코리아·아카라이브)
+1. 핫딜 소스 수집 (뽐뿌 RSS, 확장 후보 클리앙)
 2. 관심도 프로필 → 스코어링 → 추천 피드 → 피드백 → 가중치 학습 → 재평가
 
 ## 2. 서비스 범위
@@ -88,7 +88,7 @@ Vite SPA, 정적 Bearer 인증은 쓰지 않는다.
 │                scoophub backend                      │
 │                                                      │
 │  CrawlRunner (crawl_config 스케줄)                    │
-│    └─ 핫딜 Crawler (zod, fmkorea, arca)              │
+│    └─ 핫딜 Crawler (ppomppu, zod 중지)               │
 │       → hotdeal_item 저장 / 최신 메타데이터 갱신       │
 │       → 추천 평가 트리거                               │
 │                                                      │
@@ -123,19 +123,27 @@ Vite SPA, 정적 Bearer 인증은 쓰지 않는다.
 
 ## 5. 수집 소스
 
-| 소스 | 주소 / 방식 | 주요 수집 필드 | 단계 |
+| 소스 | 주소 / 방식 | 주요 수집 필드 | 상태 |
 |---|---|---|---|
-| 알구더 | zod.kr/deal | 제목·몰·가격·배송비·추천수 | M1 |
-| FM코리아 | fmkorea.com/hotdeal | 제목·가격·배송비·추천수 | M5 |
-| 아카라이브 | arca.live/b/hotdeal | 카테고리·제목·가격·추천수 | M5 |
+| 뽐뿌 | 공식 RSS `rss.php?id=ppomppu` | 몰·상품명·가격·배송(제목에서 분리)·추천수·게시 시각 | M1, 15분 주기 |
+| 알구더 | zod.kr/deal HTML | 제목·몰·가격·배송비·추천수 | 구현했지만 중지 (Cloudflare 403) |
+| 클리앙 알뜰구매 | clien.net/service/board/jirum HTML | 미정 | 확장 후보 (robots.txt 허용) |
 
-핫딜 3개 소스는 정적 HTML 파싱 검증을 마쳤다.
-저장된 HTML fixture로 파서 회귀 테스트를 구성한다.
+2026-10-14 확인 결과 (feedforge 계획의 소스 재검토):
+
+- 알구더: Cloudflare 봇 차단으로 403. 수집기와 파서는 남겨 두고 스케줄만 껐다 (V42).
+- FM코리아: HTTP 200 이지만 robots.txt 가 일반 봇에 `/hotdeal` 을 금지한다. 수집하지 않는다.
+- 아카라이브·퀘이사존: 403.
+- 뽐뿌: 공식 RSS 를 robots.txt 가 막지 않는다. RSS 는 최근 15건만 주므로 15분 주기로 수집한다.
+  `hits` 는 `[댓글|조회|추천|비추천]` 으로 보고 세 번째 값을 추천수로 쓴다 (관찰 기반 가정).
+
+소스는 robots.txt 와 이용 정책을 먼저 확인하고, 막혀 있으면 우회하지 않는다 (13절).
+저장된 HTML·RSS fixture 로 파서 회귀 테스트를 구성한다.
 
 GitHub trending, Hacker News, 테크 뉴스는 scoophub가 이미 수집한다.
 이 데이터에 개인화 점수를 적용할지는 M5에서 검토한다. 적용하더라도 새로 수집하지 않는다.
 
-확장 후순위: 뽐뿌, 클리앙, 쿨엔조이.
+확장 후순위: 클리앙, 쿨엔조이.
 
 ## 6. 웹 화면
 
@@ -160,7 +168,7 @@ scoophub 프런트엔드에 `app/(app)/hotdeal`과 `domains/hotdeal`로 추가�
 
 ```
 WD SN850X 2TB — 149,000원
-알구더 · 무료배송 · 20분 전
+뽐뿌 · G마켓 · 배송 무료 · 20분 전
 추천 이유: SSD, 저장장치 관심
 [원문 보기] [👍 관심 있음] [👎 관심 없음]
 ```
@@ -205,7 +213,7 @@ v1에서는 별도 북마크를 만들지 않는다.
 -- 수집 원본
 hotdeal_item (
   id,
-  source,                 -- ZOD | FMKOREA | ARCA
+  source,                 -- PPOMPPU | ZOD
   provider,               -- 실제 공급자 구분 (없으면 source와 같은 값)
   source_key,
   category,
@@ -474,7 +482,7 @@ scoophub `DataRetentionJob`(90일)에 핫딜 테이블을 포함할지는 M6에�
 com.scoophub
 ├── hotdeal/
 │   ├── HotdealController.kt
-│   ├── {Source}Crawler.kt      # Crawler 구현체 (zod, fmkorea, arca)
+│   ├── {Source}Crawler.kt      # Crawler 구현체 (ppomppu, zod)
 │   ├── dto/
 │   ├── entity/
 │   ├── repository/
@@ -502,17 +510,17 @@ frontend/src/
 
 ## 12. 마일스톤
 
-먼저 알구더 하나로 수집 → 추천 → 웹 피드백을 끝까지 검증한다.
+먼저 뽐뿌 하나로 수집 → 추천 → 웹 피드백을 끝까지 검증한다.
 체크리스트는 에픽 #271에서 관리한다.
 
 | 단계 | 내용 | 완료 기준 |
 |---|---|---|
 | M0 | 계획 문서 이관 (이 문서) | — |
-| M1 | 알구더 수집·원본 갱신·스코어링·피드 API | 중복 없이 수집되고 추천 근거 확인 가능 |
+| M1 | 뽐뿌 수집·원본 갱신·스코어링·피드 API | 중복 없이 수집되고 추천 근거 확인 가능 |
 | M2 | 웹 피드·좋아요/싫어요/취소·학습·관심 키워드 추가(온보딩)·재평가 | 모바일에서 피드백 가능, 이후 점수에 반영 |
 | M3 | 좋아요 목록·관심도 설정·LLM 관련성·제외 판정 | 판정 결과 확인·카테고리 가중치·학습값 초기화 가능 |
 | M4 | `NotifyRouter` 연동 Telegram 선택적 알림 | 상한·조용한 시간·중복 방지·실패 정책 검증 |
-| M5 | FM코리아·아카라이브, 기존 GitHub·HN 개인화 검토 | 소스별 수집·추천 정상 동작 |
+| M5 | 클리앙 등 정책상 허용된 소스 추가, 기존 GitHub·HN 개인화 검토 | 소스별 수집·추천 정상 동작 |
 | M6 | 통계·운영 개선·보존 정책 | 추천량·피드백률·수집 실패 상태 확인 |
 
 M1에서는 실제 알림을 보내지 않는 관찰 모드로
@@ -571,6 +579,8 @@ feedforge에서 M1까지 구현한 코드(`main` 2d87eff)를 이관 원본으로
 
 - feedforge를 scoophub로 합친다 (#271)
 - 저장 구조: `crawl_data`가 아닌 전용 테이블, 이름은 `hotdeal_` 접두어
+- 첫 소스: 뽐뿌 RSS (알구더 차단, FM코리아 robots.txt 금지로 교체)
+- 학습 폭 ±0.5, 유효 가중치 0~5, 웹 추가 키워드 기본 seed_weight 3.0 (관찰 후 조정)
 - M1 관찰 모드: 핫딜 크롤은 기존 크롤 완료 알림(`CrawlNotifyDispatcher`)에서 제외
 - 인증: scoophub Google OAuth + `@SuperOnly` (feedforge 정적 Bearer 인증 폐기)
 - 프런트엔드: scoophub Next.js (feedforge Vite SPA 폐기)
@@ -584,7 +594,7 @@ feedforge에서 M1까지 구현한 코드(`main` 2d87eff)를 이관 원본으로
 
 첫 검증 목표는 소스 개수가 아니라 추천의 유용성이다.
 
-> 알구더 하나만 연결해도 사용자가 며칠 동안 웹 피드를 계속 확인하고,
+> 뽐뿌 하나만 연결해도 사용자가 며칠 동안 웹 피드를 계속 확인하고,
 > 추천이 자신의 관심에 맞는다고 느끼는가?
 
 확인할 지표:
