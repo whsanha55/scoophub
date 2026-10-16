@@ -11,12 +11,22 @@ export interface RoomMoveEntry {
   notation: string;
 }
 
+export interface ChatEntry {
+  nickname: string;
+  text: string;
+  fromPlayer: boolean;
+  system: boolean;
+}
+
 export interface RoomSnapshot {
   phase: "waiting" | "playing" | "finished";
   gameId: string;
   timeRule: TimeRule;
   players: { white: string | null; black: string | null };
   youAre: "white" | "black" | null;
+  role: "player" | "spectator";
+  spectators: string[];
+  chat: ChatEntry[];
   turn: "white" | "black";
   moves: RoomMoveEntry[];
   clocks: { white: PlayerClock; black: PlayerClock };
@@ -27,6 +37,7 @@ export interface RoomSnapshot {
 export type RoomMessage =
   | { type: "room"; payload: RoomSnapshot }
   | { type: "move"; payload: { move: RoomMoveEntry; turn: "white" | "black" } }
+  | { type: "chat"; payload: ChatEntry }
   | { type: "game_end"; payload: { winner: string | null; reason: string } }
   | { type: "error"; payload: { message: string } }
   | { type: "pong"; payload: Record<string, never> };
@@ -62,6 +73,9 @@ function mapSnapshot(raw: Record<string, unknown>): RoomSnapshot {
     },
     players: { white: playersRaw.white ?? null, black: playersRaw.black ?? null },
     youAre: (raw.you_are as RoomSnapshot["youAre"]) ?? null,
+    role: (raw.role as RoomSnapshot["role"]) ?? "spectator",
+    spectators: (raw.spectators as string[]) ?? [],
+    chat: (raw.chat as ChatEntry[]) ?? [],
     turn: raw.turn as RoomSnapshot["turn"],
     moves: (raw.moves as RoomMoveEntry[]) ?? [],
     clocks: {

@@ -1,5 +1,6 @@
 package com.scoophub.game.service
 
+import com.scoophub.game.domain.ChatEntry
 import com.scoophub.game.domain.GameRoom
 import com.scoophub.game.domain.RoomMove
 import com.scoophub.game.domain.RoomPhase
@@ -34,6 +35,7 @@ sealed class RoomEvent {
     data class StateChanged(override val room: GameRoom) : RoomEvent()
     data class Moved(override val room: GameRoom, val move: RoomMove) : RoomEvent()
     data class Ended(override val room: GameRoom, val result: RoomResult) : RoomEvent()
+    data class Chatted(override val room: GameRoom, val entry: ChatEntry) : RoomEvent()
 }
 
 /** 남용 방지 한도. local 프로파일에서는 끈다(ADR-0002). */
@@ -159,20 +161,40 @@ class GameRoomService(private val clock: Clock, private val limiter: AbuseLimite
         return RoomLookup.Found(room)
     }
 
-    fun join(code: String, guestId: String, nickname: String): Side? {
+    fun join(code: String, guestId: String, nickname: String): com.scoophub.game.domain.JoinResult {
         val room = rooms[code] ?: throw RoomNotFoundException()
         val now = clock.instant()
-        val side = room.join(guestId, nickname, now) ?: return null
+        val result = room.join(guestId, nickname, now)
+        if (!result.allowed) return result
+        room.addSystemChat("$nickname 입장", now)
         // 대국이 시작되면 시계 기준점을 잡는다.
-        if (room.phase == com.scoophub.game.domain.RoomPhase.PLAYING) {
+        if (room.phase == RoomPhase.PLAYING) {
             lastClockTick.putIfAbsent(code, now)
         }
         eventListener?.invoke(RoomEvent.StateChanged(room))
-        return side
+        return result
+    }
+
+    fun chat(room: GameRoom, guestId: String, text: String): ChatEntry? {
+        val entry = room.addChat(guestId, text, clock.instant()) ?: return null
+        eventListener?.invoke(RoomEvent.Chatted(room, entry))
+        return entry
+    }
+
+    /** 관전자 퇴장 처리와 알림. 대국자는 재접속을 위해 방에 남는다. */
+    fun disconnect(room: GameRoom, guestId: String) {
+        seen(room, guestId)
+        val now = clock.instant()
+        room.removeSpectator(guestId)?.let {
+            room.addSystemChat("${it.nickname} 퇴장", now)
+            eventListener?.invoke(RoomEvent.StateChanged(room))
+        }
     }
 
     fun seen(room: GameRoom, guestId: String) {
-        room.playerOf(guestId)?.let { it.lastSeen = clock.instant() }
+        val now = clock.instant()
+        room.playerOf(guestId)?.let { it.lastSeen = now }
+        room.spectatorOf(guestId)?.let { it.lastSeen = now }
     }
 
     fun addMove(room: GameRoom, guestId: String, from: String, to: String, notation: String): RoomMove? {
