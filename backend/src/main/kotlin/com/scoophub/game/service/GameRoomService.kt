@@ -131,6 +131,7 @@ class GameRoomService(private val clock: Clock, private val limiter: AbuseLimite
         guestId: String,
         nickname: String,
         ip: String,
+        requiresSetup: Boolean = false,
     ): GameRoom {
         val now = clock.instant()
         if (rooms.size >= DefaultAbuseLimiter.TOTAL_ROOM_LIMIT) {
@@ -142,6 +143,7 @@ class GameRoomService(private val clock: Clock, private val limiter: AbuseLimite
             gameId = gameId,
             timeRule = timeRule,
             hostPreference = preference,
+            requiresSetup = requiresSetup,
             createdAt = now,
         )
         rooms[room.code] = room
@@ -214,6 +216,16 @@ class GameRoomService(private val clock: Clock, private val limiter: AbuseLimite
         return move
     }
 
+    /** 시작 전 준비(장기 상차림) 제출. */
+    fun submitSetup(room: GameRoom, guestId: String, pattern: String): Boolean {
+        val accepted = room.submitSetup(guestId, pattern, clock.instant())
+        if (accepted && room.phase == RoomPhase.PLAYING) {
+            lastClockTick.putIfAbsent(room.code, clock.instant())
+        }
+        eventListener?.invoke(RoomEvent.StateChanged(room))
+        return accepted
+    }
+
     /** 재대국. 두 대국자 모두 동의하면 시작된다. 시작되면 true. */
     fun requestRematch(room: GameRoom, guestId: String): Boolean {
         val started = room.requestRematch(guestId, clock.instant())
@@ -241,6 +253,13 @@ class GameRoomService(private val clock: Clock, private val limiter: AbuseLimite
             room.addSystemChat("$nickname 나감", now)
             eventListener?.invoke(RoomEvent.StateChanged(room))
         }
+    }
+
+    /** 클라이언트가 판정한 결과(외통수·빅장·200수)로 대국 종료. */
+    fun finishWith(room: GameRoom, guestId: String, winner: Side?, reason: String): RoomResult? {
+        val result = room.finishWith(guestId, winner, reason, clock.instant()) ?: return null
+        eventListener?.invoke(RoomEvent.Ended(room, result))
+        return result
     }
 
     fun resign(room: GameRoom, guestId: String): RoomResult? {

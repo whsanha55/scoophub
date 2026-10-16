@@ -5,22 +5,42 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { ensureGuestId, ensureNickname } from "@/domains/game/lib/guest";
 import { createRoom } from "@/domains/game/lib/room-client";
-import { CHESS_DEFAULT_RULE } from "@/domains/game/lib/time-control";
+import { CHESS_DEFAULT_RULE, JANGGI_DEFAULT_RULE } from "@/domains/game/lib/time-control";
 
-const SIDES = [
-  { value: "random", label: "무작위" },
-  { value: "white", label: "백" },
-  { value: "black", label: "흑" },
+const GAMES = [
+  { id: "chess", label: "체스", sides: [
+    { value: "random", label: "무작위" },
+    { value: "white", label: "백" },
+    { value: "black", label: "흑" },
+  ] },
+  { id: "janggi", label: "장기", sides: [
+    { value: "random", label: "무작위" },
+    { value: "white", label: "초" },
+    { value: "black", label: "한" },
+  ] },
 ] as const;
+
+type GameId = (typeof GAMES)[number]["id"];
 
 export default function NewRoomPage() {
   const router = useRouter();
+  const [gameId, setGameId] = useState<GameId>("chess");
   const [baseMin, setBaseMin] = useState(CHESS_DEFAULT_RULE.baseMs / 60_000);
   const [byoSec, setByoSec] = useState(CHESS_DEFAULT_RULE.byoYomiMs / 1000);
   const [byoCount, setByoCount] = useState(CHESS_DEFAULT_RULE.byoYomiCount);
-  const [side, setSide] = useState<(typeof SIDES)[number]["value"]>("random");
+  const [side, setSide] = useState<string>("random");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const game = GAMES.find((g) => g.id === gameId)!;
+
+  const switchGame = (id: GameId) => {
+    setGameId(id);
+    const rule = id === "janggi" ? JANGGI_DEFAULT_RULE : CHESS_DEFAULT_RULE;
+    setBaseMin(rule.baseMs / 60_000);
+    setByoSec(rule.byoYomiMs / 1000);
+    setByoCount(rule.byoYomiCount);
+    setSide("random");
+  };
 
   const create = async () => {
     setBusy(true);
@@ -30,13 +50,14 @@ export default function NewRoomPage() {
       const nickname = await ensureNickname();
       const code = await createRoom(
         {
-          gameId: "chess",
+          gameId,
           timeRule: {
             baseMs: baseMin * 60_000,
             byoYomiMs: byoSec * 1000,
             byoYomiCount: byoSec > 0 ? byoCount : 0,
           },
-          sidePreference: side,
+          sidePreference: side as "white" | "black" | "random",
+          requiresSetup: gameId === "janggi",
         },
         guestId,
         nickname,
@@ -68,11 +89,19 @@ export default function NewRoomPage() {
 
   return (
     <div className="mx-auto flex w-full max-w-sm flex-col gap-4">
-      <h1 className="text-2xl font-bold">체스 · 초대 대국 만들기</h1>
+      <h1 className="text-2xl font-bold">초대 대국 만들기</h1>
       <div className="flex flex-col gap-4 rounded-xl border bg-card p-5">
+        <h2 className="font-semibold">게임</h2>
+        <div className="flex gap-1">
+          {GAMES.map((g) => (
+            <Button key={g.id} variant={gameId === g.id ? "default" : "outline"} size="sm" onClick={() => switchGame(g.id)}>
+              {g.label}
+            </Button>
+          ))}
+        </div>
         <h2 className="font-semibold">내 진영</h2>
         <div className="flex gap-1">
-          {SIDES.map((s) => (
+          {game.sides.map((s) => (
             <Button key={s.value} variant={side === s.value ? "default" : "outline"} size="sm" onClick={() => setSide(s.value)}>
               {s.label}
             </Button>

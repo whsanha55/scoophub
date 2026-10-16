@@ -406,4 +406,63 @@ class GameRoomServiceTest {
             .isEqualTo(5 * 60_000)
         assertThat(room.clockSnapshot().getValue(Side.WHITE).byoYomiLeft).isEqualTo(3)
     }
+
+    @Test
+    fun `상차림 방 - 두 대국자 모두 제출하면 시작된다`() {
+        val room = service.createRoom(
+            "janggi",
+            TimeRule(300_000, 30_000, 3),
+            SidePreference.WHITE,
+            "h",
+            "초",
+            "1.1.1.1",
+            requiresSetup = true,
+        )
+        assertThat(room.phase).isEqualTo(RoomPhase.WAITING)
+        service.join(room.code, "g2", "한")
+        assertThat(room.phase).isEqualTo(RoomPhase.SETUP)
+        // 시작 전에는 수를 둘 수 없다
+        assertThat(service.addMove(room, "h", "9,1", "7,2", "마")).isNull()
+        assertThat(service.submitSetup(room, "h", "마상마상")).isTrue()
+        assertThat(room.phase).isEqualTo(RoomPhase.SETUP)
+        assertThat(service.submitSetup(room, "g2", "상마상마")).isTrue()
+        assertThat(room.phase).isEqualTo(RoomPhase.PLAYING)
+        assertThat(room.setupSnapshot()[Side.WHITE]).isEqualTo("마상마상")
+        assertThat(room.setupSnapshot()[Side.BLACK]).isEqualTo("상마상마")
+    }
+
+    @Test
+    fun `상차림 방 재대국 - 진영 교대 후 상차림을 다시 고른다`() {
+        val room = service.createRoom(
+            "janggi",
+            TimeRule(300_000, 30_000, 3),
+            SidePreference.WHITE,
+            "h",
+            "초",
+            "1.1.1.1",
+            requiresSetup = true,
+        )
+        service.join(room.code, "g2", "한")
+        service.submitSetup(room, "h", "마상마상")
+        service.submitSetup(room, "g2", "상마상마")
+        service.resign(room, "h")
+        service.requestRematch(room, "h")
+        service.requestRematch(room, "g2")
+        // 재대국 합의 → SETUP 단계, 진영은 교대
+        assertThat(room.phase).isEqualTo(RoomPhase.SETUP)
+        assertThat(room.sideOf("h")).isEqualTo(Side.BLACK)
+        assertThat(room.setupSnapshot()).isEmpty()
+        service.submitSetup(room, "h", "마상상마")
+        service.submitSetup(room, "g2", "상마마상")
+        assertThat(room.phase).isEqualTo(RoomPhase.PLAYING)
+        assertThat(room.setupSnapshot()[Side.WHITE]).isEqualTo("상마마상")
+    }
+
+    @Test
+    fun `상차림 없는 방은 두 명이 모이면 바로 시작된다`() {
+        val room = makeRoom()
+        service.join(room.code, "g2", "상대")
+        assertThat(room.phase).isEqualTo(RoomPhase.PLAYING)
+        assertThat(service.submitSetup(room, "host", "마상마상")).isFalse()
+    }
 }
