@@ -15,6 +15,7 @@ import {
   Play,
   Mail,
   Telescope,
+  Gamepad2,
   ChevronRight,
 } from "lucide-react";
 import {
@@ -53,6 +54,7 @@ const navItems = [
   { title: "뉴스", href: "/news", icon: Newspaper },
   { title: "주식", href: "/stock", icon: TrendingUp },
   { title: "날씨", href: "/weather", icon: Cloud },
+  { title: "게임", href: "/game", icon: Gamepad2 },
   { title: "시스템 관리", href: "/system", icon: Wrench },
 ];
 
