@@ -17,6 +17,8 @@ import {
   type TimeRule,
 } from "../../lib/time-control";
 import { janggiEngine, SETUP_PATTERNS, type JanggiState } from "../engine";
+import { RecordActions } from "../../components/record-actions";
+import { janggiRecordCodec } from "../../lib/record";
 import { JanggiBoard } from "./janggi-board";
 
 const ROTATE_KEY = "game.board.rotate";
@@ -360,6 +362,21 @@ export function SameScreenJanggiGame() {
                   설정 바꾸기
                 </Button>
               </div>
+              <RecordActions
+                record={{
+                  game: "janggi",
+                  moves: history,
+                  result: result?.winner
+                    ? result.winner === "white"
+                      ? "cho"
+                      : "han"
+                    : result
+                      ? "none"
+                      : undefined,
+                  setup: { cho: choSetup, han: hanSetup },
+                }}
+                codec={janggiRecordCodec}
+              />
             </div>
           )}
         </>
