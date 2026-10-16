@@ -1,0 +1,100 @@
+"use client";
+
+import type { PieceInfo } from "../../lib/board-game";
+
+const FILES = ["a", "b", "c", "d", "e", "f", "g", "h"];
+
+const PIECE_GLYPH: Record<string, string> = {
+  k: "♚",
+  q: "♛",
+  r: "♜",
+  b: "♝",
+  n: "♞",
+  p: "♟",
+};
+
+export interface ChessBoardProps {
+  pieces: Map<string, PieceInfo>;
+  /** 아래에 보일 진영 */
+  orientation: "white" | "black";
+  /**
+   * true면 보드 전체를 기물까지 180도 돌린다(같은 화면 판 회전).
+   * false면 칸 순서만 뒤집어 기물은 바로 선다(초대 대국).
+   */
+  rotatePieces?: boolean;
+  selected: string | null;
+  targets: string[];
+  lastMove: { from: string; to: string } | null;
+  /** 체크 걸린 왕의 칸 */
+  checkSquare: string | null;
+  onSquareTap: (square: string) => void;
+}
+
+export function ChessBoard({
+  pieces,
+  orientation,
+  rotatePieces = false,
+  selected,
+  targets,
+  lastMove,
+  checkSquare,
+  onSquareTap,
+}: ChessBoardProps) {
+  const flipped = orientation === "black";
+  const ranks = flipped && !rotatePieces ? [1, 2, 3, 4, 5, 6, 7, 8] : [8, 7, 6, 5, 4, 3, 2, 1];
+  const files = flipped && !rotatePieces ? [...FILES].reverse() : FILES;
+
+  return (
+    <div
+      className={`grid aspect-square w-full grid-cols-8 overflow-hidden rounded-lg border-2 border-border shadow-sm ${
+        flipped && rotatePieces ? "rotate-180" : ""
+      }`}
+    >
+      {ranks.map((rank) =>
+        files.map((file) => {
+          const square = `${file}${rank}`;
+          const isDark = (FILES.indexOf(file) + rank) % 2 === 0;
+          const piece = pieces.get(square);
+          const isSelected = selected === square;
+          const isTarget = targets.includes(square);
+          const isLast = lastMove && (lastMove.from === square || lastMove.to === square);
+          const isCheck = checkSquare === square;
+          return (
+            <button
+              key={square}
+              type="button"
+              aria-label={`${square}${piece ? ` ${piece.side} ${piece.type}` : ""}`}
+              className={`relative flex touch-manipulation items-center justify-center ${
+                isDark ? "bg-[#b58863]" : "bg-[#f0d9b5]"
+              } ${isSelected ? "outline-2 -outline-offset-2 outline-sky-500" : ""} ${
+                isLast ? "before:absolute before:inset-0 before:bg-yellow-300/40" : ""
+              } ${isCheck ? "before:absolute before:inset-0 before:bg-red-500/50" : ""}`}
+              onPointerDown={(e) => {
+                e.preventDefault();
+                onSquareTap(square);
+              }}
+            >
+              {piece && (
+                <span
+                  className={`relative z-10 select-none text-[min(7.5vw,2.6rem)] leading-none sm:text-4xl ${
+                    piece.side === "white"
+                      ? "text-white [-webkit-text-stroke:1px_#1c1917] drop-shadow-[0_1px_1px_rgba(0,0,0,0.4)]"
+                      : "text-neutral-900 drop-shadow-[0_1px_1px_rgba(255,255,255,0.25)]"
+                  }`}
+                >
+                  {PIECE_GLYPH[piece.type]}
+                </span>
+              )}
+              {isTarget && !piece && (
+                <span className="relative z-10 h-1/4 w-1/4 rounded-full bg-neutral-800/35" />
+              )}
+              {isTarget && piece && (
+                <span className="absolute inset-0 z-0 rounded-sm ring-4 ring-inset ring-emerald-600/60" />
+              )}
+            </button>
+          );
+        }),
+      )}
+    </div>
+  );
+}
