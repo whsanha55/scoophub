@@ -12,9 +12,10 @@ interface AbuseLimiter {
     /** 초대코드 시도를 기록하고, 한도를 넘었으면 사유를 돌려준다. */
     fun findCodeAttemptBlockReason(ip: String): String?
 
-    fun onRoomCreated(code: String, guestId: String, ip: String)
+    /** [roomKey] 는 게임 종류와 초대코드를 묶은 방 저장소 키다. */
+    fun onRoomCreated(roomKey: String, guestId: String, ip: String)
 
-    fun onRoomClosed(code: String)
+    fun onRoomClosed(roomKey: String)
 }
 
 class NoopAbuseLimiter : AbuseLimiter {
@@ -22,9 +23,9 @@ class NoopAbuseLimiter : AbuseLimiter {
 
     override fun findCodeAttemptBlockReason(ip: String): String? = null
 
-    override fun onRoomCreated(code: String, guestId: String, ip: String) = Unit
+    override fun onRoomCreated(roomKey: String, guestId: String, ip: String) = Unit
 
-    override fun onRoomClosed(code: String) = Unit
+    override fun onRoomClosed(roomKey: String) = Unit
 }
 
 class DefaultAbuseLimiter(private val clock: Clock) : AbuseLimiter {
@@ -52,12 +53,12 @@ class DefaultAbuseLimiter(private val clock: Clock) : AbuseLimiter {
         return null
     }
 
-    override fun onRoomCreated(code: String, guestId: String, ip: String) {
-        owners[code] = RoomOwner(guestId = guestId, ip = ip)
+    override fun onRoomCreated(roomKey: String, guestId: String, ip: String) {
+        owners[roomKey] = RoomOwner(guestId = guestId, ip = ip)
     }
 
-    override fun onRoomClosed(code: String) {
-        owners.remove(code)
+    override fun onRoomClosed(roomKey: String) {
+        owners.remove(roomKey)
     }
 
     companion object {

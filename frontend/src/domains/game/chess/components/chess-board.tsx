@@ -17,11 +17,6 @@ export interface ChessBoardProps {
   pieces: Map<string, PieceInfo>;
   /** 아래에 보일 진영 */
   orientation: "white" | "black";
-  /**
-   * true면 보드 전체를 기물까지 180도 돌린다(같은 화면 판 회전).
-   * false면 칸 순서만 뒤집어 기물은 바로 선다(초대 대국).
-   */
-  rotatePieces?: boolean;
   selected: string | null;
   targets: string[];
   lastMove: { from: string; to: string } | null;
@@ -33,7 +28,6 @@ export interface ChessBoardProps {
 export function ChessBoard({
   pieces,
   orientation,
-  rotatePieces = false,
   selected,
   targets,
   lastMove,
@@ -41,14 +35,13 @@ export function ChessBoard({
   onSquareTap,
 }: ChessBoardProps) {
   const flipped = orientation === "black";
-  const ranks = flipped && !rotatePieces ? [1, 2, 3, 4, 5, 6, 7, 8] : [8, 7, 6, 5, 4, 3, 2, 1];
-  const files = flipped && !rotatePieces ? [...FILES].reverse() : FILES;
+  // 칸 순서만 뒤집어 기물은 늘 바로 선다
+  const ranks = flipped ? [1, 2, 3, 4, 5, 6, 7, 8] : [8, 7, 6, 5, 4, 3, 2, 1];
+  const files = flipped ? [...FILES].reverse() : FILES;
 
   return (
     <div
-      className={`grid aspect-square w-full grid-cols-8 overflow-hidden rounded-lg border-2 border-border shadow-sm ${
-        flipped && rotatePieces ? "rotate-180" : ""
-      }`}
+      className="grid aspect-square w-full grid-cols-8 grid-rows-8 overflow-hidden rounded-lg border-2 border-border shadow-sm"
     >
       {ranks.map((rank) =>
         files.map((file) => {

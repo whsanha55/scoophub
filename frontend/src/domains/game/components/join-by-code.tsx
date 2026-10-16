@@ -4,9 +4,10 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { checkRoom } from "@/domains/game/lib/room-client";
+import { checkRoom } from "../lib/room-client";
 
-export default function JoinRoomPage() {
+/** 그 게임의 초대코드로 방에 들어간다. 초대코드는 게임마다 따로다. */
+export function JoinByCode({ gameId }: { gameId: string }) {
   const router = useRouter();
   const [code, setCode] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -21,13 +22,13 @@ export default function JoinRoomPage() {
     setBusy(true);
     setError(null);
     try {
-      const summary = await checkRoom(trimmed);
+      const summary = await checkRoom(gameId, trimmed);
       if (!summary.exists) {
         setError("없는 초대코드다");
         setBusy(false);
         return;
       }
-      router.push(`/game/room/${trimmed}`);
+      router.push(`/game/room/${gameId}/${trimmed}`);
     } catch (e) {
       setError(e instanceof Error ? e.message : "입장하지 못했다");
       setBusy(false);
@@ -35,9 +36,14 @@ export default function JoinRoomPage() {
   };
 
   return (
-    <div className="mx-auto flex w-full max-w-sm flex-col gap-4">
-      <h1 className="text-2xl font-bold">초대코드로 입장</h1>
-      <div className="flex flex-col gap-4 rounded-xl border bg-card p-5">
+    <div className="flex flex-col gap-3 rounded-xl border bg-card p-4">
+      <div className="flex items-center gap-2">
+        <span className="text-2xl" aria-hidden>
+          🔑
+        </span>
+        <span className="font-semibold">초대코드로 입장</span>
+      </div>
+      <div className="flex gap-2">
         <Input
           inputMode="numeric"
           pattern="\d*"
@@ -49,14 +55,14 @@ export default function JoinRoomPage() {
           onKeyDown={(e) => {
             if (e.key === "Enter") join();
           }}
-          className="text-center text-2xl font-bold tracking-[0.3em]"
+          className="text-center text-lg font-bold tracking-[0.3em]"
         />
-        {error && <p className="text-sm text-destructive">{error}</p>}
         <Button onClick={join} disabled={busy}>
           {busy ? "확인 중…" : "입장"}
         </Button>
-        <p className="text-sm text-muted-foreground">공유받은 주소로 열었다면 코드 입력 없이 바로 들어간다.</p>
       </div>
+      {error && <p className="text-sm text-destructive">{error}</p>}
+      <p className="text-sm text-muted-foreground">공유받은 주소로 열었다면 코드 입력 없이 바로 들어간다.</p>
     </div>
   );
 }
