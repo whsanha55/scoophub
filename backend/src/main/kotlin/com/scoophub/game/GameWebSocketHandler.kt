@@ -1,27 +1,25 @@
 package com.scoophub.game
 
-import com.scoophub.game.domain.ChatEntry
-import com.scoophub.game.domain.GameRoom
-import com.scoophub.game.domain.RoomMove
-import com.scoophub.game.domain.RoomPhase
-import com.scoophub.game.domain.RoomPlayer
-import com.scoophub.game.domain.RoomResult
-import com.scoophub.game.domain.Side
-import com.scoophub.game.domain.TimeRule
+import com.scoophub.game.enums.SideEnum
+import com.scoophub.game.service.GameRoom
 import com.scoophub.game.service.GameRoomService
 import com.scoophub.game.service.RoomEvent
-import com.scoophub.game.service.RoomLookup
-import com.scoophub.game.service.RoomNotFoundException
+import com.scoophub.game.vo.ChatEntry
+import com.scoophub.game.vo.RoomMove
+import com.scoophub.game.vo.RoomResult
 import io.github.oshai.kotlinlogging.KotlinLogging
+import org.springframework.context.event.EventListener
 import org.springframework.stereotype.Component
+import org.springframework.web.server.ResponseStatusException
 import org.springframework.web.socket.CloseStatus
 import org.springframework.web.socket.PingMessage
 import org.springframework.web.socket.TextMessage
+import org.springframework.web.socket.WebSocketMessage
 import org.springframework.web.socket.WebSocketSession
+import org.springframework.web.socket.handler.ConcurrentWebSocketSessionDecorator
 import org.springframework.web.socket.handler.TextWebSocketHandler
 import tools.jackson.databind.ObjectMapper
 import java.net.URI
-import java.nio.ByteBuffer
 import java.time.Clock
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.Executors
@@ -40,58 +38,66 @@ class GameWebSocketHandler(
     private val clock: Clock,
 ) : TextWebSocketHandler() {
 
-    /** code → (guestId → session). 같은 게스트의 재접속은 세션을 덮어쓴다. */
-    private val sessions = ConcurrentHashMap<String, MutableMap<String, WebSocketSession>>()
-    private val sessionGuest = ConcurrentHashMap<WebSocketSession, Pair<String, String>>() // session → (code, guestId)
+    /** 한 게스트의 연결. 요청·시계·ping 스레드가 함께 보내므로 전송은 decorator 로 직렬화한다. */
+    private data class Connection(val code: String, val guestId: String, val out: WebSocketSession)
+
+    /** 원본 세션 ID → 연결 */
+    private val connections = ConcurrentHashMap<String, Connection>()
+
+    /** 방 코드 → (게스트 → 연결). 같은 게스트가 다시 붙으면 새 연결로 바뀐다. */
+    private val roomConnections = ConcurrentHashMap<String, ConcurrentHashMap<String, Connection>>()
+
     private val pingScheduler = Executors.newSingleThreadScheduledExecutor { r ->
         Thread(r, "game-ws-ping").apply { isDaemon = true }
     }
 
     init {
-        gameRoomService.eventListener = ::broadcastEvent
         // Cloudflare가 유휴 WebSocket 을 끊지 않도록 주기적으로 ping 을 보낸다.
         pingScheduler.scheduleAtFixedRate({ sendPings() }, 20, 20, TimeUnit.SECONDS)
     }
 
     override fun afterConnectionEstablished(session: WebSocketSession) {
         val uri = session.uri ?: return session.close(CloseStatus.BAD_DATA)
-        val code = roomCode(uri) ?: return session.close(CloseStatus.BAD_DATA)
-        val guestId = queryParam(uri, "guest") ?: return session.close(CloseStatus.BAD_DATA)
-        val nickname = queryParam(uri, "nick")?.takeIf { it.isNotBlank() } ?: defaultNickname(guestId)
+        val code = findRoomCode(uri) ?: return session.close(CloseStatus.BAD_DATA)
+        val guestId = findQueryParam(uri, "guest") ?: return session.close(CloseStatus.BAD_DATA)
+        val nickname = findQueryParam(uri, "nick")?.takeIf { it.isNotBlank() } ?: defaultNickname(guestId)
+        val ip =
+            resolveClientIp(
+                session.handshakeHeaders.getFirst(CLIENT_IP_HEADER),
+                session.remoteAddress?.address?.hostAddress,
+            )
+        val out = ConcurrentWebSocketSessionDecorator(session, SEND_TIME_LIMIT_MS, SEND_BUFFER_LIMIT_BYTES)
 
-        val room = when (val lookup = gameRoomService.roomOf(code)) {
-            is RoomLookup.NotFound -> return session.close(CloseStatus.NOT_ACCEPTABLE)
-            is RoomLookup.Found -> lookup.room
-        }
-        val join = try {
-            val result = gameRoomService.join(code, guestId, nickname)
-            if (!result.allowed) {
-                send(session, mapOf("type" to "error", "payload" to mapOf("message" to "방 인원이 가득 찼습니다")))
-                return session.close(CloseStatus.NOT_ACCEPTABLE)
-            }
-            result
-        } catch (e: RoomNotFoundException) {
+        val room = try {
+            gameRoomService.findRoomToConnect(code, guestId, ip)
+        } catch (e: ResponseStatusException) {
+            sendError(out, e.reason ?: "지금은 들어갈 수 없습니다")
+            return session.close(CloseStatus.POLICY_VIOLATION)
+        } ?: return session.close(CloseStatus.NOT_ACCEPTABLE)
+
+        val join = gameRoomService.join(room, guestId, nickname)
+        if (!join.isAllowed) {
+            sendError(out, "방 인원이 가득 찼습니다")
             return session.close(CloseStatus.NOT_ACCEPTABLE)
         }
-        sessionGuest[session] = code to guestId
-        sessions.computeIfAbsent(code) { ConcurrentHashMap() }[guestId] = session
+        val connection = Connection(code = code, guestId = guestId, out = out)
+        connections[session.id] = connection
+        roomConnections.computeIfAbsent(code) { ConcurrentHashMap() }[guestId] = connection
         log.info { "game ws connected: room=$code guest=$guestId role=${join.role}" }
-        sendRoomState(room, guestId, session)
-        broadcastRoom(room)
+        sendRoomState(room, connection)
     }
 
     override fun handleTextMessage(session: WebSocketSession, message: TextMessage) {
-        val (code, guestId) = sessionGuest[session] ?: return
-        val room = (gameRoomService.roomOf(code) as? RoomLookup.Found)?.room ?: return
-        gameRoomService.seen(room, guestId)
+        val connection = connections[session.id] ?: return
+        val room = gameRoomService.findRoom(connection.code) ?: return
+        val guestId = connection.guestId
         val parsed = try {
             objectMapper.readValue(message.payload, Map::class.java)
         } catch (e: Exception) {
+            log.debug { "game ws bad message: room=${connection.code} guest=$guestId error=${e.message}" }
             return
         }
-
-        @Suppress("UNCHECKED_CAST")
-        val payload = (parsed["payload"] as? Map<String, Any?>) ?: emptyMap<String, Any?>()
+        val payload = parsed["payload"] as? Map<*, *> ?: emptyMap<String, Any?>()
         when (parsed["type"]) {
             "move" -> {
                 val move = gameRoomService.addMove(
@@ -100,20 +106,17 @@ class GameWebSocketHandler(
                     from = payload["from"]?.toString() ?: return,
                     to = payload["to"]?.toString() ?: return,
                     notation = payload["notation"]?.toString() ?: "",
+                    matingMaterial = parseMatingMaterial(payload["mating_material"]),
                 )
-                if (move == null) {
-                    send(session, mapOf("type" to "error", "payload" to mapOf("message" to "지금은 둘 수 없습니다")))
-                }
+                if (move == null) sendError(connection.out, "지금은 둘 수 없습니다")
             }
 
             "resign" -> gameRoomService.resign(room, guestId)
 
             "finish" -> {
-                val winner = (payload["winner"] as? String)?.lowercase()
-                    ?.let { w -> Side.entries.firstOrNull { it.name.lowercase() == w } }
                 val reason = payload["reason"]?.toString() ?: return
-                if (gameRoomService.finishWith(room, guestId, winner, reason) == null) {
-                    send(session, mapOf("type" to "error", "payload" to mapOf("message" to "지금은 대국을 끝낼 수 없습니다")))
+                if (gameRoomService.finishWith(room, guestId, parseSide(payload["winner"]), reason) == null) {
+                    sendError(connection.out, "지금은 대국을 끝낼 수 없습니다")
                 }
             }
 
@@ -122,7 +125,7 @@ class GameWebSocketHandler(
             "setup" -> {
                 val pattern = payload["pattern"]?.toString() ?: return
                 if (!gameRoomService.submitSetup(room, guestId, pattern)) {
-                    send(session, mapOf("type" to "error", "payload" to mapOf("message" to "지금은 상차림을 고를 수 없습니다")))
+                    sendError(connection.out, "지금은 상차림을 고를 수 없습니다")
                 }
             }
 
@@ -132,99 +135,86 @@ class GameWebSocketHandler(
             }
 
             "time_rule" -> {
-                val rule = payload["rule"] as? Map<*, *>
-                if (rule != null) {
-                    val parsed = TimeRule(
-                        baseMs = (rule["base_ms"] as? Number)?.toLong() ?: 0,
-                        byoYomiMs = (rule["byo_yomi_ms"] as? Number)?.toLong() ?: 0,
-                        byoYomiCount = (rule["byo_yomi_count"] as? Number)?.toInt() ?: 0,
-                    )
-                    if (!gameRoomService.updateTimeRule(room, guestId, parsed)) {
-                        send(session, mapOf("type" to "error", "payload" to mapOf("message" to "지금은 시간 규칙을 바꿀 수 없습니다")))
-                    }
-                }
+                val rule = payload["rule"] as? Map<*, *> ?: return
+                val isChanged = gameRoomService.updateTimeRule(
+                    room = room,
+                    guestId = guestId,
+                    baseMs = (rule["base_ms"] as? Number)?.toLong() ?: 0,
+                    byoYomiMs = (rule["byo_yomi_ms"] as? Number)?.toLong() ?: 0,
+                    byoYomiCount = (rule["byo_yomi_count"] as? Number)?.toInt() ?: 0,
+                )
+                if (!isChanged) sendError(connection.out, "지금은 시간 규칙을 바꿀 수 없습니다")
             }
 
             "chat" -> {
                 val text = payload["text"]?.toString() ?: return
                 if (gameRoomService.chat(room, guestId, text) == null) {
-                    send(session, mapOf("type" to "error", "payload" to mapOf("message" to "메시지를 보낼 수 없습니다")))
+                    sendError(connection.out, "메시지를 보낼 수 없습니다")
                 }
             }
 
             "claim_abandon_win" -> {
                 if (gameRoomService.claimAbandonWin(room, guestId) == null) {
-                    send(session, mapOf("type" to "error", "payload" to mapOf("message" to "아직 승리 처리를 할 수 없습니다")))
+                    sendError(connection.out, "아직 승리 처리를 할 수 없습니다")
                 }
             }
 
-            "ping" -> send(session, mapOf("type" to "pong", "payload" to emptyMap<String, Any?>()))
+            "ping" -> send(connection.out, "pong", emptyMap<String, Any?>())
         }
     }
 
     override fun afterConnectionClosed(session: WebSocketSession, status: CloseStatus) {
-        val (code, guestId) = sessionGuest.remove(session) ?: return
-        sessions[code]?.remove(guestId)
-        (gameRoomService.roomOf(code) as? RoomLookup.Found)?.room?.let { room ->
-            gameRoomService.disconnect(room, guestId)
-        }
+        val connection = connections.remove(session.id) ?: return
+        // 같은 게스트가 이미 새 연결로 다시 붙었으면, 예전 연결이 닫힌 것은 끊김이 아니다
+        val isCurrent = roomConnections[connection.code]?.remove(connection.guestId, connection) == true
+        if (!isCurrent) return
+        gameRoomService.findRoom(connection.code)?.let { gameRoomService.disconnect(it, connection.guestId) }
     }
 
-    private fun broadcastEvent(event: RoomEvent) {
+    @EventListener
+    fun onRoomEvent(event: RoomEvent) {
+        val room = event.room
         when (event) {
-            is RoomEvent.StateChanged -> broadcastRoom(event.room)
+            is RoomEvent.StateChanged -> Unit
 
-            is RoomEvent.Moved -> {
-                broadcast(event.room, mapOf("type" to "move", "payload" to movePayload(event.room, event.move)))
-                broadcastRoom(event.room)
-            }
+            is RoomEvent.Moved -> broadcast(
+                room,
+                "move",
+                gameRoomService.locked(room) {
+                    movePayload(room, event.move)
+                },
+            )
 
-            is RoomEvent.Ended -> {
-                broadcast(event.room, mapOf("type" to "game_end", "payload" to resultPayload(event.result)))
-                broadcastRoom(event.room)
-            }
+            is RoomEvent.Ended -> broadcast(room, "game_end", resultPayload(event.result))
 
-            is RoomEvent.Chatted -> {
-                broadcast(event.room, mapOf("type" to "chat", "payload" to chatEntryPayload(event.entry)))
-            }
+            is RoomEvent.Chatted -> broadcast(room, "chat", chatEntryPayload(event.entry))
         }
+        if (event !is RoomEvent.Chatted) broadcastRoomState(room)
     }
 
-    private fun broadcastRoom(room: GameRoom) {
-        for ((guestId, session) in sessions[room.code] ?: emptyMap()) {
-            if (session.isOpen) sendRoomState(room, guestId, session)
-        }
+    private fun broadcastRoomState(room: GameRoom) {
+        roomConnections[room.code]?.values?.forEach { sendRoomState(room, it) }
     }
 
-    private fun broadcast(room: GameRoom, message: Map<String, Any?>) {
-        for ((_, session) in sessions[room.code] ?: emptyMap()) {
-            if (session.isOpen) send(session, message)
-        }
+    private fun broadcast(room: GameRoom, type: String, payload: Map<String, Any?>) {
+        roomConnections[room.code]?.values?.forEach { send(it.out, type, payload) }
     }
 
-    private fun sendRoomState(room: GameRoom, guestId: String, session: WebSocketSession) {
-        val payload = roomPayload(room, guestId)
-        send(session, mapOf("type" to "room", "payload" to payload))
+    private fun sendRoomState(room: GameRoom, connection: Connection) {
+        send(connection.out, "room", gameRoomService.locked(room) { roomPayload(room, connection.guestId) })
     }
 
     private fun roomPayload(room: GameRoom, guestId: String): Map<String, Any?> {
-        val youAre = room.sideOf(guestId)
+        val youAre = room.findSide(guestId)
         return mapOf(
-            "phase" to when (room.phase) {
-                RoomPhase.WAITING -> "waiting"
-                RoomPhase.SETUP -> "setup"
-                RoomPhase.PLAYING -> "playing"
-                RoomPhase.FINISHED -> "finished"
-            },
+            "phase" to room.phase.name.lowercase(),
             "game_id" to room.gameId,
             "time_rule" to mapOf(
                 "base_ms" to room.timeRule.baseMs,
                 "byo_yomi_ms" to room.timeRule.byoYomiMs,
                 "byo_yomi_count" to room.timeRule.byoYomiCount,
             ),
-            "players" to room.playersSnapshot().associate { player ->
-                player.side.name.lowercase() to player.nickname
-            },
+            "players" to room.playersSnapshot().associate { it.side.name.lowercase() to it.nickname },
             "you_are" to youAre?.name?.lowercase(),
             "role" to if (youAre != null) "player" else "spectator",
             "you_are_host" to (guestId == room.hostGuestId),
@@ -233,9 +223,7 @@ class GameWebSocketHandler(
             "turn" to room.turn().name.lowercase(),
             "moves" to room.movesSnapshot().map { movePayloadEntry(it) },
             "rematch_votes" to room.rematchVotesSnapshot(),
-            "setups" to room.setupSnapshot().entries.associate { (side, pattern) ->
-                side.name.lowercase() to pattern
-            },
+            "setups" to room.setupSnapshot().entries.associate { (side, pattern) -> side.name.lowercase() to pattern },
             "clocks" to clocksPayload(room),
             "result" to room.result?.let { resultPayload(it) },
             "server_now" to clock.instant().toEpochMilli(),
@@ -245,10 +233,10 @@ class GameWebSocketHandler(
     private fun clocksPayload(room: GameRoom): Map<String, Any?> = room.clockSnapshot().entries.associate { (side, c) ->
         side.name.lowercase() to mapOf(
             "base_left_ms" to c.baseLeftMs,
-            "in_byo_yomi" to c.inByoYomi,
+            "in_byo_yomi" to c.isInByoYomi,
             "byo_yomi_left_ms" to c.byoYomiLeftMs,
             "byo_yomi_left" to c.byoYomiLeft,
-            "flagged" to c.flagged,
+            "flagged" to c.isFlagged,
         )
     }
 
@@ -269,8 +257,8 @@ class GameWebSocketHandler(
     private fun chatEntryPayload(entry: ChatEntry): Map<String, Any?> = mapOf(
         "nickname" to entry.nickname,
         "text" to entry.text,
-        "from_player" to entry.fromPlayer,
-        "system" to entry.system,
+        "from_player" to entry.isFromPlayer,
+        "system" to entry.isSystem,
     )
 
     private fun resultPayload(result: RoomResult): Map<String, Any?> = mapOf(
@@ -278,35 +266,52 @@ class GameWebSocketHandler(
         "reason" to result.reason,
     )
 
-    private fun send(session: WebSocketSession, message: Map<String, Any?>) {
-        try {
-            if (session.isOpen) session.sendMessage(TextMessage(objectMapper.writeValueAsString(message)))
-        } catch (e: Exception) {
-            log.debug { "game ws send failed: ${e.message}" }
-        }
+    private fun parseSide(value: Any?): SideEnum? = SideEnum.entries.firstOrNull {
+        it.name.equals(value as? String, ignoreCase = true)
+    }
+
+    /** {"white": true, "black": false} 형태. 빠진 진영은 바꾸지 않는다. */
+    private fun parseMatingMaterial(value: Any?): Map<SideEnum, Boolean> {
+        val raw = value as? Map<*, *> ?: return emptyMap()
+        return raw.entries.mapNotNull { (side, hasMaterial) ->
+            val parsedSide = parseSide(side) ?: return@mapNotNull null
+            (hasMaterial as? Boolean)?.let { parsedSide to it }
+        }.toMap()
+    }
+
+    private fun sendError(out: WebSocketSession, message: String) = send(out, "error", mapOf("message" to message))
+
+    private fun send(out: WebSocketSession, type: String, payload: Map<String, Any?>) {
+        sendRaw(out, TextMessage(objectMapper.writeValueAsString(mapOf("type" to type, "payload" to payload))))
     }
 
     private fun sendPings() {
-        for (map in sessions.values) {
-            for (session in map.values) {
-                try {
-                    if (session.isOpen) session.sendMessage(PingMessage(ByteBuffer.wrap(ByteArray(0))))
-                } catch (e: Exception) {
-                    // 닫힌 세션은 무시한다
-                }
-            }
+        connections.values.forEach { sendRaw(it.out, PingMessage()) }
+    }
+
+    private fun sendRaw(out: WebSocketSession, message: WebSocketMessage<*>) {
+        if (!out.isOpen) return
+        try {
+            out.sendMessage(message)
+        } catch (e: Exception) {
+            log.debug { "game ws send failed: session=${out.id} error=${e.message}" }
         }
     }
 
-    private fun roomCode(uri: URI): String? {
+    private fun findRoomCode(uri: URI): String? {
         val segments = uri.path.split("/").filter { it.isNotBlank() }
         return segments.lastOrNull()?.takeIf { segments.contains("game") }
     }
 
-    private fun queryParam(uri: URI, key: String): String? = uri.query?.split("&")
+    private fun findQueryParam(uri: URI, key: String): String? = uri.query?.split("&")
         ?.map { it.split("=", limit = 2) }
         ?.firstOrNull { it.first() == key }
         ?.getOrNull(1)
 
     private fun defaultNickname(guestId: String): String = "게스트" + guestId.takeLast(4)
+
+    companion object {
+        private const val SEND_TIME_LIMIT_MS = 5_000
+        private const val SEND_BUFFER_LIMIT_BYTES = 512 * 1024
+    }
 }

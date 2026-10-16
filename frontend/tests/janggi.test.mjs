@@ -194,6 +194,22 @@ test("빅장: 기물이 잡힌 뒤에만 부를 수 있고, 점수로 승패를 
   assert.ok(result.reason.includes("빅장"));
 });
 
+test("빅장: 두 궁이 마주 보지 않으면 부를 수 없다", () => {
+  // given — 기물이 잡혔지만 두 궁 사이에 초 차가 있다
+  const state = stateWithBoard([
+    [0, 4, "K", "black"],
+    [9, 4, "K", "white"],
+    [5, 4, "R", "white"],
+    [6, 2, "R", "white"],
+    [6, 0, "P", "black"],
+  ]);
+  const moved = janggiEngine.applyMovePos(state, { row: 6, col: 2 }, { row: 6, col: 0 });
+  assert.ok(moved);
+
+  // then
+  assert.equal(janggiDeclareBigjang(moved.state), null);
+});
+
 test("외통수: 궁이 장군을 피할 수 없으면 끝난다", () => {
   // 초 차(4,0)가 (0,0)으로 이동해 열 0에서 한 궁(0,4)을 묶고,
   // 초 차(2,4)가 궁의 아래 도주처 (1,4)를 커버한다.

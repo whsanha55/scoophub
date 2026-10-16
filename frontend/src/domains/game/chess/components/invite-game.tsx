@@ -11,15 +11,15 @@ import {
   type RoomSnapshot,
 } from "../../lib/room-client";
 import {
-  formatClock,
   isUntimed,
   tickClock,
   type PlayerClock,
   type Side,
 } from "../../lib/time-control";
-import { chessEngine, type ChessState } from "../engine";
+import { chessEngine, hasMatingMaterial, type ChessState } from "../engine";
 import { ChessBoard } from "./chess-board";
 import { RuleStepper } from "../../components/rule-stepper";
+import { ClockView } from "../../components/clock-view";
 import { RecordActions } from "../../components/record-actions";
 import { CHESS_RESULT, chessRecordCodec, janggiRecordCodec } from "../../lib/record";
 import { JanggiBoard } from "../../janggi/components/janggi-board";
@@ -69,41 +69,6 @@ function replayJanggi(snapshot: RoomSnapshot): JanggiState {
     }
   }
   return state;
-}
-
-function ClockView({
-  clock,
-  label,
-  active,
-  untimed,
-}: {
-  clock: PlayerClock;
-  label: string;
-  active: boolean;
-  untimed: boolean;
-}) {
-  const ms = clock.inByoYomi ? clock.byoYomiLeftMs : clock.baseLeftMs;
-  return (
-    <div
-      className={`flex items-center justify-between rounded-lg border px-3 py-1.5 ${
-        active ? "border-primary bg-primary/10" : "border-border"
-      }`}
-    >
-      <span className="truncate text-sm font-semibold">{label}</span>
-      {untimed ? (
-        <span className="text-sm text-muted-foreground">무제한</span>
-      ) : (
-        <span className="flex items-baseline gap-2">
-          {clock.inByoYomi && (
-            <span className="text-xs text-muted-foreground">초읽기 ×{clock.byoYomiLeft}</span>
-          )}
-          <span className={`text-lg font-bold tabular-nums ${ms <= 10_000 ? "text-red-500" : ""}`}>
-            {formatClock(ms)}
-          </span>
-        </span>
-      )}
-    </div>
-  );
 }
 
 export function InviteChessGame({ code }: { code: string }) {
@@ -240,8 +205,20 @@ export function InviteChessGame({ code }: { code: string }) {
       if (targets.includes(square)) {
         const r = chessEngine.applyMove(state, selected, square);
         if (r) {
-          // 규칙 판정은 클라이언트가 하고, 서버는 순서와 시계만 관리한다 (ADR-0001)
-          send({ type: "move", payload: { from: selected, to: square, notation: r.notation } });
+          // 규칙 판정은 클라이언트가 하고, 서버는 순서와 시계만 관리한다 (ADR-0001).
+          // 메이트할 기물 유무를 함께 보내 서버가 시간패를 무승부로 바꿀 수 있게 한다.
+          const board = r.state.game.board();
+          send({
+            type: "move",
+            payload: {
+              from: selected,
+              to: square,
+              notation: r.notation,
+              mating_material: { white: hasMatingMaterial(board, "w"), black: hasMatingMaterial(board, "b") },
+            },
+          });
+          const after = chessEngine.status(r.state);
+          if (after.over) sendFinish(after.winner, after.reason);
         }
         setSelected(null);
         return;
@@ -397,7 +374,7 @@ export function InviteChessGame({ code }: { code: string }) {
           <p className="text-sm text-muted-foreground">초대코드</p>
           <p className="text-4xl font-bold tracking-[0.3em] tabular-nums">{code}</p>
           <div className="flex gap-2">
-            <Button onClick={share}>초대 링크 공유</Button>
+            <Button onClick={share}>초대코드 공유</Button>
             <Button
               variant="outline"
               onClick={async () => {

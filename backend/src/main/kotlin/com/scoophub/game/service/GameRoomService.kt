@@ -1,122 +1,50 @@
 package com.scoophub.game.service
 
-import com.scoophub.game.domain.ChatEntry
-import com.scoophub.game.domain.GameRoom
-import com.scoophub.game.domain.RoomMove
-import com.scoophub.game.domain.RoomPhase
-import com.scoophub.game.domain.RoomPlayer
-import com.scoophub.game.domain.RoomResult
-import com.scoophub.game.domain.Side
-import com.scoophub.game.domain.SidePreference
-import com.scoophub.game.domain.TimeRule
-import com.scoophub.game.domain.opposite
+import com.scoophub.game.dto.CreateRoomCommand
+import com.scoophub.game.enums.RoomPhaseEnum
+import com.scoophub.game.enums.SideEnum
+import com.scoophub.game.enums.SidePreferenceEnum
+import com.scoophub.game.vo.ChatEntry
+import com.scoophub.game.vo.JoinResult
+import com.scoophub.game.vo.MoveResult
+import com.scoophub.game.vo.RoomMove
+import com.scoophub.game.vo.RoomResult
+import com.scoophub.game.vo.TimeRule
+import io.github.oshai.kotlinlogging.KotlinLogging
+import org.springframework.context.ApplicationEventPublisher
+import org.springframework.http.HttpStatus
 import org.springframework.stereotype.Service
+import org.springframework.web.server.ResponseStatusException
 import java.security.SecureRandom
 import java.time.Clock
-import java.time.Duration
-import java.time.Instant
-import java.util.Collections
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.Executors
 import java.util.concurrent.ScheduledExecutorService
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
 
-/** 방 조회/입장 결과 */
-sealed class RoomLookup {
-    data class Found(val room: GameRoom) : RoomLookup()
-    data class NotFound(val reason: String) : RoomLookup()
-}
-
-/** 방에서 일어난 사건. WS 핸들러가 이벤트를 참가자에게 전파한다. */
-sealed class RoomEvent {
-    abstract val room: GameRoom
-
-    data class StateChanged(override val room: GameRoom) : RoomEvent()
-    data class Moved(override val room: GameRoom, val move: RoomMove) : RoomEvent()
-    data class Ended(override val room: GameRoom, val result: RoomResult) : RoomEvent()
-    data class Chatted(override val room: GameRoom, val entry: ChatEntry) : RoomEvent()
-}
-
-/** 남용 방지 한도. local 프로파일에서는 끈다(ADR-0002). */
-interface AbuseLimiter {
-    fun canCreateRoom(guestId: String, ip: String): String?
-
-    fun onCodeAttempt(ip: String): String?
-
-    fun onRoomClosed(room: GameRoom)
-}
-
-class NoopAbuseLimiter : AbuseLimiter {
-    override fun canCreateRoom(guestId: String, ip: String): String? = null
-    override fun onCodeAttempt(ip: String): String? = null
-    override fun onRoomClosed(room: GameRoom) {}
-}
-
-class DefaultAbuseLimiter(private val clock: Clock) : AbuseLimiter {
-    private val roomsByGuest = ConcurrentHashMap<String, MutableSet<String>>()
-    private val roomsByIp = ConcurrentHashMap<String, MutableSet<String>>()
-    private val codeAttempts = ConcurrentHashMap<String, MutableList<Instant>>()
-
-    override fun canCreateRoom(guestId: String, ip: String): String? {
-        if (roomsByGuest[guestId]?.size ?: 0 >= GUEST_ROOM_LIMIT) return "게스트당 방은 ${GUEST_ROOM_LIMIT}개까지 만들 수 있습니다"
-        if (roomsByIp[ip]?.size ?: 0 >= IP_ROOM_LIMIT) return "같은 IP에서 방을 더 만들 수 없습니다"
-        return null
-    }
-
-    override fun onCodeAttempt(ip: String): String? {
-        val now = clock.instant()
-        val attempts = codeAttempts.computeIfAbsent(ip) { Collections.synchronizedList(mutableListOf()) }
-        synchronized(attempts) {
-            attempts.removeAll { Duration.between(it, now).seconds > 60 }
-            if (attempts.size >= CODE_ATTEMPT_LIMIT) return "초대코드 확인이 너무 잦습니다. 잠시 뒤 시도하세요"
-            attempts.add(now)
-        }
-        return null
-    }
-
-    override fun onRoomClosed(room: GameRoom) {
-        for (player in room.playersSnapshot()) {
-            roomsByGuest[player.guestId]?.remove(room.code)
-        }
-        // 방 생성자 IP는 별도 기록하지 않는다: 생성 시 등록만 한다 (registerCreation)
-    }
-
-    fun registerCreation(room: GameRoom, guestId: String, ip: String) {
-        roomsByGuest.computeIfAbsent(guestId) { ConcurrentHashMap.newKeySet() }.add(room.code)
-        roomsByIp.computeIfAbsent(ip) { ConcurrentHashMap.newKeySet() }.add(room.code)
-    }
-
-    fun totalRooms(): Int = roomsByGuest.values.sumOf { it.size }
-
-    companion object {
-        const val GUEST_ROOM_LIMIT = 3
-        const val IP_ROOM_LIMIT = 20
-        const val TOTAL_ROOM_LIMIT = 200
-        const val CODE_ATTEMPT_LIMIT = 10
-    }
-}
+private val log = KotlinLogging.logger {}
 
 /**
  * 게임 방 관리. DB 없이 메모리에서만 유지한다(ADR-0002).
+ * 방 상태는 요청 스레드와 시계 스레드가 함께 바꾸므로 방 단위로 잠근다.
  * 시계 판정과 방 수명 정리는 자체 스케줄러로 돈다 — 크롤링 ENABLE_SCHEDULER 와 무관하게
  * 대국 시계는 항상 흘러야 하기 때문이다.
  */
 @Service
-class GameRoomService(private val clock: Clock, private val limiter: AbuseLimiter) : AutoCloseable {
+class GameRoomService(
+    private val clock: Clock,
+    private val limiter: AbuseLimiter,
+    private val eventPublisher: ApplicationEventPublisher,
+) : AutoCloseable {
     private val rooms = ConcurrentHashMap<String, GameRoom>()
-    private val codeInUse = ConcurrentHashMap.newKeySet<String>()
     private val random = SecureRandom()
-    private val scheduler: ScheduledExecutorService
     private val tickCounter = AtomicInteger(0)
-
-    /** 방 이벤트 구독(WS 핸들러가 등록). 메인 테스트에서는 등록하지 않는다. */
-    var eventListener: ((RoomEvent) -> Unit)? = null
+    private val scheduler: ScheduledExecutorService = Executors.newSingleThreadScheduledExecutor { r ->
+        Thread(r, "game-room-ticker").apply { isDaemon = true }
+    }
 
     init {
-        scheduler = Executors.newSingleThreadScheduledExecutor { r ->
-            Thread(r, "game-room-ticker").apply { isDaemon = true }
-        }
         scheduler.scheduleAtFixedRate({ runTick() }, 1, 1, TimeUnit.SECONDS)
     }
 
@@ -124,207 +52,181 @@ class GameRoomService(private val clock: Clock, private val limiter: AbuseLimite
         scheduler.shutdownNow()
     }
 
-    fun createRoom(
-        gameId: String,
-        timeRule: TimeRule,
-        preference: SidePreference,
-        guestId: String,
-        nickname: String,
-        ip: String,
-        requiresSetup: Boolean = false,
-    ): GameRoom {
+    fun createRoom(command: CreateRoomCommand): GameRoom {
+        limiter.findCreateBlockReason(command.guestId, command.ip, rooms.size)?.let { throw tooManyRequests(it) }
         val now = clock.instant()
-        if (rooms.size >= DefaultAbuseLimiter.TOTAL_ROOM_LIMIT) {
-            throw RoomLimitException("서버 방 수 한도에 걸렸습니다")
+        val room = registerWithNewCode { code ->
+            GameRoom(
+                code = code,
+                gameId = command.gameId,
+                timeRule = TimeRule.of(command.baseMs, command.byoYomiMs, command.byoYomiCount),
+                hostPreference = SidePreferenceEnum.from(command.sidePreference),
+                isSetupRequired = command.isSetupRequired,
+                createdAt = now,
+            )
         }
-        limiter.canCreateRoom(guestId, ip)?.let { throw RoomLimitException(it) }
-        val room = GameRoom(
-            code = newCode(),
-            gameId = gameId,
-            timeRule = timeRule,
-            hostPreference = preference,
-            requiresSetup = requiresSetup,
-            createdAt = now,
-        )
-        rooms[room.code] = room
-        codeInUse.add(room.code)
-        (limiter as? DefaultAbuseLimiter)?.registerCreation(room, guestId, ip)
-        room.join(guestId, nickname, now)
+        limiter.onRoomCreated(room.code, command.guestId, command.ip)
+        room.join(command.guestId, command.nickname, now)
         return room
     }
 
-    /** 초대코드 시도(REST 확인·입장 모두). 한도를 넘으면 예외. */
-    fun checkCodeAttempt(ip: String) {
-        limiter.onCodeAttempt(ip)?.let { throw RoomLimitException(it) }
+    /** REST 초대코드 확인. 시도마다 한도를 센다. */
+    fun validateCodeAttempt(ip: String) {
+        limiter.findCodeAttemptBlockReason(ip)?.let { throw tooManyRequests(it) }
     }
 
-    fun roomOf(code: String): RoomLookup {
-        val room = rooms[code] ?: return RoomLookup.NotFound("방을 찾을 수 없습니다")
-        return RoomLookup.Found(room)
+    fun findRoom(code: String): GameRoom? = rooms[code]
+
+    /**
+     * WS 연결 대상 방. 이미 방에 있는 게스트의 재접속은 한도를 세지 않고,
+     * 처음 들어오는 연결은 초대코드 시도로 센다 — WS 로 코드를 대입해 보는 것을 막는다.
+     */
+    fun findRoomToConnect(code: String, guestId: String, ip: String): GameRoom? {
+        val room = rooms[code]
+        if (room != null && locked(room) { room.isParticipant(guestId) }) return room
+        validateCodeAttempt(ip)
+        return room
     }
 
-    fun join(code: String, guestId: String, nickname: String): com.scoophub.game.domain.JoinResult {
-        val room = rooms[code] ?: throw RoomNotFoundException()
-        val now = clock.instant()
-        val result = room.join(guestId, nickname, now)
-        if (!result.allowed) return result
-        room.addSystemChat("$nickname 입장", now)
-        // 대국이 시작되면 시계 기준점을 잡는다.
-        if (room.phase == RoomPhase.PLAYING) {
-            lastClockTick.putIfAbsent(code, now)
-        }
-        eventListener?.invoke(RoomEvent.StateChanged(room))
+    fun join(room: GameRoom, guestId: String, nickname: String): JoinResult {
+        val result = locked(room) { room.join(guestId, nickname, clock.instant()) }
+        if (result.isAllowed) publish(RoomEvent.StateChanged(room))
         return result
     }
 
-    fun chat(room: GameRoom, guestId: String, text: String): ChatEntry? {
-        val entry = room.addChat(guestId, text, clock.instant()) ?: return null
-        eventListener?.invoke(RoomEvent.Chatted(room, entry))
-        return entry
-    }
-
-    /** 관전자 퇴장 처리와 알림. 대국자는 재접속을 위해 방에 남는다. */
+    /** 연결이 끊겼다. 관전자는 퇴장하고, 대국자는 재접속을 기다린다. */
     fun disconnect(room: GameRoom, guestId: String) {
-        seen(room, guestId)
-        val now = clock.instant()
-        room.removeSpectator(guestId)?.let {
-            room.addSystemChat("${it.nickname} 퇴장", now)
-            eventListener?.invoke(RoomEvent.StateChanged(room))
-        }
-    }
-
-    fun seen(room: GameRoom, guestId: String) {
-        val now = clock.instant()
-        room.playerOf(guestId)?.let { it.lastSeen = now }
-        room.spectatorOf(guestId)?.let { it.lastSeen = now }
-    }
-
-    fun addMove(room: GameRoom, guestId: String, from: String, to: String, notation: String): RoomMove? {
-        val now = clock.instant()
-        // 수를 받은 시각 기준으로 둔 사람의 시계를 먼저 정산한다(ADR-0001).
-        val side = room.sideOf(guestId) ?: return null
-        val elapsed = Duration.between(lastClockTick.getOrDefault(room.code, now), now).toMillis()
-        if (elapsed > 0 && room.chargeElapsed(side, elapsed)) {
-            eventListener?.invoke(
-                RoomEvent.Ended(room, room.result ?: RoomResult(side.opposite(), "시간패")),
-            )
-            return null
-        }
-        lastClockTick[room.code] = now
-        val move = room.addMove(guestId, from, to, notation, now) ?: return null
-        eventListener?.invoke(RoomEvent.Moved(room, move))
-        return move
-    }
-
-    /** 시작 전 준비(장기 상차림) 제출. */
-    fun submitSetup(room: GameRoom, guestId: String, pattern: String): Boolean {
-        val accepted = room.submitSetup(guestId, pattern, clock.instant())
-        if (accepted && room.phase == RoomPhase.PLAYING) {
-            lastClockTick.putIfAbsent(room.code, clock.instant())
-        }
-        eventListener?.invoke(RoomEvent.StateChanged(room))
-        return accepted
-    }
-
-    /** 재대국. 두 대국자 모두 동의하면 시작된다. 시작되면 true. */
-    fun requestRematch(room: GameRoom, guestId: String): Boolean {
-        val started = room.requestRematch(guestId, clock.instant())
-        if (started) {
-            lastClockTick[room.code] = clock.instant()
-        }
-        eventListener?.invoke(RoomEvent.StateChanged(room))
-        return started
-    }
-
-    /** 끝난 방에서 방장이 시간 규칙을 바꾼다. */
-    fun updateTimeRule(room: GameRoom, guestId: String, rule: TimeRule): Boolean {
-        val changed = room.updateTimeRule(guestId, rule, clock.instant())
-        if (changed) {
-            eventListener?.invoke(RoomEvent.StateChanged(room))
-        }
-        return changed
+        locked(room) { room.disconnect(guestId, clock.instant()) }
+        publish(RoomEvent.StateChanged(room))
     }
 
     /** 방 나가기. 대국자가 나가면 재대국을 할 수 없다. */
     fun leave(room: GameRoom, guestId: String) {
-        val now = clock.instant()
-        val nickname = room.removePlayer(guestId)?.nickname ?: room.removeSpectator(guestId)?.nickname
-        if (nickname != null) {
-            room.addSystemChat("$nickname 나감", now)
-            eventListener?.invoke(RoomEvent.StateChanged(room))
+        locked(room) { room.leave(guestId, clock.instant()) }
+        publish(RoomEvent.StateChanged(room))
+    }
+
+    fun chat(room: GameRoom, guestId: String, text: String): ChatEntry? {
+        val entry = locked(room) { room.addChat(guestId, text, clock.instant()) } ?: return null
+        publish(RoomEvent.Chatted(room, entry))
+        return entry
+    }
+
+    fun addMove(
+        room: GameRoom,
+        guestId: String,
+        from: String,
+        to: String,
+        notation: String,
+        matingMaterial: Map<SideEnum, Boolean> = emptyMap(),
+    ): RoomMove? = when (
+        val result = locked(room) {
+            room.addMove(guestId, from, to, notation, matingMaterial, clock.instant())
         }
+    ) {
+        MoveResult.Rejected -> null
+
+        is MoveResult.TimedOut -> {
+            publish(RoomEvent.Ended(room, result.result))
+            null
+        }
+
+        is MoveResult.Moved -> {
+            publish(RoomEvent.Moved(room, result.move))
+            result.move
+        }
+    }
+
+    /** 시작 전 준비(장기 상차림) 제출. */
+    fun submitSetup(room: GameRoom, guestId: String, pattern: String): Boolean {
+        val isAccepted = locked(room) { room.submitSetup(guestId, pattern, clock.instant()) }
+        publish(RoomEvent.StateChanged(room))
+        return isAccepted
+    }
+
+    /** 재대국. 두 대국자 모두 동의하면 시작된다. 시작되면 true. */
+    fun requestRematch(room: GameRoom, guestId: String): Boolean {
+        val isStarted = locked(room) { room.requestRematch(guestId, clock.instant()) }
+        publish(RoomEvent.StateChanged(room))
+        return isStarted
+    }
+
+    /** 끝난 방에서 방장이 시간 규칙을 바꾼다. 값은 방 만들기와 같은 상한으로 맞춘다. */
+    fun updateTimeRule(room: GameRoom, guestId: String, baseMs: Long, byoYomiMs: Long, byoYomiCount: Int): Boolean {
+        val rule = TimeRule.of(baseMs, byoYomiMs, byoYomiCount)
+        val isChanged = locked(room) { room.updateTimeRule(guestId, rule, clock.instant()) }
+        if (isChanged) publish(RoomEvent.StateChanged(room))
+        return isChanged
     }
 
     /** 클라이언트가 판정한 결과(외통수·빅장·200수)로 대국 종료. */
-    fun finishWith(room: GameRoom, guestId: String, winner: Side?, reason: String): RoomResult? {
-        val result = room.finishWith(guestId, winner, reason, clock.instant()) ?: return null
-        eventListener?.invoke(RoomEvent.Ended(room, result))
-        return result
-    }
+    fun finishWith(room: GameRoom, guestId: String, winner: SideEnum?, reason: String): RoomResult? =
+        endWith(room) { room.finishWith(guestId, winner, reason, clock.instant()) }
 
-    fun resign(room: GameRoom, guestId: String): RoomResult? {
-        val result = room.resign(guestId, clock.instant()) ?: return null
-        eventListener?.invoke(RoomEvent.Ended(room, result))
-        return result
-    }
+    fun resign(room: GameRoom, guestId: String): RoomResult? = endWith(room) { room.resign(guestId, clock.instant()) }
 
-    /** 무제한 대국에서 상대 5분 이탈 시 승리 처리. */
-    fun claimAbandonWin(room: GameRoom, guestId: String): RoomResult? {
-        val now = clock.instant()
-        val threshold = now.minus(Duration.ofMinutes(5))
-        val result = room.claimAbandonWin(guestId, now, threshold) ?: return null
-        eventListener?.invoke(RoomEvent.Ended(room, result))
-        return result
-    }
+    /** 무제한 대국에서 상대 연결이 5분 이상 끊겼을 때 승리 처리. */
+    fun claimAbandonWin(room: GameRoom, guestId: String): RoomResult? =
+        endWith(room) { room.claimAbandonWin(guestId, clock.instant()) }
 
     fun closeRoom(code: String) {
-        rooms.remove(code)?.let { room ->
-            codeInUse.remove(room.code)
-            limiter.onRoomClosed(room)
-        }
+        rooms.remove(code)?.let { limiter.onRoomClosed(it.code) }
     }
 
     fun activeRoomCount(): Int = rooms.size
 
-    /** 1초 틱: 진행 중 방 시계 감산(5초마다), 방 수명 정리(30초마다). */
+    /** 방 상태를 읽거나 바꿀 때는 이 잠금 안에서 한다. */
+    fun <T> locked(room: GameRoom, block: () -> T): T = synchronized(room) { block() }
+
+    private fun endWith(room: GameRoom, end: () -> RoomResult?): RoomResult? {
+        val result = locked(room, end) ?: return null
+        publish(RoomEvent.Ended(room, result))
+        return result
+    }
+
+    private fun publish(event: RoomEvent) {
+        eventPublisher.publishEvent(event)
+    }
+
+    /** 1초 틱: 진행 중 방 시계 정산(5초마다), 방 수명 정리(30초마다). */
     private fun runTick() {
         try {
             val n = tickCounter.incrementAndGet()
             val now = clock.instant()
-            if (n % 30 == 0) {
-                rooms.values.removeIf { room ->
-                    val expired = room.expired(now)
-                    if (expired) limiter.onRoomClosed(room)
-                    expired
-                }
+            if (n % EXPIRE_EVERY_TICKS == 0) {
+                rooms.values
+                    .filter { room -> locked(room) { room.isExpired(now) } }
+                    .forEach { closeRoom(it.code) }
             }
-            if (n % 5 != 0) return
+            if (n % CLOCK_EVERY_TICKS != 0) return
             for (room in rooms.values) {
-                if (room.phase != RoomPhase.PLAYING) continue
-                // 마지막 갱신 이후 경과 시간만큼 차례 진영 시계를 깎는다.
-                val elapsed = Duration.between(lastClockTick.getOrDefault(room.code, now), now).toMillis()
-                if (elapsed <= 0) continue
-                lastClockTick[room.code] = now
-                room.tickActiveClock(elapsed)?.let { result ->
-                    eventListener?.invoke(RoomEvent.Ended(room, result))
+                val (isPlaying, result) = locked(room) {
+                    val isPlaying = room.phase == RoomPhaseEnum.PLAYING
+                    isPlaying to (if (isPlaying) room.settleClock(now) else null)
                 }
-                eventListener?.invoke(RoomEvent.StateChanged(room))
+                if (!isPlaying) continue
+                result?.let { publish(RoomEvent.Ended(room, it)) }
+                publish(RoomEvent.StateChanged(room))
             }
         } catch (e: Exception) {
-            // 틱 하나가 죽어도 스케줄러는 계속 돈다
+            // 틱 하나가 실패해도 스케줄러는 계속 돌아야 한다
+            log.error(e) { "게임 방 틱 실패" }
         }
     }
 
-    private val lastClockTick = ConcurrentHashMap<String, Instant>()
-
-    private fun newCode(): String {
+    /** 쓰이지 않는 6자리 코드로 방을 등록한다. 동시에 같은 코드를 잡지 않도록 putIfAbsent 로 확정한다. */
+    private fun registerWithNewCode(create: (String) -> GameRoom): GameRoom {
         while (true) {
             val code = (random.nextInt(900_000) + 100_000).toString()
-            if (codeInUse.add(code)) return code
+            val room = create(code)
+            if (rooms.putIfAbsent(code, room) == null) return room
         }
     }
+
+    private fun tooManyRequests(reason: String) = ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS, reason)
+
+    companion object {
+        private const val CLOCK_EVERY_TICKS = 5
+        private const val EXPIRE_EVERY_TICKS = 30
+    }
 }
-
-class RoomLimitException(message: String) : RuntimeException(message)
-
-class RoomNotFoundException : RuntimeException("방을 찾을 수 없습니다")
