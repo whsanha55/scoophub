@@ -20,6 +20,8 @@ import {
 import { chessEngine, type ChessState } from "../engine";
 import { ChessBoard } from "./chess-board";
 import { RuleStepper } from "../../components/rule-stepper";
+import { RecordActions } from "../../components/record-actions";
+import { CHESS_RESULT, chessRecordCodec } from "../../lib/record";
 
 function replayChess(moves: RoomSnapshot["moves"]): ChessState {
   let state = chessEngine.initialState();
@@ -500,6 +502,18 @@ export function InviteChessGame({ code }: { code: string }) {
               ) : (
                 <p className="text-sm text-muted-foreground">관전 중인 대국이 끝났다</p>
               )}
+              <RecordActions
+                record={{
+                  game: "chess",
+                  moves: snapshot.moves.map((m) => m.notation),
+                  result: snapshot.result?.winner
+                    ? CHESS_RESULT[snapshot.result.winner]
+                    : snapshot.result
+                      ? CHESS_RESULT.draw
+                      : undefined,
+                }}
+                codec={chessRecordCodec}
+              />
               <Button
                 variant="outline"
                 size="sm"

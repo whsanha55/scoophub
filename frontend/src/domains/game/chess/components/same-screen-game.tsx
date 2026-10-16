@@ -17,6 +17,8 @@ import {
   type TimeRule,
 } from "../../lib/time-control";
 import { chessEngine, hasMatingMaterial, type ChessState } from "../engine";
+import { RecordActions } from "../../components/record-actions";
+import { CHESS_RESULT, chessRecordCodec } from "../../lib/record";
 import type { GameStatus } from "../../lib/board-game";
 
 const ROTATE_KEY = "game.board.rotate";
@@ -327,6 +329,18 @@ export function SameScreenChessGame() {
                       시간 규칙 바꾸기
                     </Button>
                   </div>
+                  <RecordActions
+                    record={{
+                      game: "chess",
+                      moves: history,
+                      result: result?.winner
+                        ? CHESS_RESULT[result.winner]
+                        : result
+                          ? CHESS_RESULT.draw
+                          : undefined,
+                    }}
+                    codec={chessRecordCodec}
+                  />
                 </div>
               </div>
             )}
