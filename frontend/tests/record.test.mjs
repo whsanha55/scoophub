@@ -64,3 +64,59 @@ test("URL 해시: 깨진 문자열은 null", async () => {
 test("코덱 등록: 체스 코덱이 조회된다", () => {
   assert.equal(RECORD_CODECS.chess, chessRecordCodec);
 });
+
+// ---------- 장기 기보 형식 ----------
+
+const JANGGI_MOVES = [
+  "차 9,1→7,1", "한수쉼", "마 9,2→7,3", "병 6,4→5,4",
+];
+
+test("장기 기보 왕복: toFile → fromFile 로 수순·상차림·결과가 돌아온다", () => {
+  const record = {
+    game: "janggi",
+    moves: JANGGI_MOVES,
+    result: "cho",
+    setup: { cho: "마상마상", han: "상마상마" },
+  };
+  const file = RECORD_CODECS.janggi.toFile(record);
+  assert.ok(file.includes("[ScoopHub Janggi]"));
+  assert.ok(file.includes("Setup cho=마상마상 han=상마상마"));
+  assert.ok(file.includes("Result cho"));
+  assert.ok(file.includes("1. 초 차 9,1→7,1"));
+  assert.ok(file.includes("2. 한 한수쉼"));
+
+  const parsed = RECORD_CODECS.janggi.fromFile(file);
+  assert.deepEqual(parsed.moves, JANGGI_MOVES);
+  assert.deepEqual(parsed.setup, { cho: "마상마상", han: "상마상마" });
+  assert.equal(parsed.result, "cho");
+  assert.equal(parsed.game, "janggi");
+});
+
+test("장기 기보: 결과 없으면 none, 잘못된 파일은 null", () => {
+  const file = RECORD_CODECS.janggi.toFile({
+    game: "janggi",
+    moves: ["병 6,4→5,4"],
+    setup: { cho: "마상마상", han: "마상마상" },
+  });
+  assert.ok(file.includes("Result none"));
+  const parsed = RECORD_CODECS.janggi.fromFile(file);
+  assert.equal(parsed.result, undefined);
+
+  assert.equal(RECORD_CODECS.janggi.fromFile("엉뚱한 파일"), null);
+  assert.equal(RECORD_CODECS.janggi.fromFile("[ScoopHub Janggi]\nResult none\n"), null);
+});
+
+test("장기 공유 링크 왕복: 상차림까지 돌아온다", async () => {
+  const record = {
+    game: "janggi",
+    moves: JANGGI_MOVES,
+    result: "han",
+    setup: { cho: "마상상마", han: "상마마상" },
+  };
+  const encoded = await RECORD_CODECS.janggi.encodeShare(record);
+  const decoded = await RECORD_CODECS.janggi.decodeShare(encoded);
+  assert.deepEqual(decoded.moves, JANGGI_MOVES);
+  assert.deepEqual(decoded.setup, { cho: "마상상마", han: "상마마상" });
+  assert.equal(decoded.result, "han");
+  assert.equal(decoded.game, "janggi");
+});

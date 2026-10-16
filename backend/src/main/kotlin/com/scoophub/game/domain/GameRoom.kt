@@ -2,7 +2,7 @@ package com.scoophub.game.domain
 
 import java.time.Instant
 
-enum class RoomPhase { WAITING, PLAYING, FINISHED }
+enum class RoomPhase { WAITING, SETUP, PLAYING, FINISHED }
 
 enum class Side { WHITE, BLACK }
 
@@ -45,6 +45,8 @@ class GameRoom(
     /** 재대국 직전에 방장이 시간 규칙을 바꿀 수 있다. */
     var timeRule: TimeRule,
     private val hostPreference: SidePreference,
+    /** 시작 전 대국자별 준비(장기 상차림 등)가 필요한 방인지. */
+    val requiresSetup: Boolean,
     val createdAt: Instant,
 ) {
     /** 방장 게스트. 시간 규칙 변경 권한이 있다. */
@@ -116,7 +118,11 @@ class GameRoom(
             hostGuestId = guestId
         }
         players.add(RoomPlayer(guestId = guestId, nickname = nickname, side = side, lastSeen = now))
-        if (players.size == 2) start(now)
+        if (players.size == 2 && requiresSetup) {
+            phase = RoomPhase.SETUP
+        } else if (players.size == 2) {
+            start(now)
+        }
         return JoinResult(side = side, role = Role.PLAYER, allowed = true)
     }
 
@@ -163,6 +169,21 @@ class GameRoom(
         while (chatLog.size > CHAT_HISTORY) chatLog.removeFirst()
     }
 
+    /** 시작 전 준비(장기 상차림). 두 대국자 모두 제출하면 대국이 시작된다. */
+    private val setups = mutableMapOf<Side, String>()
+
+    fun submitSetup(guestId: String, pattern: String, now: Instant): Boolean {
+        touch(now)
+        if (phase != RoomPhase.SETUP) return false
+        val side = sideOf(guestId) ?: return false
+        setups[side] = pattern
+        playerOf(guestId)?.let { it.lastSeen = now }
+        if (setups.size == 2) start(now)
+        return true
+    }
+
+    fun setupSnapshot(): Map<Side, String> = setups.toMap()
+
     private fun start(now: Instant) {
         phase = RoomPhase.PLAYING
         startedAt = now
@@ -206,6 +227,17 @@ class GameRoom(
         moves.add(move)
         clocks[side] = clockAfterMove(clocks.getValue(side), timeRule)
         return move
+    }
+
+/** 규칙 판정 결과(외통수·빅장 등)로 대국을 끝낸다. 판정은 클라이언트가 했다(ADR-0001). */
+    fun finishWith(guestId: String, winner: Side?, reason: String, now: Instant): RoomResult? {
+        touch(now)
+        sideOf(guestId) ?: return null
+        if (phase != RoomPhase.PLAYING) return null
+        playerOf(guestId)?.let { it.lastSeen = now }
+        val result = RoomResult(winner = winner, reason = reason)
+        finish(result)
+        return result
     }
 
     fun resign(guestId: String, now: Instant): RoomResult? {
@@ -289,6 +321,16 @@ class GameRoom(
         // 진영 교대: 백과 흑이 서로 바뀐다
         for (i in players.indices) {
             players[i] = players[i].copy(side = players[i].side.opposite())
+        }
+        if (requiresSetup) {
+            // 상차림을 다시 고른다
+            setups.clear()
+            moves.clear()
+            rematchVotes.clear()
+            result = null
+            phase = RoomPhase.SETUP
+            touch(now)
+            return
         }
         moves.clear()
         rematchVotes.clear()

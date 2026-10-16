@@ -19,7 +19,7 @@ export interface ChatEntry {
 }
 
 export interface RoomSnapshot {
-  phase: "waiting" | "playing" | "finished";
+  phase: "waiting" | "setup" | "playing" | "finished";
   gameId: string;
   timeRule: TimeRule;
   players: { white: string | null; black: string | null };
@@ -27,6 +27,8 @@ export interface RoomSnapshot {
   role: "player" | "spectator";
   youAreHost: boolean;
   rematchVotes: string[];
+  /** 장기 상차림 제출 현황 (진영 → 패턴) */
+  setups: { white?: string; black?: string };
   spectators: string[];
   chat: ChatEntry[];
   turn: "white" | "black";
@@ -78,6 +80,7 @@ function mapSnapshot(raw: Record<string, unknown>): RoomSnapshot {
     role: (raw.role as RoomSnapshot["role"]) ?? "spectator",
     youAreHost: (raw.you_are_host as boolean) ?? false,
     rematchVotes: (raw.rematch_votes as string[]) ?? [],
+    setups: (raw.setups as RoomSnapshot["setups"]) ?? {},
     spectators: (raw.spectators as string[]) ?? [],
     chat: (raw.chat as ChatEntry[]) ?? [],
     turn: raw.turn as RoomSnapshot["turn"],
@@ -167,6 +170,8 @@ export interface CreateRoomInput {
   gameId: string;
   timeRule: TimeRule;
   sidePreference: "white" | "black" | "random";
+  /** 시작 전 대국자별 준비(장기 상차림)가 필요한지 */
+  requiresSetup?: boolean;
 }
 
 export async function createRoom(input: CreateRoomInput, guestId: string, nickname: string): Promise<string> {
@@ -181,6 +186,7 @@ export async function createRoom(input: CreateRoomInput, guestId: string, nickna
         byo_yomi_count: input.timeRule.byoYomiCount,
       },
       side_preference: input.sidePreference,
+      requires_setup: input.requiresSetup ?? false,
       guest_id: guestId,
       nickname,
     }),

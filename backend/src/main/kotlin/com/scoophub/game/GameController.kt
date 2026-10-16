@@ -34,6 +34,8 @@ data class CreateRoomRequest(
     val sidePreference: String,
     val guestId: String,
     val nickname: String,
+    /** 시작 전 대국자별 준비(장기 상차림)가 필요한지 */
+    val requiresSetup: Boolean = false,
 )
 
 data class TimeRuleRequest(val baseMs: Long, val byoYomiMs: Long, val byoYomiCount: Int)
@@ -81,6 +83,7 @@ class GameController(private val gameRoomService: GameRoomService, private val c
                 preference = SidePreference.entries.firstOrNull {
                     it.name.equals(request.sidePreference, ignoreCase = true)
                 } ?: SidePreference.RANDOM,
+                requiresSetup = request.requiresSetup,
                 guestId = request.guestId,
                 nickname = request.nickname,
                 ip = clientIp(servletRequest),

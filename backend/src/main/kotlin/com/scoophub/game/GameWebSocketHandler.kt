@@ -108,7 +108,23 @@ class GameWebSocketHandler(
 
             "resign" -> gameRoomService.resign(room, guestId)
 
+            "finish" -> {
+                val winner = (payload["winner"] as? String)?.lowercase()
+                    ?.let { w -> Side.entries.firstOrNull { it.name.lowercase() == w } }
+                val reason = payload["reason"]?.toString() ?: return
+                if (gameRoomService.finishWith(room, guestId, winner, reason) == null) {
+                    send(session, mapOf("type" to "error", "payload" to mapOf("message" to "지금은 대국을 끝낼 수 없습니다")))
+                }
+            }
+
             "rematch" -> gameRoomService.requestRematch(room, guestId)
+
+            "setup" -> {
+                val pattern = payload["pattern"]?.toString() ?: return
+                if (!gameRoomService.submitSetup(room, guestId, pattern)) {
+                    send(session, mapOf("type" to "error", "payload" to mapOf("message" to "지금은 상차림을 고를 수 없습니다")))
+                }
+            }
 
             "leave" -> {
                 gameRoomService.leave(room, guestId)
@@ -196,6 +212,7 @@ class GameWebSocketHandler(
         return mapOf(
             "phase" to when (room.phase) {
                 RoomPhase.WAITING -> "waiting"
+                RoomPhase.SETUP -> "setup"
                 RoomPhase.PLAYING -> "playing"
                 RoomPhase.FINISHED -> "finished"
             },
@@ -216,6 +233,9 @@ class GameWebSocketHandler(
             "turn" to room.turn().name.lowercase(),
             "moves" to room.movesSnapshot().map { movePayloadEntry(it) },
             "rematch_votes" to room.rematchVotesSnapshot(),
+            "setups" to room.setupSnapshot().entries.associate { (side, pattern) ->
+                side.name.lowercase() to pattern
+            },
             "clocks" to clocksPayload(room),
             "result" to room.result?.let { resultPayload(it) },
             "server_now" to clock.instant().toEpochMilli(),

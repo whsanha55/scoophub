@@ -21,7 +21,13 @@ import { chessEngine, type ChessState } from "../engine";
 import { ChessBoard } from "./chess-board";
 import { RuleStepper } from "../../components/rule-stepper";
 import { RecordActions } from "../../components/record-actions";
-import { CHESS_RESULT, chessRecordCodec } from "../../lib/record";
+import { CHESS_RESULT, chessRecordCodec, janggiRecordCodec } from "../../lib/record";
+import { JanggiBoard } from "../../janggi/components/janggi-board";
+import {
+  janggiEngine,
+  SETUP_PATTERNS,
+  type JanggiState,
+} from "../../janggi/engine";
 
 function replayChess(moves: RoomSnapshot["moves"]): ChessState {
   let state = chessEngine.initialState();
@@ -29,6 +35,38 @@ function replayChess(moves: RoomSnapshot["moves"]): ChessState {
     const r = chessEngine.applyMove(state, m.from, m.to);
     if (!r) break; // 조작된 기보는 알 수 없는 시점에서 멈춘다 (ADR-0001 감수)
     state = r.state;
+  }
+  return state;
+}
+
+function sideLabel(side: Side, janggi: boolean): string {
+  if (janggi) return side === "white" ? "초" : "한";
+  return side === "white" ? "백" : "흑";
+}
+
+function replayJanggi(snapshot: RoomSnapshot): JanggiState {
+  const setups = snapshot.setups ?? {};
+  let state = janggiEngine.initialState({
+    cho: setups.white ?? "마상마상",
+    han: setups.black ?? "마상마상",
+  });
+  for (const m of snapshot.moves) {
+    const coords = m.notation?.match(/(\d+),(\d+)→(\d+),(\d+)/);
+    if (m.notation === "한수쉼") {
+      const r = janggiEngine.pass(state);
+      if (!r) break;
+      state = r.state;
+    } else if (coords) {
+      const r = janggiEngine.applyMovePos(
+        state,
+        { row: Number(coords[1]), col: Number(coords[2]) },
+        { row: Number(coords[3]), col: Number(coords[4]) },
+      );
+      if (!r) break;
+      state = r.state;
+    } else {
+      break;
+    }
   }
   return state;
 }
@@ -159,11 +197,12 @@ export function InviteChessGame({ code }: { code: string }) {
     socketRef.current?.send(message);
   }, []);
 
+  const isJanggi = snapshot?.gameId === "janggi";
   const state = snapshot ? replayChess(snapshot.moves) : null;
+  const janggiState = snapshot && isJanggi ? replayJanggi(snapshot) : null;
   const mySide = snapshot?.youAre ?? null;
   const turn = snapshot?.turn ?? "white";
-  const pieces = state ? chessEngine.pieces(state) : new Map();
-  const targets = selected ? chessEngine.legalTargets(state ?? chessEngine.initialState(), selected) : [];
+  const pieces = state && !isJanggi ? chessEngine.pieces(state) : new Map();
   const lastEntry = snapshot?.moves[snapshot.moves.length - 1] ?? null;
   const checkSquare = (() => {
     if (!state || !chessEngine.inCheck(state)) return null;
@@ -172,10 +211,31 @@ export function InviteChessGame({ code }: { code: string }) {
     }
     return null;
   })();
+  const janggiTargets = (() => {
+    if (!janggiState || selected === null) return [];
+    return janggiEngine.legalTargets(janggiState, selected);
+  })();
+  const janggiCheckSquare = (() => {
+    if (!janggiState || !janggiEngine.inCheck(janggiState)) return null;
+    for (const [point, piece] of janggiEngine.pieces(janggiState)) {
+      if (piece.type === "K" && piece.side === turn) return point;
+    }
+    return null;
+  })();
+  const targets = (() => {
+    if (selected === null) return [];
+    if (isJanggi) return janggiTargets;
+    return state ? chessEngine.legalTargets(state, selected) : [];
+  })();
 
   const onSquareTap = (square: string) => {
-    if (!snapshot || snapshot.phase !== "playing" || !state) return;
+    if (!snapshot || snapshot.phase !== "playing") return;
     if (!mySide || mySide !== turn) return; // 관전자는 둘 수 없다
+    if (isJanggi) {
+      onJanggiTap(square);
+      return;
+    }
+    if (!state) return;
     if (selected) {
       if (targets.includes(square)) {
         const r = chessEngine.applyMove(state, selected, square);
@@ -196,6 +256,54 @@ export function InviteChessGame({ code }: { code: string }) {
     }
     const piece = pieces.get(square);
     if (piece && piece.side === mySide) setSelected(square);
+  };
+
+  const onJanggiTap = (point: string) => {
+    if (!janggiState) return;
+    const [r, c] = point.split(",").map(Number);
+    if (selected) {
+      if (targets.includes(point)) {
+        const moved = janggiEngine.applyMovePos(
+          janggiState,
+          { row: Number(selected.split(",")[0]), col: Number(selected.split(",")[1]) },
+          { row: r, col: c },
+        );
+        if (moved) {
+          send({ type: "move", payload: { from: selected, to: point, notation: moved.notation } });
+          const after = janggiEngine.status(moved.state);
+          if (after.over) sendFinish(after.winner, after.reason);
+        }
+        setSelected(null);
+        return;
+      }
+      const piece = janggiState.board[r][c];
+      if (piece && piece.side === mySide) {
+        setSelected(point);
+        return;
+      }
+      setSelected(null);
+      return;
+    }
+    const piece = janggiState.board[r][c];
+    if (piece && piece.side === mySide) setSelected(point);
+  };
+
+  const sendFinish = (winner: Side | null, reason: string | null) => {
+    send({ type: "finish", payload: { winner, reason: reason ?? "" } });
+  };
+
+  const janggiPass = () => {
+    if (!janggiState || snapshot?.phase !== "playing") return;
+    const passed = janggiEngine.pass(janggiState);
+    if (!passed) return;
+    send({ type: "move", payload: { from: "-1,-1", to: "-1,-1", notation: "한수쉼" } });
+    setSelected(null);
+  };
+
+  const janggiDeclareBigjang = () => {
+    if (!janggiState || snapshot?.phase !== "playing") return;
+    const result = janggiEngine.declareBigjang(janggiState);
+    if (result) sendFinish(result.winner, result.reason);
   };
 
   const shareUrl = typeof window !== "undefined" ? `${window.location.origin}/game/room/${code}` : "";
@@ -307,6 +415,34 @@ export function InviteChessGame({ code }: { code: string }) {
             나가기
           </Button>
         </div>
+      ) : snapshot.phase === "setup" ? (
+        <div className="mx-auto flex w-full max-w-sm flex-col gap-4 rounded-xl border bg-card p-6">
+          <h2 className="font-semibold">상차림 고르기</h2>
+          <p className="text-sm text-muted-foreground">
+            두 대국자 모두 고르면 대국이 시작된다.
+          </p>
+          {mySide ? (
+            <div className="flex flex-col gap-2">
+              <span className="text-sm text-muted-foreground">
+                내 진영: {sideLabel(mySide, true)} {snapshot.setups[mySide] ? "(제출함)" : ""}
+              </span>
+              <div className="flex flex-wrap gap-1">
+                {SETUP_PATTERNS.map((pattern) => (
+                  <Button
+                    key={pattern}
+                    variant={snapshot.setups[mySide] === pattern ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => send({ type: "setup", payload: { pattern } })}
+                  >
+                    {pattern}
+                  </Button>
+                ))}
+              </div>
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground">관전자는 상차림에 참여하지 않는다</p>
+          )}
+        </div>
       ) : (
         <>
           {clocks && (
@@ -317,15 +453,28 @@ export function InviteChessGame({ code }: { code: string }) {
               untimed={isUntimed(snapshot.timeRule)}
             />
           )}
-          <ChessBoard
-            pieces={pieces}
-            orientation={myView}
-            selected={selected}
-            targets={targets}
-            lastMove={lastEntry ? { from: lastEntry.from, to: lastEntry.to } : null}
-            checkSquare={checkSquare}
-            onSquareTap={onSquareTap}
-          />
+          {isJanggi ? (
+            <JanggiBoard
+              board={(janggiState ?? janggiEngine.initialState()).board}
+              orientation={myView}
+              rotatePieces={false}
+              selected={selected}
+              targets={targets}
+              lastMove={lastEntry ? { from: lastEntry.from, to: lastEntry.to } : null}
+              checkSquare={janggiCheckSquare}
+              onPointTap={onSquareTap}
+            />
+          ) : (
+            <ChessBoard
+              pieces={pieces}
+              orientation={myView}
+              selected={selected}
+              targets={targets}
+              lastMove={lastEntry ? { from: lastEntry.from, to: lastEntry.to } : null}
+              checkSquare={checkSquare}
+              onSquareTap={onSquareTap}
+            />
+          )}
           {clocks && mySide && (
             <ClockView
               clock={clocks[mySide]}
@@ -347,7 +496,7 @@ export function InviteChessGame({ code }: { code: string }) {
               {snapshot.phase === "playing" ? (
                 <>
                   {isSpectator
-                    ? `${turn === "white" ? "백" : "흑"} 차례 · 관전 ${snapshot.spectators.length + 1}명`
+                    ? `${sideLabel(turn, isJanggi)} 차례 · 관전 ${snapshot.spectators.length + 1}명`
                     : turn === mySide
                       ? "내 차례"
                       : `${opponentLabel} 차례`}
@@ -365,6 +514,16 @@ export function InviteChessGame({ code }: { code: string }) {
               )}
               {snapshot.phase === "playing" && (
                 <div className="flex gap-2">
+                {isJanggi && mySide && (
+                  <>
+                    <Button variant="outline" size="sm" onClick={janggiPass}>
+                      한수쉼
+                    </Button>
+                    <Button variant="outline" size="sm" onClick={janggiDeclareBigjang}>
+                      빅장
+                    </Button>
+                  </>
+                )}
                 {isUntimed(snapshot.timeRule) && (
                   <Button
                     variant="outline"
@@ -504,15 +663,27 @@ export function InviteChessGame({ code }: { code: string }) {
               )}
               <RecordActions
                 record={{
-                  game: "chess",
+                  game: isJanggi ? "janggi" : "chess",
                   moves: snapshot.moves.map((m) => m.notation),
                   result: snapshot.result?.winner
-                    ? CHESS_RESULT[snapshot.result.winner]
+                    ? isJanggi
+                      ? snapshot.result.winner === "white"
+                        ? "cho"
+                        : "han"
+                      : CHESS_RESULT[snapshot.result.winner]
                     : snapshot.result
-                      ? CHESS_RESULT.draw
+                      ? isJanggi
+                        ? "none"
+                        : CHESS_RESULT.draw
                       : undefined,
+                  setup: isJanggi
+                    ? {
+                        cho: snapshot.setups.white ?? "마상마상",
+                        han: snapshot.setups.black ?? "마상마상",
+                      }
+                    : undefined,
                 }}
-                codec={chessRecordCodec}
+                codec={isJanggi ? janggiRecordCodec : chessRecordCodec}
               />
               <Button
                 variant="outline"
