@@ -8,6 +8,12 @@ const games = [
     href: "/game/lemon",
     emoji: "🍋",
   },
+  {
+    title: "체스 · 같은 화면 대국",
+    description: "한 기기에서 둘이 번갈아 두는 체스 대국",
+    href: "/game/chess",
+    emoji: "♟️",
+  },
 ];
 
 export default function GamePage() {
