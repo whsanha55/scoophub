@@ -401,4 +401,4 @@ GitHub Trending ←→ 패키지 릴리즈 ←→ CVE/보안
 | YouTube | ✅ API 키 | 10,000 유닛/일 |
 | Hugging Face | ❌ | 무제한 |
 | CVE/NVD | 선택 | 키 없이 5회/30초, 키 있으면 50회/30초 |
-| X/Twitter | ✅ OAuth | 1,500포스트/월 |
+| X/Twitter | ✅ OAuth (유료) | 무료 tier는 조회 불가 |
