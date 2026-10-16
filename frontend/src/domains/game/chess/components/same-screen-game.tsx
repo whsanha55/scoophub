@@ -18,8 +18,6 @@ import {
 import { chessEngine, hasMatingMaterial, type ChessState } from "../engine";
 import { ClockView } from "../../components/clock-view";
 import { RuleStepper } from "../../components/rule-stepper";
-import { RecordActions } from "../../components/record-actions";
-import { CHESS_RESULT, chessRecordCodec } from "../../lib/record";
 import type { GameStatus } from "../../lib/board-game";
 
 const ROTATE_KEY = "game.board.rotate";
@@ -223,7 +221,6 @@ export function SameScreenChessGame() {
             <ChessBoard
               pieces={pieces}
               orientation={orientation}
-              rotatePieces
               selected={selected}
               targets={targets}
               lastMove={lastMove}
@@ -245,18 +242,6 @@ export function SameScreenChessGame() {
                       시간 규칙 바꾸기
                     </Button>
                   </div>
-                  <RecordActions
-                    record={{
-                      game: "chess",
-                      moves: history,
-                      result: result?.winner
-                        ? CHESS_RESULT[result.winner]
-                        : result
-                          ? CHESS_RESULT.draw
-                          : undefined,
-                    }}
-                    codec={chessRecordCodec}
-                  />
                 </div>
               </div>
             )}

@@ -20,8 +20,6 @@ import { chessEngine, hasMatingMaterial, type ChessState } from "../engine";
 import { ChessBoard } from "./chess-board";
 import { RuleStepper } from "../../components/rule-stepper";
 import { ClockView } from "../../components/clock-view";
-import { RecordActions } from "../../components/record-actions";
-import { CHESS_RESULT, chessRecordCodec, janggiRecordCodec } from "../../lib/record";
 import { JanggiBoard } from "../../janggi/components/janggi-board";
 import {
   janggiEngine,
@@ -71,7 +69,7 @@ function replayJanggi(snapshot: RoomSnapshot): JanggiState {
   return state;
 }
 
-export function InviteChessGame({ code }: { code: string }) {
+export function InviteChessGame({ gameId, code }: { gameId: string; code: string }) {
   const router = useRouter();
   const [snapshot, setSnapshot] = useState<RoomSnapshot | null>(null);
   const [conn, setConn] = useState<ConnectionState>("connecting");
@@ -102,6 +100,7 @@ export function InviteChessGame({ code }: { code: string }) {
         const nickname = await ensureNickname();
         if (cancelled) return;
         socket = new RoomSocket(
+          gameId,
           code,
           guestId,
           nickname,
@@ -137,7 +136,7 @@ export function InviteChessGame({ code }: { code: string }) {
       cancelled = true;
       socket?.close();
     };
-  }, [code]);
+  }, [gameId, code]);
 
   // 서버 시계 보간: 마지막 스냅샷 이후 흐른 시간을 활성 진영에 반영한다.
   useEffect(() => {
@@ -283,13 +282,14 @@ export function InviteChessGame({ code }: { code: string }) {
     if (result) sendFinish(result.winner, result.reason);
   };
 
-  const shareUrl = typeof window !== "undefined" ? `${window.location.origin}/game/room/${code}` : "";
+  const shareUrl = typeof window !== "undefined" ? `${window.location.origin}/game/room/${gameId}/${code}` : "";
 
   const share = async () => {
-    const text = `체스 초대 대국 코드 ${code}`;
+    const gameLabel = gameId === "janggi" ? "장기" : "체스";
+    const text = `${gameLabel} 초대 대국 코드 ${code}`;
     if (navigator.share) {
       try {
-        await navigator.share({ title: "ScoopHub 체스", text, url: shareUrl });
+        await navigator.share({ title: `ScoopHub ${gameLabel}`, text, url: shareUrl });
         return;
       } catch {
         // 공유 취소/실패 시 복사로 넘어간다
@@ -434,7 +434,6 @@ export function InviteChessGame({ code }: { code: string }) {
             <JanggiBoard
               board={(janggiState ?? janggiEngine.initialState()).board}
               orientation={myView}
-              rotatePieces={false}
               selected={selected}
               targets={targets}
               lastMove={lastEntry ? { from: lastEntry.from, to: lastEntry.to } : null}
@@ -638,30 +637,6 @@ export function InviteChessGame({ code }: { code: string }) {
               ) : (
                 <p className="text-sm text-muted-foreground">관전 중인 대국이 끝났다</p>
               )}
-              <RecordActions
-                record={{
-                  game: isJanggi ? "janggi" : "chess",
-                  moves: snapshot.moves.map((m) => m.notation),
-                  result: snapshot.result?.winner
-                    ? isJanggi
-                      ? snapshot.result.winner === "white"
-                        ? "cho"
-                        : "han"
-                      : CHESS_RESULT[snapshot.result.winner]
-                    : snapshot.result
-                      ? isJanggi
-                        ? "none"
-                        : CHESS_RESULT.draw
-                      : undefined,
-                  setup: isJanggi
-                    ? {
-                        cho: snapshot.setups.white ?? "마상마상",
-                        han: snapshot.setups.black ?? "마상마상",
-                      }
-                    : undefined,
-                }}
-                codec={isJanggi ? janggiRecordCodec : chessRecordCodec}
-              />
               <Button
                 variant="outline"
                 size="sm"

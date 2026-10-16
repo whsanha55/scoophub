@@ -6,8 +6,6 @@ export interface JanggiBoardProps {
   board: (JanggiPiece | null)[][];
   /** 아래에 보일 진영 */
   orientation: "white" | "black";
-  /** true면 보드 전체를 기물 글자까지 180도 돌린다(같은 화면 판 회전) */
-  rotatePieces?: boolean;
   selected: string | null; // "r,c"
   targets: string[];
   lastMove: { from: string; to: string } | null;
@@ -20,27 +18,25 @@ export interface JanggiBoardProps {
 export function JanggiBoard({
   board,
   orientation,
-  rotatePieces = false,
   selected,
   targets,
   lastMove,
   checkSquare,
   onPointTap,
 }: JanggiBoardProps) {
-  const flipped = orientation === "black" && !rotatePieces;
-  const rows = flipped ? [...Array(10).keys()] : [...Array(10).keys()].reverse();
-  const cols = flipped ? [...Array(9).keys()].reverse() : [...Array(9).keys()];
+  // 판선은 상하·좌우 대칭이라 기물 좌표만 뒤집는다. 글자는 늘 바로 선다.
+  const flipped = orientation === "black";
+  const rows = [...Array(10).keys()];
+  const cols = [...Array(9).keys()];
 
   return (
     <div
-      className={`relative aspect-[9/10] w-full max-w-[min(88vw,480px)] select-none overflow-hidden rounded-lg border-2 border-amber-900/60 bg-[#e8c98f] shadow-sm ${
-        orientation === "black" && rotatePieces ? "rotate-180" : ""
-      }`}
+      className="relative aspect-[9/10] w-full max-w-[min(88vw,480px)] select-none overflow-hidden rounded-lg border-2 border-amber-900/60 bg-[#e8c98f] shadow-sm"
     >
       {/* 판선: 세로 9 · 가로 10 · 궁성 대각선 · 강 표시 */}
       <svg
-        viewBox="-0.5 -0.5 9 10"
-        className="absolute inset-[6%] h-[88%] w-[88%]"
+        viewBox="0 0 8 9"
+        className="absolute inset-[6%] h-[88%] w-[88%] overflow-visible"
         preserveAspectRatio="none"
         aria-hidden
       >
@@ -76,7 +72,10 @@ export function JanggiBoard({
                 type="button"
                 aria-label={`${point}${piece ? ` ${piece.side === "white" ? "초" : "한"} ${piece.type}` : ""}`}
                 className="absolute flex h-[10%] w-[11%] -translate-x-1/2 -translate-y-1/2 items-center justify-center"
-                style={{ left: `${(c / 8) * 100}%`, top: `${(r / 9) * 100}%` }}
+                style={{
+                  left: `${((flipped ? 8 - c : c) / 8) * 100}%`,
+                  top: `${((flipped ? 9 - r : r) / 9) * 100}%`,
+                }}
                 onPointerDown={(e) => {
                   e.preventDefault();
                   onPointTap(point);

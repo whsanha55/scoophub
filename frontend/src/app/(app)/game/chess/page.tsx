@@ -1,15 +1,29 @@
 import type { Metadata } from "next";
-import { SameScreenChessGame } from "@/domains/game/chess/components/same-screen-game";
+import { GameModePicker } from "@/domains/game/components/game-mode-picker";
 
 export const metadata: Metadata = {
-  title: "체스 같은 화면 대국 — ScoopHub",
+  title: "체스 — ScoopHub",
 };
 
-export default function ChessPage() {
+export default function ChessModePage() {
   return (
-    <div className="space-y-4">
-      <h1 className="text-2xl font-bold">체스 · 같은 화면 대국</h1>
-      <SameScreenChessGame />
-    </div>
+    <GameModePicker
+      gameId="chess"
+      title="체스"
+      modes={[
+        {
+          title: "같은 화면에서 둘이",
+          description: "한 기기에서 둘이 번갈아 둔다",
+          href: "/game/chess/local",
+          icon: "📱",
+        },
+        {
+          title: "방 만들고 초대하기",
+          description: "초대코드를 보내 서로 다른 기기에서 둔다",
+          href: "/game/room/new?game=chess",
+          icon: "✉️",
+        },
+      ]}
+    />
   );
 }

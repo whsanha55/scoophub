@@ -15,7 +15,7 @@
 
 ## 백엔드 — 게임 방 WebSocket 메시지
 
-- 게임 방 WebSocket(`/ws/game/{code}`, ADR-0003)의 메시지는 `{type, payload}` JSON 으로 주고받는다. → api.md §3의 `{type, data}` 미적용. 프론트 `room-client.ts` 와 한 번에 맞춘 계약이라 이름을 바꾸지 않는다.
+- 게임 방 WebSocket(`/ws/game/{gameId}/{code}`, ADR-0003. 초대코드는 게임마다 따로다)의 메시지는 `{type, payload}` JSON 으로 주고받는다. → api.md §3의 `{type, data}` 미적용. 프론트 `room-client.ts` 와 한 번에 맞춘 계약이라 이름을 바꾸지 않는다.
 - 에러는 `{type: "error", payload: {message}}` 로 보낸다. REST 에러 바디(`{"detail": ...}`)와 다르다.
 
 ## 백엔드 — 데이터 접근 레이어
