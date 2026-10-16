@@ -521,10 +521,23 @@ export function janggiPass(state: JanggiState): { state: JanggiState; notation: 
   return { state: checkLimits(next), notation };
 }
 
-/** 빅장 선언. 기물이 잡힌 뒤부터 부를 수 있고, 성립하면 점수로 판정한다. */
+/** 두 궁이 같은 세로줄에서 사이에 기물 없이 마주 보는지. 빅장 성립 조건이다. */
+function kingsFacing(board: (JanggiPiece | null)[][]): boolean {
+  const cho = findKing(board, "white");
+  const han = findKing(board, "black");
+  if (!cho || !han || cho.col !== han.col) return false;
+  const [top, bottom] = cho.row < han.row ? [cho.row, han.row] : [han.row, cho.row];
+  for (let r = top + 1; r < bottom; r++) {
+    if (board[r][cho.col]) return false;
+  }
+  return true;
+}
+
+/** 빅장 선언. 기물이 잡힌 뒤 두 궁이 마주 볼 때 부를 수 있고, 성립하면 점수로 판정한다. */
 export function janggiDeclareBigjang(state: JanggiState): GameStatus | null {
   if (state.result) return null;
   if (!state.capturedHappened) return null;
+  if (!kingsFacing(state.board)) return null;
   const white = scoreOf(state, "white");
   const black = scoreOf(state, "black");
   const winner = white > black ? "white" : black > white ? "black" : null;

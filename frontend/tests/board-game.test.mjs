@@ -160,17 +160,29 @@ test("3회 반복 무승부", () => {
 
 test("시간패 무승부 판정: 메이트할 기물이 없으면 무승부", () => {
   // 왕+기사1 or 왕+비숍1 or 왕뿐 → 불가
-  assert.equal(hasMatingMaterial([[{ type: "k", color: "w" }, null], [null, null]].concat(Array.from({ length: 6 }, () => [null, null]))), false);
+  assert.equal(hasMatingMaterial([[{ type: "k", color: "w" }, null], [null, null]].concat(Array.from({ length: 6 }, () => [null, null])), "w"), false);
   const boardWithKnight = Array.from({ length: 8 }, (_, r) =>
     r === 7 ? [{ type: "k", color: "w" }, { type: "n", color: "w" }] : [null, null],
   );
-  assert.equal(hasMatingMaterial(boardWithKnight), false);
+  assert.equal(hasMatingMaterial(boardWithKnight, "w"), false);
   const boardWithRook = Array.from({ length: 8 }, (_, r) =>
     r === 7 ? [{ type: "k", color: "w" }, { type: "r", color: "w" }] : [null, null],
   );
-  assert.equal(hasMatingMaterial(boardWithRook), true);
+  assert.equal(hasMatingMaterial(boardWithRook, "w"), true);
   const boardWithBishops = Array.from({ length: 8 }, (_, r) =>
     r === 7 ? [{ type: "k", color: "w" }, { type: "b", color: "w" }, { type: "b", color: "w" }] : [null, null],
   );
-  assert.equal(hasMatingMaterial(boardWithBishops), true);
+  assert.equal(hasMatingMaterial(boardWithBishops, "w"), true);
+});
+
+test("시간패 무승부 판정: 시간이 다 된 쪽의 기물은 세지 않는다", () => {
+  // given — 백은 왕+퀸, 흑은 왕뿐
+  const board = Array.from({ length: 8 }, (_, r) =>
+    r === 7
+      ? [{ type: "k", color: "w" }, { type: "q", color: "w" }, { type: "k", color: "b" }]
+      : [null, null, null],
+  );
+  // then — 백이 시간패해도 흑은 메이트할 기물이 없다
+  assert.equal(hasMatingMaterial(board, "b"), false);
+  assert.equal(hasMatingMaterial(board, "w"), true);
 });

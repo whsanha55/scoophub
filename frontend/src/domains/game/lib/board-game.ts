@@ -33,6 +33,6 @@ export interface BoardGameEngine<S> {
   undo(state: S): S | null;
   status(state: S): GameStatus;
   inCheck(state: S): boolean;
-  /** 기보 표기 목록 (수순) */
+  /** 기보 표기 목록 (둔 순서대로) */
   notationHistory(state: S): string[];
 }

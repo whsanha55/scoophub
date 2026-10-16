@@ -55,7 +55,7 @@ export default function JoinRoomPage() {
         <Button onClick={join} disabled={busy}>
           {busy ? "확인 중…" : "입장"}
         </Button>
-        <p className="text-sm text-muted-foreground">초대 링크로 열렸다면 코드 입력 없이 바로 들어간다.</p>
+        <p className="text-sm text-muted-foreground">공유받은 주소로 열었다면 코드 입력 없이 바로 들어간다.</p>
       </div>
     </div>
   );

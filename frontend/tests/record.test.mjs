@@ -13,7 +13,7 @@ const SAMPLE_MOVES = [
   "Re1", "b5", "Bb3", "d6", "c3", "O-O", "h3",
 ];
 
-test("PGN 왕복: toFile → fromFile 로 수순과 결과가 돌아온다", () => {
+test("PGN 왕복: toFile → fromFile 로 기보와 결과가 돌아온다", () => {
   const record = { game: "chess", moves: SAMPLE_MOVES, result: "1-0" };
   const pgn = chessRecordCodec.toFile(record);
   assert.ok(pgn.includes("[Event \"ScoopHub 체스\"]"));
@@ -38,7 +38,7 @@ test("PGN 결과 없는 기보는 진행 중 표기(*)로 나온다", () => {
   assert.equal(parsed.result, "*");
 });
 
-test("URL 해시 왕복: 압축 → 복원으로 수순이 돌아온다", async () => {
+test("URL 해시 왕복: 압축 → 복원으로 기보가 돌아온다", async () => {
   const record = { game: "chess", moves: SAMPLE_MOVES, result: CHESS_RESULT.white };
   const encoded = await encodeShareRecord(record);
   assert.ok(encoded.startsWith("r="));
@@ -71,7 +71,7 @@ const JANGGI_MOVES = [
   "차 9,1→7,1", "한수쉼", "마 9,2→7,3", "병 6,4→5,4",
 ];
 
-test("장기 기보 왕복: toFile → fromFile 로 수순·상차림·결과가 돌아온다", () => {
+test("장기 기보 왕복: toFile → fromFile 로 기보·상차림·결과가 돌아온다", () => {
   const record = {
     game: "janggi",
     moves: JANGGI_MOVES,

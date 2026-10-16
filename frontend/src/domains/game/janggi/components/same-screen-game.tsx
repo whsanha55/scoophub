@@ -7,7 +7,6 @@ import { RuleStepper } from "../../components/rule-stepper";
 import {
   JANGGI_DEFAULT_RULE,
   clockAfterMove,
-  formatClock,
   initClock,
   isFlagged,
   isUntimed,
@@ -17,6 +16,7 @@ import {
   type TimeRule,
 } from "../../lib/time-control";
 import { janggiEngine, SETUP_PATTERNS, type JanggiState } from "../engine";
+import { ClockView } from "../../components/clock-view";
 import { RecordActions } from "../../components/record-actions";
 import { janggiRecordCodec } from "../../lib/record";
 import { JanggiBoard } from "./janggi-board";
@@ -28,41 +28,6 @@ type Clocks = Record<Side, PlayerClock>;
 
 function sideLabel(side: Side): string {
   return side === "white" ? "초" : "한";
-}
-
-function ClockView({
-  clock,
-  rule,
-  label,
-  active,
-}: {
-  clock: PlayerClock;
-  rule: TimeRule;
-  label: string;
-  active: boolean;
-}) {
-  const ms = clock.inByoYomi ? clock.byoYomiLeftMs : clock.baseLeftMs;
-  return (
-    <div
-      className={`flex items-center justify-between rounded-lg border px-3 py-1.5 ${
-        active ? "border-primary bg-primary/10" : "border-border"
-      }`}
-    >
-      <span className="text-sm font-semibold">{label}</span>
-      {isUntimed(rule) ? (
-        <span className="text-sm text-muted-foreground">무제한</span>
-      ) : (
-        <span className="flex items-baseline gap-2">
-          {clock.inByoYomi && (
-            <span className="text-xs text-muted-foreground">초읽기 ×{clock.byoYomiLeft}</span>
-          )}
-          <span className={`text-lg font-bold tabular-nums ${ms <= 10_000 ? "text-red-500" : ""}`}>
-            {formatClock(ms)}
-          </span>
-        </span>
-      )}
-    </div>
-  );
 }
 
 export function SameScreenJanggiGame() {
@@ -272,7 +237,7 @@ export function SameScreenJanggiGame() {
           {clocks && (
             <ClockView
               clock={clocks[topSide]}
-              rule={rule}
+              untimed={isUntimed(rule)}
               label={sideLabel(topSide)}
               active={phase === "playing" && turn === topSide}
             />
@@ -294,7 +259,7 @@ export function SameScreenJanggiGame() {
           {clocks && (
             <ClockView
               clock={clocks[orientation]}
-              rule={rule}
+              untimed={isUntimed(rule)}
               label={sideLabel(orientation)}
               active={phase === "playing" && turn === orientation}
             />
