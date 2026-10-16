@@ -34,11 +34,6 @@ class GameRoomServiceTest {
     private val limiter = DefaultAbuseLimiter(clock)
     private val service = GameRoomService(clock, limiter)
 
-    @AfterEach
-    fun tearDown() {
-        service.close()
-    }
-
     private fun makeRoom(
         rule: TimeRule = TimeRule(60_000, 10_000, 1),
         preference: SidePreference = SidePreference.WHITE,
@@ -336,5 +331,79 @@ class GameRoomServiceTest {
         }
         assertThat(room.chatSnapshot().filter { !it.system }).hasSize(50)
         assertThat(room.chatSnapshot().last().text).isEqualTo("msg60")
+    }
+
+    @Test
+    fun `재대국은 양쪽 모두 동의해야 시작된다`() {
+        val room = makeRoom()
+        service.join(room.code, "guest2", "상대")
+        service.resign(room, "host")
+        // 한쪽만 누르면 시작 안 함
+        assertThat(service.requestRematch(room, "host")).isFalse()
+        assertThat(room.phase).isEqualTo(RoomPhase.FINISHED)
+        // 상대도 누르면 시작
+        assertThat(service.requestRematch(room, "guest2")).isTrue()
+        assertThat(room.phase).isEqualTo(RoomPhase.PLAYING)
+        assertThat(room.movesSnapshot()).isEmpty()
+        assertThat(room.result).isNull()
+    }
+
+    @Test
+    fun `재대국하면 진영이 서로 바뀐다`() {
+        val room = makeRoom() // host = WHITE
+        service.join(room.code, "guest2", "상대") // BLACK
+        val before = listOf(room.sideOf("host"), room.sideOf("guest2"))
+        service.resign(room, "guest2")
+        service.requestRematch(room, "host")
+        service.requestRematch(room, "guest2")
+        val after = listOf(room.sideOf("host"), room.sideOf("guest2"))
+        assertThat(after).containsExactly(Side.BLACK, Side.WHITE)
+        assertThat(before).containsExactly(Side.WHITE, Side.BLACK)
+    }
+
+    @Test
+    fun `재대국 시작 시 시계와 방 수명이 갱신된다`() {
+        val room = makeRoom(rule = TimeRule(60_000, 0, 0))
+        service.join(room.code, "guest2", "상대")
+        clock.advance(20 * 60_000)
+        service.resign(room, "host")
+        clock.advance(9 * 60_000) // 종료 후 9분 → 아직 정리 아님
+        assertThat(room.expired(clock.now)).isFalse()
+        service.requestRematch(room, "host")
+        service.requestRematch(room, "guest2")
+        // 재대국이 시작되면 수명 타이머가 처음부터 다시 돈다: 새로 끝나고 9분이면 유지
+        service.resign(room, "host")
+        clock.advance(9 * 60_000)
+        assertThat(room.expired(clock.now)).isFalse()
+        clock.advance(2 * 60_000)
+        assertThat(room.expired(clock.now)).isTrue()
+        // 시계도 새로 채워졌다
+        assertThat(room.clockSnapshot().getValue(Side.WHITE).baseLeftMs).isEqualTo(60_000)
+    }
+
+    @Test
+    fun `대국자가 나가면 재대국을 할 수 없다`() {
+        val room = makeRoom()
+        service.join(room.code, "guest2", "상대")
+        service.resign(room, "host")
+        service.leave(room, "guest2")
+        assertThat(room.playerOf("guest2")).isNull()
+        assertThat(service.requestRematch(room, "host")).isFalse()
+        assertThat(room.phase).isEqualTo(RoomPhase.FINISHED)
+    }
+
+    @Test
+    fun `재대국 직전 방장만 시간 규칙을 바꿀 수 있다`() {
+        val room = makeRoom()
+        service.join(room.code, "guest2", "상대")
+        service.resign(room, "host")
+        val newRule = TimeRule(5 * 60_000, 10_000, 3)
+        assertThat(service.updateTimeRule(room, "guest2", newRule)).isFalse()
+        assertThat(service.updateTimeRule(room, "host", newRule)).isTrue()
+        service.requestRematch(room, "host")
+        service.requestRematch(room, "guest2")
+        assertThat(room.clockSnapshot().getValue(Side.WHITE).baseLeftMs)
+            .isEqualTo(5 * 60_000)
+        assertThat(room.clockSnapshot().getValue(Side.WHITE).byoYomiLeft).isEqualTo(3)
     }
 }

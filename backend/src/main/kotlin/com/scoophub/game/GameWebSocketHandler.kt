@@ -7,6 +7,7 @@ import com.scoophub.game.domain.RoomPhase
 import com.scoophub.game.domain.RoomPlayer
 import com.scoophub.game.domain.RoomResult
 import com.scoophub.game.domain.Side
+import com.scoophub.game.domain.TimeRule
 import com.scoophub.game.service.GameRoomService
 import com.scoophub.game.service.RoomEvent
 import com.scoophub.game.service.RoomLookup
@@ -107,6 +108,27 @@ class GameWebSocketHandler(
 
             "resign" -> gameRoomService.resign(room, guestId)
 
+            "rematch" -> gameRoomService.requestRematch(room, guestId)
+
+            "leave" -> {
+                gameRoomService.leave(room, guestId)
+                session.close(CloseStatus.NORMAL)
+            }
+
+            "time_rule" -> {
+                val rule = payload["rule"] as? Map<*, *>
+                if (rule != null) {
+                    val parsed = TimeRule(
+                        baseMs = (rule["base_ms"] as? Number)?.toLong() ?: 0,
+                        byoYomiMs = (rule["byo_yomi_ms"] as? Number)?.toLong() ?: 0,
+                        byoYomiCount = (rule["byo_yomi_count"] as? Number)?.toInt() ?: 0,
+                    )
+                    if (!gameRoomService.updateTimeRule(room, guestId, parsed)) {
+                        send(session, mapOf("type" to "error", "payload" to mapOf("message" to "지금은 시간 규칙을 바꿀 수 없습니다")))
+                    }
+                }
+            }
+
             "chat" -> {
                 val text = payload["text"]?.toString() ?: return
                 if (gameRoomService.chat(room, guestId, text) == null) {
@@ -165,35 +187,40 @@ class GameWebSocketHandler(
     }
 
     private fun sendRoomState(room: GameRoom, guestId: String, session: WebSocketSession) {
-        val payload = roomPayload(room, room.sideOf(guestId))
+        val payload = roomPayload(room, guestId)
         send(session, mapOf("type" to "room", "payload" to payload))
     }
 
-    private fun roomPayload(room: GameRoom, youAre: Side?): Map<String, Any?> = mapOf(
-        "phase" to when (room.phase) {
-            RoomPhase.WAITING -> "waiting"
-            RoomPhase.PLAYING -> "playing"
-            RoomPhase.FINISHED -> "finished"
-        },
-        "game_id" to room.gameId,
-        "time_rule" to mapOf(
-            "base_ms" to room.timeRule.baseMs,
-            "byo_yomi_ms" to room.timeRule.byoYomiMs,
-            "byo_yomi_count" to room.timeRule.byoYomiCount,
-        ),
-        "players" to room.playersSnapshot().associate { player ->
-            player.side.name.lowercase() to player.nickname
-        },
-        "you_are" to youAre?.name?.lowercase(),
-        "role" to if (youAre != null) "player" else "spectator",
-        "spectators" to room.spectatorsSnapshot().map { it.nickname },
-        "chat" to room.chatSnapshot().map { chatEntryPayload(it) },
-        "turn" to room.turn().name.lowercase(),
-        "moves" to room.movesSnapshot().map { movePayloadEntry(it) },
-        "clocks" to clocksPayload(room),
-        "result" to room.result?.let { resultPayload(it) },
-        "server_now" to clock.instant().toEpochMilli(),
-    )
+    private fun roomPayload(room: GameRoom, guestId: String): Map<String, Any?> {
+        val youAre = room.sideOf(guestId)
+        return mapOf(
+            "phase" to when (room.phase) {
+                RoomPhase.WAITING -> "waiting"
+                RoomPhase.PLAYING -> "playing"
+                RoomPhase.FINISHED -> "finished"
+            },
+            "game_id" to room.gameId,
+            "time_rule" to mapOf(
+                "base_ms" to room.timeRule.baseMs,
+                "byo_yomi_ms" to room.timeRule.byoYomiMs,
+                "byo_yomi_count" to room.timeRule.byoYomiCount,
+            ),
+            "players" to room.playersSnapshot().associate { player ->
+                player.side.name.lowercase() to player.nickname
+            },
+            "you_are" to youAre?.name?.lowercase(),
+            "role" to if (youAre != null) "player" else "spectator",
+            "you_are_host" to (guestId == room.hostGuestId),
+            "spectators" to room.spectatorsSnapshot().map { it.nickname },
+            "chat" to room.chatSnapshot().map { chatEntryPayload(it) },
+            "turn" to room.turn().name.lowercase(),
+            "moves" to room.movesSnapshot().map { movePayloadEntry(it) },
+            "rematch_votes" to room.rematchVotesSnapshot(),
+            "clocks" to clocksPayload(room),
+            "result" to room.result?.let { resultPayload(it) },
+            "server_now" to clock.instant().toEpochMilli(),
+        )
+    }
 
     private fun clocksPayload(room: GameRoom): Map<String, Any?> = room.clockSnapshot().entries.associate { (side, c) ->
         side.name.lowercase() to mapOf(

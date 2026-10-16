@@ -19,6 +19,7 @@ import {
 } from "../../lib/time-control";
 import { chessEngine, type ChessState } from "../engine";
 import { ChessBoard } from "./chess-board";
+import { RuleStepper } from "../../components/rule-stepper";
 
 function replayChess(moves: RoomSnapshot["moves"]): ChessState {
   let state = chessEngine.initialState();
@@ -77,6 +78,7 @@ export function InviteChessGame({ code }: { code: string }) {
   const [chat, setChat] = useState<ChatEntry[]>([]);
   const [chatInput, setChatInput] = useState("");
   const [flipped, setFlipped] = useState(false);
+  const [ruleDraft, setRuleDraft] = useState({ baseMin: 10, byoSec: 30, byoCount: 1 });
   const socketRef = useRef<RoomSocket | null>(null);
   const lastTickRef = useRef(0);
   const snapRef = useRef<RoomSnapshot | null>(null);
@@ -212,6 +214,26 @@ export function InviteChessGame({ code }: { code: string }) {
     } catch {
       setNotice("링크 복사에 실패했다");
     }
+  };
+
+  const myNickname = mySide ? snapshot?.players[mySide] : null;
+  const voted = !!(myNickname && snapshot?.rematchVotes.includes(myNickname));
+  const playersPresent = !!(snapshot?.players.white && snapshot?.players.black);
+  const updateRuleDraft = (key: "baseMin" | "byoSec" | "byoCount", value: number) => {
+    setRuleDraft((prev) => {
+      const next = { ...prev, [key]: value };
+      send({
+        type: "time_rule",
+        payload: {
+          rule: {
+            base_ms: next.baseMin * 60_000,
+            byo_yomi_ms: next.byoSec * 1000,
+            byo_yomi_count: next.byoSec > 0 ? next.byoCount : 0,
+          },
+        },
+      });
+      return next;
+    });
   };
 
   if (fatal) {
@@ -437,7 +459,7 @@ export function InviteChessGame({ code }: { code: string }) {
             </div>
           </div>
           {snapshot.phase === "finished" && snapshot.result && (
-            <div className="flex flex-col items-center gap-2 rounded-xl border bg-card p-5 text-center">
+            <div className="flex flex-col items-center gap-3 rounded-xl border bg-card p-5 text-center">
               <p className="text-lg font-bold">
                 {snapshot.result.winner
                   ? snapshot.result.winner === mySide
@@ -446,7 +468,48 @@ export function InviteChessGame({ code }: { code: string }) {
                   : "무승부"}
               </p>
               <p className="text-sm text-muted-foreground">{snapshot.result.reason}</p>
-              <Button onClick={() => router.push("/game")}>나가기</Button>
+              {mySide ? (
+                <>
+                  {playersPresent ? (
+                    <>
+                      <Button onClick={() => send({ type: "rematch" })}>
+                        {voted ? "한 판 더 — 상대 동의 기다리는 중" : "한 판 더"}
+                      </Button>
+                      {snapshot.rematchVotes.length === 1 && (
+                        <p className="text-sm text-muted-foreground">
+                          {snapshot.rematchVotes[0]} 님이 기다리는 중
+                        </p>
+                      )}
+                      {snapshot.youAreHost && (
+                        <div className="flex w-full flex-col gap-2 rounded-lg border p-3 text-left">
+                          <p className="text-xs text-muted-foreground">
+                            재대국 시간 규칙 (시작 전에 바꿀 수 있다)
+                          </p>
+                          <RuleStepper label="기본 시간" value={ruleDraft.baseMin} suffix="분" step={1} min={0} max={60} onChange={(v) => updateRuleDraft("baseMin", v)} />
+                          <RuleStepper label="초읽기" value={ruleDraft.byoSec} suffix="초" step={5} min={0} max={60} onChange={(v) => updateRuleDraft("byoSec", v)} />
+                          <RuleStepper label="초읽기 횟수" value={ruleDraft.byoCount} suffix="회" step={1} min={ruleDraft.byoSec > 0 ? 1 : 0} max={5} onChange={(v) => updateRuleDraft("byoCount", v)} />
+                        </div>
+                      )}
+                    </>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">
+                      상대가 방을 나가서 재대국을 할 수 없다
+                    </p>
+                  )}
+                </>
+              ) : (
+                <p className="text-sm text-muted-foreground">관전 중인 대국이 끝났다</p>
+              )}
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  send({ type: "leave" });
+                  router.push("/game");
+                }}
+              >
+                나가기
+              </Button>
             </div>
           )}
         </>

@@ -42,10 +42,16 @@ data class RoomResult(val winner: Side?, val reason: String)
 class GameRoom(
     val code: String,
     val gameId: String,
-    val timeRule: TimeRule,
+    /** 재대국 직전에 방장이 시간 규칙을 바꿀 수 있다. */
+    var timeRule: TimeRule,
     private val hostPreference: SidePreference,
     val createdAt: Instant,
 ) {
+    /** 방장 게스트. 시간 규칙 변경 권한이 있다. */
+    var hostGuestId: String? = null
+        private set
+
+    private val rematchVotes = mutableSetOf<String>()
     var phase = RoomPhase.WAITING
         private set
     private val players = mutableListOf<RoomPlayer>()
@@ -105,7 +111,10 @@ class GameRoom(
 
             else -> players.first().side.opposite()
         }
-        if (players.isEmpty()) hostSide = side
+        if (players.isEmpty()) {
+            hostSide = side
+            hostGuestId = guestId
+        }
         players.add(RoomPlayer(guestId = guestId, nickname = nickname, side = side, lastSeen = now))
         if (players.size == 2) start(now)
         return JoinResult(side = side, role = Role.PLAYER, allowed = true)
@@ -256,6 +265,60 @@ class GameRoom(
     private fun finish(result: RoomResult) {
         this.result = result
         phase = RoomPhase.FINISHED
+    }
+
+    /**
+     * 재대국 투표. 끝난 방에서 양쪽 대국자가 모두 눌러야 새 대국이 시작된다.
+     * 대국자가 한 명이라도 방을 나가면 더 이상 할 수 없다.
+     */
+    fun requestRematch(guestId: String, now: Instant): Boolean {
+        touch(now)
+        if (phase != RoomPhase.FINISHED) return false
+        val player = playerOf(guestId) ?: return false
+        if (players.size < 2) return false
+        rematchVotes.add(guestId)
+        player.lastSeen = now
+        if (rematchVotes.size < 2 || rematchVotes != players.map { it.guestId }.toSet()) {
+            return false
+        }
+        startRematch(now)
+        return true
+    }
+
+    private fun startRematch(now: Instant) {
+        // 진영 교대: 백과 흑이 서로 바뀐다
+        for (i in players.indices) {
+            players[i] = players[i].copy(side = players[i].side.opposite())
+        }
+        moves.clear()
+        rematchVotes.clear()
+        result = null
+        phase = RoomPhase.PLAYING
+        clocks = mutableMapOf(
+            Side.WHITE to initClock(timeRule),
+            Side.BLACK to initClock(timeRule),
+        )
+        startedAt = now
+        touch(now) // 방 수명 타이머를 처음부터 다시 잰다
+    }
+
+    /** 재대국 투표 현황(닉네임). */
+    fun rematchVotesSnapshot(): List<String> = rematchVotes.map { v -> playerOf(v)?.nickname ?: return@map v }
+
+    /** 대국자가 방을 나간다. 나가면 재대국을 할 수 없다. */
+    fun removePlayer(guestId: String): RoomPlayer? {
+        rematchVotes.remove(guestId)
+        val player = playerOf(guestId) ?: return null
+        players.remove(player)
+        return player
+    }
+
+    /** 끝난 방에서 방장이 시간 규칙을 바꾼다(재대국 시작 전까지). */
+    fun updateTimeRule(guestId: String, rule: TimeRule, now: Instant): Boolean {
+        touch(now)
+        if (phase != RoomPhase.FINISHED || hostGuestId != guestId) return false
+        timeRule = rule
+        return true
     }
 
     private fun touch(now: Instant) {
