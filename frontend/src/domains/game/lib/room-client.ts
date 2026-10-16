@@ -186,7 +186,7 @@ export async function createRoom(input: CreateRoomInput, guestId: string, nickna
         byo_yomi_count: input.timeRule.byoYomiCount,
       },
       side_preference: input.sidePreference,
-      requires_setup: input.requiresSetup ?? false,
+      is_setup_required: input.requiresSetup ?? false,
       guest_id: guestId,
       nickname,
     }),
@@ -217,6 +217,6 @@ export async function checkRoom(code: string): Promise<RoomSummary> {
     exists: data.exists as boolean,
     phase: (data.phase?.toLowerCase() as RoomSummary["phase"]) ?? null,
     gameId: (data.game_id as string) ?? null,
-    full: (data.full as boolean) ?? null,
+    full: (data.is_full as boolean) ?? null,
   };
 }

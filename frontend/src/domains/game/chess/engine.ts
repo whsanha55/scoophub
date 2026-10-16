@@ -2,11 +2,14 @@
 import { Chess, type Move, type Square } from "chess.js";
 import type { BoardGameEngine, GameStatus, PieceInfo } from "../lib/board-game";
 
-/** 상대가 메이트할 기물이 있는지. 없으면 시간패 대신 무승부다. */
-export function hasMatingMaterial(board: (null | { type: string; color: string })[][]): boolean {
+/** color 진영에 메이트할 기물이 있는지. 시간패한 쪽의 상대에게 없으면 시간패 대신 무승부다. */
+export function hasMatingMaterial(
+  board: (null | { type: string; color: string })[][],
+  color: "w" | "b",
+): boolean {
   const pieces = board
     .flat()
-    .filter((p): p is { type: string; color: string } => p !== null);
+    .filter((p): p is { type: string; color: string } => p !== null && p.color === color);
   // 폰·룩·퀸은 물론 소수 기물 조합도 메이트 가능성이 있다.
   // 왕뿐이거나 왕+기사1/비숍1만으로는 강제 메이트가 불가능하다.
   const nonKings = pieces.filter((p) => p.type !== "k");
@@ -83,7 +86,7 @@ export const chessEngine: BoardGameEngine<ChessState> = {
       .moves({ square: from as Square, verbose: true })
       .some((m) => m.to === to);
     if (!legal) return null;
-    // 반복 무승부 판정에는 수순이 필요하므로 초기 국면에서 수순을 다시 놓는다
+    // 반복 무승부 판정에는 지금까지 둔 수가 필요하므로 초기 국면에서 기보를 다시 놓는다
     const next = new Chess();
     for (const hist of game.history()) {
       next.move(hist);

@@ -7,7 +7,6 @@ import { ChessBoard } from "./chess-board";
 import {
   CHESS_DEFAULT_RULE,
   clockAfterMove,
-  formatClock,
   initClock,
   isFlagged,
   isUntimed,
@@ -17,6 +16,8 @@ import {
   type TimeRule,
 } from "../../lib/time-control";
 import { chessEngine, hasMatingMaterial, type ChessState } from "../engine";
+import { ClockView } from "../../components/clock-view";
+import { RuleStepper } from "../../components/rule-stepper";
 import { RecordActions } from "../../components/record-actions";
 import { CHESS_RESULT, chessRecordCodec } from "../../lib/record";
 import type { GameStatus } from "../../lib/board-game";
@@ -25,91 +26,6 @@ const ROTATE_KEY = "game.board.rotate";
 
 type Phase = "setup" | "playing" | "over";
 type Clocks = Record<Side, PlayerClock>;
-
-function ClockView({
-  clock,
-  rule,
-  label,
-  active,
-}: {
-  clock: PlayerClock;
-  rule: TimeRule;
-  label: string;
-  active: boolean;
-}) {
-  const ms = clock.inByoYomi ? clock.byoYomiLeftMs : clock.baseLeftMs;
-  return (
-    <div
-      className={`flex items-center justify-between rounded-lg border px-3 py-1.5 ${
-        active ? "border-primary bg-primary/10" : "border-border"
-      }`}
-    >
-      <span className="text-sm font-semibold">{label}</span>
-      {isUntimed(rule) ? (
-        <span className="text-sm text-muted-foreground">무제한</span>
-      ) : (
-        <span className="flex items-baseline gap-2">
-          {clock.inByoYomi && (
-            <span className="text-xs text-muted-foreground">
-              초읽기 ×{clock.byoYomiLeft}
-            </span>
-          )}
-          <span className={`text-lg font-bold tabular-nums ${ms <= 10_000 ? "text-red-500" : ""}`}>
-            {formatClock(ms)}
-          </span>
-        </span>
-      )}
-    </div>
-  );
-}
-
-function RuleStepper({
-  label,
-  value,
-  suffix,
-  step,
-  min,
-  max,
-  onChange,
-}: {
-  label: string;
-  value: number;
-  suffix: string;
-  step: number;
-  min: number;
-  max: number;
-  onChange: (v: number) => void;
-}) {
-  return (
-    <div className="flex items-center justify-between gap-2">
-      <span className="text-sm text-muted-foreground">{label}</span>
-      <div className="flex items-center gap-1.5">
-        <Button
-          variant="outline"
-          size="icon-sm"
-          aria-label={`${label} 감소`}
-          disabled={value <= min}
-          onClick={() => onChange(Math.max(min, value - step))}
-        >
-          −
-        </Button>
-        <span className="w-16 text-center text-sm font-semibold tabular-nums">
-          {value}
-          {suffix}
-        </span>
-        <Button
-          variant="outline"
-          size="icon-sm"
-          aria-label={`${label} 증가`}
-          disabled={value >= max}
-          onClick={() => onChange(Math.min(max, value + step))}
-        >
-          +
-        </Button>
-      </div>
-    </div>
-  );
-}
 
 export function SameScreenChessGame() {
   const [phase, setPhase] = useState<Phase>("setup");
@@ -182,7 +98,7 @@ export function SameScreenChessGame() {
           // 상대에게 메이트할 기물이 없으면 시간패 대신 무승부
           const board = stateRef.current.game.board();
           const opponent: Side = mover === "white" ? "black" : "white";
-          const winner = hasMatingMaterial(board) ? opponent : null;
+          const winner = hasMatingMaterial(board, opponent === "white" ? "w" : "b") ? opponent : null;
           setResult({
             over: true,
             winner,
@@ -298,7 +214,7 @@ export function SameScreenChessGame() {
           {clocks && (
             <ClockView
               clock={clocks[topSide]}
-              rule={rule}
+              untimed={isUntimed(rule)}
               label={topSide === "white" ? "백" : "흑"}
               active={phase === "playing" && turn === topSide}
             />
@@ -348,7 +264,7 @@ export function SameScreenChessGame() {
           {clocks && (
             <ClockView
               clock={clocks[orientation]}
-              rule={rule}
+              untimed={isUntimed(rule)}
               label={orientation === "white" ? "백" : "흑"}
               active={phase === "playing" && turn === orientation}
             />
