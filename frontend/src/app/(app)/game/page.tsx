@@ -15,6 +15,12 @@ const games = [
     emoji: "♟️",
   },
   {
+    title: "장기 · 같은 화면 대국",
+    description: "한 기기에서 둘이 번갈아 두는 장기 대국",
+    href: "/game/janggi",
+    emoji: "🎴",
+  },
+  {
     title: "체스 · 초대 대국 만들기",
     description: "초대코드로 서로 다른 기기에서 두는 체스 대국",
     href: "/game/room/new",
