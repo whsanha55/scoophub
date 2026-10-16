@@ -14,6 +14,18 @@ const games = [
     href: "/game/chess",
     emoji: "♟️",
   },
+  {
+    title: "체스 · 초대 대국 만들기",
+    description: "초대코드로 서로 다른 기기에서 두는 체스 대국",
+    href: "/game/room/new",
+    emoji: "✉️",
+  },
+  {
+    title: "초대코드로 입장",
+    description: "받은 6자리 초대코드로 방에 들어간다",
+    href: "/game/join",
+    emoji: "🔑",
+  },
 ];
 
 export default function GamePage() {
