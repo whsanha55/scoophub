@@ -25,6 +25,8 @@ export interface RoomSnapshot {
   players: { white: string | null; black: string | null };
   youAre: "white" | "black" | null;
   role: "player" | "spectator";
+  youAreHost: boolean;
+  rematchVotes: string[];
   spectators: string[];
   chat: ChatEntry[];
   turn: "white" | "black";
@@ -74,6 +76,8 @@ function mapSnapshot(raw: Record<string, unknown>): RoomSnapshot {
     players: { white: playersRaw.white ?? null, black: playersRaw.black ?? null },
     youAre: (raw.you_are as RoomSnapshot["youAre"]) ?? null,
     role: (raw.role as RoomSnapshot["role"]) ?? "spectator",
+    youAreHost: (raw.you_are_host as boolean) ?? false,
+    rematchVotes: (raw.rematch_votes as string[]) ?? [],
     spectators: (raw.spectators as string[]) ?? [],
     chat: (raw.chat as ChatEntry[]) ?? [],
     turn: raw.turn as RoomSnapshot["turn"],

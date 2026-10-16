@@ -214,6 +214,35 @@ class GameRoomService(private val clock: Clock, private val limiter: AbuseLimite
         return move
     }
 
+    /** 재대국. 두 대국자 모두 동의하면 시작된다. 시작되면 true. */
+    fun requestRematch(room: GameRoom, guestId: String): Boolean {
+        val started = room.requestRematch(guestId, clock.instant())
+        if (started) {
+            lastClockTick[room.code] = clock.instant()
+        }
+        eventListener?.invoke(RoomEvent.StateChanged(room))
+        return started
+    }
+
+    /** 끝난 방에서 방장이 시간 규칙을 바꾼다. */
+    fun updateTimeRule(room: GameRoom, guestId: String, rule: TimeRule): Boolean {
+        val changed = room.updateTimeRule(guestId, rule, clock.instant())
+        if (changed) {
+            eventListener?.invoke(RoomEvent.StateChanged(room))
+        }
+        return changed
+    }
+
+    /** 방 나가기. 대국자가 나가면 재대국을 할 수 없다. */
+    fun leave(room: GameRoom, guestId: String) {
+        val now = clock.instant()
+        val nickname = room.removePlayer(guestId)?.nickname ?: room.removeSpectator(guestId)?.nickname
+        if (nickname != null) {
+            room.addSystemChat("$nickname 나감", now)
+            eventListener?.invoke(RoomEvent.StateChanged(room))
+        }
+    }
+
     fun resign(room: GameRoom, guestId: String): RoomResult? {
         val result = room.resign(guestId, clock.instant()) ?: return null
         eventListener?.invoke(RoomEvent.Ended(room, result))
