@@ -26,6 +26,12 @@ const games = [
     href: "/game/join",
     emoji: "🔑",
   },
+  {
+    title: "기보 다시보기",
+    description: "PGN 파일을 불러오거나 공유 링크로 대국을 다시 본다",
+    href: "/game/review",
+    emoji: "📖",
+  },
 ];
 
 export default function GamePage() {
