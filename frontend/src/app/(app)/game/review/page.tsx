@@ -11,13 +11,23 @@ export default function ReviewPage() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const hash = window.location.hash.slice(1);
-    if (!hash) return;
-    (async () => {
-      const decoded = await RECORD_CODECS.chess.decodeShare(hash);
-      if (decoded) setRecord(decoded);
-      else setError("링크에서 기보를 읽을 수 없다");
-    })();
+    const load = () => {
+      const hash = window.location.hash.slice(1);
+      if (!hash) return;
+      (async () => {
+        const decoded = await RECORD_CODECS.chess.decodeShare(hash);
+        if (decoded) {
+          setRecord(decoded);
+          setError(null);
+        } else {
+          setError("링크에서 기보를 읽을 수 없다");
+        }
+      })();
+    };
+    load();
+    // 같은 경로에서 다른 공유 링크를 열 때도 따라간다
+    window.addEventListener("hashchange", load);
+    return () => window.removeEventListener("hashchange", load);
   }, []);
 
   const onFile = async (file: File) => {
