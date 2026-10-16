@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { ensureGuestId, ensureNickname } from "../../lib/guest";
 import {
   RoomSocket,
+  type ChatEntry,
   type ConnectionState,
   type RoomSnapshot,
 } from "../../lib/room-client";
@@ -73,6 +74,9 @@ export function InviteChessGame({ code }: { code: string }) {
   const [confirmingResign, setConfirmingResign] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [clocks, setClocks] = useState<{ white: PlayerClock; black: PlayerClock } | null>(null);
+  const [chat, setChat] = useState<ChatEntry[]>([]);
+  const [chatInput, setChatInput] = useState("");
+  const [flipped, setFlipped] = useState(false);
   const socketRef = useRef<RoomSocket | null>(null);
   const lastTickRef = useRef(0);
   const snapRef = useRef<RoomSnapshot | null>(null);
@@ -97,6 +101,7 @@ export function InviteChessGame({ code }: { code: string }) {
           (msg) => {
             if (msg.type === "room") {
               setSnapshot(msg.payload);
+              setChat(msg.payload.chat);
               setClocks(msg.payload.clocks);
               lastTickRef.current = Date.now();
             } else if (msg.type === "error") {
@@ -109,6 +114,8 @@ export function InviteChessGame({ code }: { code: string }) {
               setNotice(msg.payload.message);
             } else if (msg.type === "game_end") {
               setNotice(null);
+            } else if (msg.type === "chat") {
+              setChat((prev) => [...prev.slice(-80), msg.payload]);
             }
           },
           (state) => setConn(state),
@@ -164,7 +171,7 @@ export function InviteChessGame({ code }: { code: string }) {
 
   const onSquareTap = (square: string) => {
     if (!snapshot || snapshot.phase !== "playing" || !state) return;
-    if (mySide !== turn) return;
+    if (!mySide || mySide !== turn) return; // 관전자는 둘 수 없다
     if (selected) {
       if (targets.includes(square)) {
         const r = chessEngine.applyMove(state, selected, square);
@@ -229,9 +236,13 @@ export function InviteChessGame({ code }: { code: string }) {
     );
   }
 
-  const opponentSide: Side = mySide === "white" ? "black" : "white";
+  const isSpectator = snapshot.role === "spectator";
+  // 관전자는 백 쪽이 아래로 고정, 직접 뒤집어 볼 수 있다
+  const myView: Side = isSpectator ? (flipped ? "black" : "white") : (mySide ?? "white");
+  const opponentSide: Side = myView === "white" ? "black" : "white";
   const opponentLabel =
-    snapshot.players[opponentSide] ?? (snapshot.phase === "waiting" ? "상대를 기다리는 중…" : "");
+    snapshot.players[opponentSide] ??
+    (snapshot.phase === "waiting" ? "상대를 기다리는 중…" : "");
 
   return (
     <div className="mx-auto flex w-full max-w-xl flex-col gap-3">
@@ -284,7 +295,7 @@ export function InviteChessGame({ code }: { code: string }) {
           )}
           <ChessBoard
             pieces={pieces}
-            orientation={mySide ?? "white"}
+            orientation={myView}
             selected={selected}
             targets={targets}
             lastMove={lastEntry ? { from: lastEntry.from, to: lastEntry.to } : null}
@@ -299,19 +310,37 @@ export function InviteChessGame({ code }: { code: string }) {
               untimed={isUntimed(snapshot.timeRule)}
             />
           )}
+          {clocks && !mySide && (
+            <ClockView
+              clock={clocks[myView]}
+              label={snapshot.players[myView] ?? ""}
+              active={snapshot.phase === "playing" && turn === myView}
+              untimed={isUntimed(snapshot.timeRule)}
+            />
+          )}
           <div className="flex flex-wrap items-center justify-between gap-2">
             <span className="text-sm font-medium">
               {snapshot.phase === "playing" ? (
                 <>
-                  {turn === mySide ? "내 차례" : `${opponentLabel} 차례`}
+                  {isSpectator
+                    ? `${turn === "white" ? "백" : "흑"} 차례 · 관전 ${snapshot.spectators.length + 1}명`
+                    : turn === mySide
+                      ? "내 차례"
+                      : `${opponentLabel} 차례`}
                   {chessEngine.inCheck(state ?? chessEngine.initialState()) && (
                     <span className="ml-1 font-bold text-red-500">체크!</span>
                   )}
                 </>
               ) : null}
             </span>
-            {snapshot.phase === "playing" && (
-              <div className="flex gap-2">
+            <div className="flex gap-2">
+              {isSpectator && (
+                <Button variant="outline" size="sm" onClick={() => setFlipped((f) => !f)}>
+                  뒤집기
+                </Button>
+              )}
+              {snapshot.phase === "playing" && (
+                <div className="flex gap-2">
                 {isUntimed(snapshot.timeRule) && (
                   <Button
                     variant="outline"
@@ -324,21 +353,22 @@ export function InviteChessGame({ code }: { code: string }) {
                     승리 처리
                   </Button>
                 )}
-                {confirmingResign ? (
-                  <Button
-                    variant="destructive"
-                    size="sm"
-                    onClick={() => send({ type: "resign" })}
-                  >
-                    기권 확정
-                  </Button>
-                ) : (
-                  <Button variant="outline" size="sm" onClick={() => setConfirmingResign(true)}>
-                    기권
-                  </Button>
-                )}
-              </div>
-            )}
+                  {confirmingResign ? (
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      onClick={() => send({ type: "resign" })}
+                    >
+                      기권 확정
+                    </Button>
+                  ) : (
+                    <Button variant="outline" size="sm" onClick={() => setConfirmingResign(true)}>
+                      기권
+                    </Button>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
           {snapshot.moves.length > 0 && (
             <div className="max-h-40 overflow-y-auto rounded-lg border bg-card p-2">
@@ -353,6 +383,59 @@ export function InviteChessGame({ code }: { code: string }) {
               </ol>
             </div>
           )}
+          <div className="flex flex-col gap-2 rounded-lg border bg-card p-2">
+            <div className="flex max-h-48 flex-col gap-1 overflow-y-auto" aria-live="polite">
+              {chat.length === 0 && (
+                <p className="py-2 text-center text-sm text-muted-foreground">채팅이 없다</p>
+              )}
+              {chat.map((entry, i) =>
+                entry.system ? (
+                  <p key={i} className="text-center text-xs text-muted-foreground">
+                    {entry.text}
+                  </p>
+                ) : (
+                  <p key={i} className="text-sm">
+                    <span
+                      className={`mr-1.5 rounded px-1 py-0.5 text-xs ${
+                        entry.fromPlayer ? "bg-primary/15 text-primary" : "bg-muted text-muted-foreground"
+                      }`}
+                    >
+                      {entry.fromPlayer ? "대국자" : "관전"}
+                    </span>
+                    <span className="font-semibold">{entry.nickname}</span>{" "}
+                    {entry.text}
+                  </p>
+                ),
+              )}
+            </div>
+            <div className="flex gap-2">
+              <input
+                className="flex-1 rounded-md border bg-background px-2 py-1 text-sm outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                placeholder="메시지 (200자까지)"
+                aria-label="채팅 메시지"
+                maxLength={200}
+                value={chatInput}
+                onChange={(e) => setChatInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && chatInput.trim()) {
+                    send({ type: "chat", payload: { text: chatInput.trim() } });
+                    setChatInput("");
+                  }
+                }}
+              />
+              <Button
+                size="sm"
+                disabled={!chatInput.trim()}
+                onClick={() => {
+                  if (!chatInput.trim()) return;
+                  send({ type: "chat", payload: { text: chatInput.trim() } });
+                  setChatInput("");
+                }}
+              >
+                보내기
+              </Button>
+            </div>
+          </div>
           {snapshot.phase === "finished" && snapshot.result && (
             <div className="flex flex-col items-center gap-2 rounded-xl border bg-card p-5 text-center">
               <p className="text-lg font-bold">

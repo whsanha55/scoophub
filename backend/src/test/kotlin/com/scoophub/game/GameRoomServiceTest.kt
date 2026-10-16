@@ -1,6 +1,7 @@
 package com.scoophub.game
 
 import com.scoophub.game.domain.GameRoom
+import com.scoophub.game.domain.Role
 import com.scoophub.game.domain.RoomPhase
 import com.scoophub.game.domain.Side
 import com.scoophub.game.domain.SidePreference
@@ -64,8 +65,8 @@ class GameRoomServiceTest {
     @Test
     fun `두 대국자가 모이면 대국이 시작된다`() {
         val room = makeRoom(preference = SidePreference.WHITE)
-        val side = service.join(room.code, "guest2", "상대")
-        assertThat(side).isEqualTo(Side.BLACK)
+        val join = service.join(room.code, "guest2", "상대")
+        assertThat(join.side).isEqualTo(Side.BLACK)
         assertThat(room.phase).isEqualTo(RoomPhase.PLAYING)
     }
 
@@ -73,7 +74,8 @@ class GameRoomServiceTest {
     fun `정원이 찬 방에는 대국자로 들어올 수 없다`() {
         val room = makeRoom()
         service.join(room.code, "guest2", "상대")
-        assertThat(service.join(room.code, "guest3", "늦은이")).isNull()
+        // 대국자 정원 초과 → 관전자로 배정된다
+        assertThat(service.join(room.code, "guest3", "늦은이").role).isEqualTo(Role.SPECTATOR)
     }
 
     @Test
@@ -81,7 +83,8 @@ class GameRoomServiceTest {
         val room = makeRoom()
         service.join(room.code, "guest2", "상대")
         val again = service.join(room.code, "host", "방장")
-        assertThat(again).isEqualTo(Side.WHITE)
+        assertThat(again.side).isEqualTo(Side.WHITE)
+        assertThat(again.role).isEqualTo(Role.PLAYER)
         assertThat(room.playerCount).isEqualTo(2)
     }
 
@@ -249,5 +252,89 @@ class GameRoomServiceTest {
         }.isInstanceOf(RoomLimitException::class.java)
         service.closeRoom(rooms.first().code)
         service.createRoom("chess", TimeRule.untimed(), SidePreference.RANDOM, "g1", "닉", "1.1.1.1")
+    }
+
+    @Test
+    fun `관전자는 방당 최대 10명이다`() {
+        val room = makeRoom()
+        service.join(room.code, "guest2", "상대")
+        repeat(10) { i ->
+            val join = service.join(room.code, "spec$i", "관전$i")
+            assertThat(join.role).isEqualTo(Role.SPECTATOR)
+            assertThat(join.allowed).isTrue()
+        }
+        val join = service.join(room.code, "spec11", "넘침")
+        assertThat(join.allowed).isFalse()
+    }
+
+    @Test
+    fun `관전자 재참가는 같은 자리다`() {
+        val room = makeRoom()
+        service.join(room.code, "guest2", "상대")
+        service.join(room.code, "spec1", "관전1")
+        service.disconnect(room, "spec1")
+        assertThat(room.spectatorsSnapshot().map { it.guestId }).doesNotContain("spec1")
+        val again = service.join(room.code, "spec1", "관전1")
+        assertThat(again.role).isEqualTo(Role.SPECTATOR)
+        assertThat(room.spectatorsSnapshot().map { it.guestId }).contains("spec1")
+    }
+
+    @Test
+    fun `대국자와 관전자 모두 채팅할 수 있고 표시가 갈린다`() {
+        val room = makeRoom()
+        service.join(room.code, "guest2", "상대")
+        service.join(room.code, "spec1", "관전1")
+        val p = service.chat(room, "host", "안녕")
+        assertThat(p).isNotNull
+        assertThat(p!!.fromPlayer).isTrue()
+        val sp = service.chat(room, "spec1", "관전입니다")
+        assertThat(sp).isNotNull
+        assertThat(sp!!.fromPlayer).isFalse()
+    }
+
+    @Test
+    fun `채팅은 1인당 1초에 1개까지`() {
+        val room = makeRoom()
+        service.join(room.code, "guest2", "상대")
+        assertThat(service.chat(room, "host", "첫 번째")).isNotNull
+        assertThat(service.chat(room, "host", "두 번째")).isNull()
+        assertThat(service.chat(room, "guest2", "다른 사람은 가능")).isNotNull
+        clock.advance(1_000)
+        assertThat(service.chat(room, "host", "1초 뒤")).isNotNull
+    }
+
+    @Test
+    fun `채팅은 200자까지이고 방에 없는 사람은 못 쓴다`() {
+        val room = makeRoom()
+        service.join(room.code, "guest2", "상대")
+        assertThat(service.chat(room, "host", "가".repeat(200))).isNotNull
+        clock.advance(1_100)
+        assertThat(service.chat(room, "host", "가".repeat(201))!!.text).hasSize(200)
+        clock.advance(1_100)
+        assertThat(service.chat(room, "stranger", "외부인")).isNull()
+        assertThat(service.chat(room, "host", "   ")).isNull()
+    }
+
+    @Test
+    fun `입장과 퇴장이 채팅에 알림으로 남는다`() {
+        val room = makeRoom()
+        service.join(room.code, "guest2", "상대")
+        service.join(room.code, "spec1", "관전1")
+        service.disconnect(room, "spec1")
+        val texts = room.chatSnapshot().map { it.text }
+        assertThat(texts).contains("관전1 입장", "관전1 퇴장")
+        assertThat(room.chatSnapshot().filter { !it.system }.size).isEqualTo(0)
+    }
+
+    @Test
+    fun `채팅 기록은 최근 50개만 남는다`() {
+        val room = makeRoom()
+        service.join(room.code, "guest2", "상대")
+        for (i in 1..60) {
+            clock.advance(1_100)
+            service.chat(room, "host", "msg$i")
+        }
+        assertThat(room.chatSnapshot().filter { !it.system }).hasSize(50)
+        assertThat(room.chatSnapshot().last().text).isEqualTo("msg60")
     }
 }

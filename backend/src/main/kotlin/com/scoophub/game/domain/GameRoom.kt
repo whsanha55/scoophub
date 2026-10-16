@@ -16,6 +16,21 @@ data class RoomPlayer(
     var lastSeen: Instant,
 )
 
+data class RoomSpectator(val guestId: String, val nickname: String, var lastSeen: Instant)
+
+data class ChatEntry(
+    val nickname: String,
+    val text: String,
+    /** 대국자면 true. 시스템 메시지면 false. */
+    val fromPlayer: Boolean,
+    val system: Boolean = false,
+    val at: Instant,
+)
+
+enum class Role { PLAYER, SPECTATOR }
+
+data class JoinResult(val side: Side?, val role: Role, val allowed: Boolean)
+
 data class RoomMove(val side: Side, val from: String, val to: String, val notation: String, val at: Instant)
 
 data class RoomResult(val winner: Side?, val reason: String)
@@ -34,7 +49,10 @@ class GameRoom(
     var phase = RoomPhase.WAITING
         private set
     private val players = mutableListOf<RoomPlayer>()
+    private val spectators = mutableListOf<RoomSpectator>()
     private val moves = mutableListOf<RoomMove>()
+    private val chatLog = ArrayDeque<ChatEntry>()
+    private val lastChatAt = mutableMapOf<String, Instant>()
     private var clocks: MutableMap<Side, PlayerClock> = mutableMapOf()
     private var startedAt: Instant? = null
     var lastActivityAt = createdAt
@@ -54,14 +72,29 @@ class GameRoom(
 
     fun playerOfSide(side: Side): RoomPlayer? = players.firstOrNull { it.side == side }
 
-    /** 대국자로 참가. 정원이 차 있으면 null. 같은 게스트의 재참가는 자리를 되찾는다. */
-    fun join(guestId: String, nickname: String, now: Instant): Side? {
+    fun spectatorOf(guestId: String): RoomSpectator? = spectators.firstOrNull { it.guestId == guestId }
+
+    /**
+     * 참가. 대국자 자리가 남아 있으면 대국자, 다 찼으면 관전자로 배정한다.
+     * 관전자 정원(10)까지 차면 거절한다. 같은 게스트의 재참가는 자리를 되찾는다.
+     */
+    fun join(guestId: String, nickname: String, now: Instant): JoinResult {
         touch(now)
         playerOf(guestId)?.let {
             it.lastSeen = now
-            return it.side
+            return JoinResult(side = it.side, role = Role.PLAYER, allowed = true)
         }
-        if (isFull) return null
+        spectatorOf(guestId)?.let {
+            it.lastSeen = now
+            return JoinResult(side = null, role = Role.SPECTATOR, allowed = true)
+        }
+        if (isFull) {
+            if (spectators.size >= SPECTATOR_LIMIT) {
+                return JoinResult(side = null, role = Role.SPECTATOR, allowed = false)
+            }
+            spectators.add(RoomSpectator(guestId = guestId, nickname = nickname, lastSeen = now))
+            return JoinResult(side = null, role = Role.SPECTATOR, allowed = true)
+        }
         val side = when {
             players.isEmpty() ->
                 when (hostPreference) {
@@ -75,7 +108,50 @@ class GameRoom(
         if (players.isEmpty()) hostSide = side
         players.add(RoomPlayer(guestId = guestId, nickname = nickname, side = side, lastSeen = now))
         if (players.size == 2) start(now)
-        return side
+        return JoinResult(side = side, role = Role.PLAYER, allowed = true)
+    }
+
+    /** 관전자 퇴장. 대국자는 재접속할 수 있으므로 방에 남긴다. */
+    fun removeSpectator(guestId: String): RoomSpectator? {
+        val spectator = spectatorOf(guestId) ?: return null
+        spectators.remove(spectator)
+        return spectator
+    }
+
+    /**
+     * 채팅. 대국자와 관전자 모두 쓸 수 있고 1인당 1초에 1개까지.
+     * 메시지는 200자까지. 위반하면 null.
+     */
+    fun addChat(guestId: String, text: String, now: Instant): ChatEntry? {
+        touch(now)
+        val trimmed = text.trim().take(MAX_CHAT_LENGTH)
+        if (trimmed.isEmpty()) return null
+        val isPlayer = playerOf(guestId) != null
+        if (!isPlayer && spectatorOf(guestId) == null) return null
+        val last = lastChatAt[guestId]
+        if (last != null && java.time.Duration.between(last, now).toMillis() < 1_000) return null
+        lastChatAt[guestId] = now
+        val nickname = playerOf(guestId)?.nickname ?: spectatorOf(guestId)?.nickname ?: return null
+        val entry = ChatEntry(
+            nickname = nickname,
+            text = trimmed,
+            fromPlayer = isPlayer,
+            at = now,
+        )
+        appendChat(entry)
+        return entry
+    }
+
+    /** 입·퇴장 알림 등 시스템 메시지. 한도 대상 아니다. */
+    fun addSystemChat(text: String, now: Instant): ChatEntry {
+        val entry = ChatEntry(nickname = "", text = text, fromPlayer = false, system = true, at = now)
+        appendChat(entry)
+        return entry
+    }
+
+    private fun appendChat(entry: ChatEntry) {
+        chatLog.addLast(entry)
+        while (chatLog.size > CHAT_HISTORY) chatLog.removeFirst()
     }
 
     private fun start(now: Instant) {
@@ -166,6 +242,16 @@ class GameRoom(
     fun movesSnapshot(): List<RoomMove> = moves.toList()
 
     fun playersSnapshot(): List<RoomPlayer> = players.toList()
+
+    fun spectatorsSnapshot(): List<RoomSpectator> = spectators.toList()
+
+    fun chatSnapshot(): List<ChatEntry> = chatLog.toList()
+
+    companion object {
+        const val SPECTATOR_LIMIT = 10
+        const val CHAT_HISTORY = 50
+        const val MAX_CHAT_LENGTH = 200
+    }
 
     private fun finish(result: RoomResult) {
         this.result = result
