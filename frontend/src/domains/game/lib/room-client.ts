@@ -3,6 +3,7 @@
 
 import type { PlayerClock, TimeRule } from "./time-control";
 import { wsBase } from "./guest";
+import { mapChat } from "./chat-entry";
 
 export interface RoomMoveEntry {
   side: "white" | "black";
@@ -82,7 +83,7 @@ function mapSnapshot(raw: Record<string, unknown>): RoomSnapshot {
     rematchVotes: (raw.rematch_votes as string[]) ?? [],
     setups: (raw.setups as RoomSnapshot["setups"]) ?? {},
     spectators: (raw.spectators as string[]) ?? [],
-    chat: (raw.chat as ChatEntry[]) ?? [],
+    chat: ((raw.chat as Record<string, unknown>[]) ?? []).map(mapChat),
     turn: raw.turn as RoomSnapshot["turn"],
     moves: (raw.moves as RoomMoveEntry[]) ?? [],
     clocks: {
@@ -131,6 +132,8 @@ export class RoomSocket {
         const raw = JSON.parse(e.data as string) as { type: string; payload: unknown };
         if (raw.type === "room") {
           this.onMessage({ type: "room", payload: mapSnapshot(raw.payload as Record<string, unknown>) });
+        } else if (raw.type === "chat") {
+          this.onMessage({ type: "chat", payload: mapChat(raw.payload as Record<string, unknown>) });
         } else {
           this.onMessage(raw as RoomMessage);
         }
