@@ -29,12 +29,14 @@ export interface ScoreSheetProps {
   dice: number[] | null;
   /** 있으면 예상 점수 칸을 눌러 기록한다 */
   onRecord?: (category: Category) => void;
+  /** 보여줄 열. 혼자 하기는 한 열만 쓴다 */
+  sides?: Side[];
 }
 
 const SIDES: Side[] = ["white", "black"];
 
 /** 두 대국자의 점수표. 상단 소계·보너스·총점을 함께 보여준다 */
-export function ScoreSheet({ sheets, turn, names, dice, onRecord }: ScoreSheetProps) {
+export function ScoreSheet({ sheets, turn, names, dice, onRecord, sides = SIDES }: ScoreSheetProps) {
   const cell = (side: Side, category: Category) => {
     const written = sheets[side][category];
     if (written !== undefined) return <span className="font-semibold">{written}</span>;
@@ -60,7 +62,7 @@ export function ScoreSheet({ sheets, turn, names, dice, onRecord }: ScoreSheetPr
       <th scope="row" className="py-1 pr-2 text-left font-normal text-muted-foreground">
         {CATEGORY_LABEL[category]}
       </th>
-      {SIDES.map((side) => (
+      {sides.map((side) => (
         <td key={side} className={`py-1 text-center tabular-nums ${side === turn ? "bg-primary/5" : ""}`}>
           {cell(side, category)}
         </td>
@@ -73,7 +75,7 @@ export function ScoreSheet({ sheets, turn, names, dice, onRecord }: ScoreSheetPr
       <thead>
         <tr>
           <th className="w-2/5" />
-          {SIDES.map((side) => (
+          {sides.map((side) => (
             <th
               key={side}
               scope="col"
@@ -90,7 +92,7 @@ export function ScoreSheet({ sheets, turn, names, dice, onRecord }: ScoreSheetPr
           <th scope="row" className="py-1 pr-2 text-left font-normal text-muted-foreground">
             소계 / 보너스 ({BONUS_THRESHOLD}↑ +{BONUS})
           </th>
-          {SIDES.map((side) => (
+          {sides.map((side) => (
             <td key={side} className="py-1 text-center tabular-nums">
               {upperSum(sheets[side])}/{BONUS_THRESHOLD} {bonusOf(sheets[side]) > 0 && <b>+{BONUS}</b>}
             </td>
@@ -101,7 +103,7 @@ export function ScoreSheet({ sheets, turn, names, dice, onRecord }: ScoreSheetPr
           <th scope="row" className="py-1.5 pr-2 text-left">
             총점
           </th>
-          {SIDES.map((side) => (
+          {sides.map((side) => (
             <td key={side} className="py-1.5 text-center tabular-nums">
               {totalOf(sheets[side])}
             </td>
