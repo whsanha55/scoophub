@@ -16,15 +16,10 @@ import {
   type TimeRule,
 } from "../../lib/time-control";
 import { forbiddenPoints, omokEngine, winningLine, type OmokState } from "../engine";
-import { OmokBoard } from "./omok-board";
+import { OmokBoard, omokSideLabel } from "./omok-board";
 
 type Phase = "setup" | "playing" | "over";
 type Clocks = Record<Side, PlayerClock>;
-
-/** 진영 이름. white=선수(흑돌), black=후수(백돌) */
-export function omokSideLabel(side: Side): string {
-  return side === "white" ? "흑" : "백";
-}
 
 export function SameScreenOmokGame() {
   const [phase, setPhase] = useState<Phase>("setup");

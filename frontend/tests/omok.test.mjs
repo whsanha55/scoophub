@@ -134,6 +134,19 @@ test("한쪽이 막힌 3은 열린 3이 아니므로 3-3이 아니다", () => {
   assert.equal(isForbidden(board, 7, 7), false);
 });
 
+test("4-3은 금수가 아니다: 4가 있는 줄은 3으로 세지 않는다", () => {
+  const board = emptyBoard();
+  for (const [r, c] of [[7, 4], [7, 5], [7, 6], [5, 7], [6, 7]]) board[r][c] = "white";
+  assert.equal(isForbidden(board, 7, 7), false);
+});
+
+test("판 가장자리에 막힌 3은 열린 3이 아니므로 3-3이 아니다", () => {
+  const board = emptyBoard();
+  for (const [r, c] of [[2, 5], [2, 6], [0, 7], [1, 7]]) board[r][c] = "white";
+  // 세로 0·1·2행 3은 위가 판 끝이라 열린 4가 될 수 없다
+  assert.equal(isForbidden(board, 2, 7), false);
+});
+
 test("4-4 금수: 4가 두 줄 생기는 점 (막힌 4도 센다)", () => {
   const board = emptyBoard();
   for (const [r, c] of [[7, 4], [7, 5], [7, 6], [4, 7], [5, 7], [6, 7]]) board[r][c] = "white";

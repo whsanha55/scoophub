@@ -3,8 +3,7 @@
 import type { RoomSnapshot } from "../../lib/room-client";
 import { InviteGameRoom, useInviteRoom } from "../../components/invite-game-room";
 import { forbiddenPoints, omokEngine, winningLine, type OmokState } from "../engine";
-import { OmokBoard } from "./omok-board";
-import { omokSideLabel } from "./same-screen-game";
+import { OmokBoard, omokSideLabel } from "./omok-board";
 
 function replayOmok(moves: RoomSnapshot["moves"]): OmokState {
   let state = omokEngine.initialState();

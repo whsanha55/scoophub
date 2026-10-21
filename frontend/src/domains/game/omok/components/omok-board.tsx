@@ -1,6 +1,12 @@
 "use client";
 
+import type { Side } from "../../lib/board-game";
 import { SIZE, type Board } from "../engine";
+
+/** 진영 이름. white=선수(흑돌), black=후수(백돌) */
+export function omokSideLabel(side: Side): string {
+  return side === "white" ? "흑" : "백";
+}
 
 export interface OmokBoardProps {
   board: Board;
