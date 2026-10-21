@@ -6,9 +6,12 @@ import type { PieceInfo } from "../lib/board-game";
 export function CapturedPiecesView({
   pieces,
   render,
+  score,
 }: {
   pieces: PieceInfo[];
   render: (piece: PieceInfo) => ReactNode;
+  /** 그 대국자의 현재 점수. 점수제 게임(장기)만 넘긴다 */
+  score?: number;
 }) {
   // 비어 있어도 칸을 그린다. 첫 기물을 잡을 때 칸이 생기면 보드가 밀려 탭이 빗나간다
   return (
@@ -20,6 +23,9 @@ export function CapturedPiecesView({
       {pieces.map((piece, i) => (
         <span key={i}>{render(piece)}</span>
       ))}
+      {score !== undefined && (
+        <span className="ml-auto shrink-0 text-sm font-semibold tabular-nums">{score}점</span>
+      )}
     </div>
   );
 }

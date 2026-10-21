@@ -194,11 +194,17 @@ export function InviteChessGame({ gameId, code }: { gameId: string; code: string
   })();
   const captured = state && !isJanggi ? chessEngine.capturedPieces(state) : null;
   const janggiCaptured = janggiState ? janggiEngine.capturedPieces(janggiState) : null;
+  const janggiScores = janggiState ? janggiEngine.scores(janggiState) : null;
   // 잡은 기물 칸. 게임 종류에 맞는 모양으로 그린다
   const capturedStrip = (side: Side) =>
     isJanggi
-      ? janggiCaptured && (
-          <CapturedPiecesView pieces={janggiCaptured[side]} render={janggiCapturedGlyph} />
+      ? janggiCaptured &&
+        janggiScores && (
+          <CapturedPiecesView
+            pieces={janggiCaptured[side]}
+            render={janggiCapturedGlyph}
+            score={janggiScores[side]}
+          />
         )
       : captured && <CapturedPiecesView pieces={captured[side]} render={chessCapturedGlyph} />;
 

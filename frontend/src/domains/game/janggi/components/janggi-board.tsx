@@ -4,15 +4,30 @@ import type { ReactNode } from "react";
 import { PIECE_HANJA, type JanggiPiece, type JanggiPieceType } from "../engine";
 import type { PieceInfo } from "../../lib/board-game";
 
-/** 잡힌 기물 토큰 크기: 판 위 기물과 같은 동그라미를 기물 점수(크기)별로 그린다. */
-const CAPTURED_TOKEN_SIZE: Record<JanggiPieceType, string> = {
-  K: "h-6 w-6 text-sm", // 궁은 잡히는 순간 대국이 끝나므로 표시되지 않는다
-  R: "h-8 w-8 text-lg",
-  C: "h-7 w-7 text-base",
-  N: "h-6 w-6 text-sm",
-  B: "h-5 w-5 text-[11px]",
-  A: "h-5 w-5 text-[11px]",
-  P: "h-4 w-4 text-[9px]",
+/** 기물 등급: 궁 > 차·포·마·상 > 사·병. 판과 잡은 기물 칸이 같은 비율(1 : 0.87 : 0.63)로 그린다. */
+type PieceTier = "large" | "medium" | "small";
+const PIECE_TIER: Record<JanggiPieceType, PieceTier> = {
+  K: "large",
+  R: "medium",
+  C: "medium",
+  N: "medium",
+  B: "medium",
+  A: "small",
+  P: "small",
+};
+
+/** 판 위 기물 크기 (칸 너비 기준) */
+const BOARD_TOKEN_SIZE: Record<PieceTier, string> = {
+  large: "w-full text-[min(4.5vw,1.35rem)]",
+  medium: "w-[87%] text-[min(3.9vw,1.15rem)]",
+  small: "w-[63%] text-[min(2.9vw,0.85rem)]",
+};
+
+/** 잡힌 기물 토큰 크기 (궁은 잡히는 순간 대국이 끝나므로 표시되지 않는다) */
+const CAPTURED_TOKEN_SIZE: Record<PieceTier, string> = {
+  large: "h-9 w-9 text-lg",
+  medium: "h-8 w-8 text-base",
+  small: "h-6 w-6 text-xs",
 };
 
 export function janggiCapturedGlyph(piece: PieceInfo): ReactNode {
@@ -20,7 +35,7 @@ export function janggiCapturedGlyph(piece: PieceInfo): ReactNode {
   return (
     <span
       className={`flex shrink-0 items-center justify-center rounded-full border font-bold leading-none ${
-        CAPTURED_TOKEN_SIZE[type]
+        CAPTURED_TOKEN_SIZE[PIECE_TIER[type]]
       } ${
         piece.side === "white"
           ? "border-emerald-300/40 bg-emerald-700 text-emerald-50"
@@ -113,7 +128,9 @@ export function JanggiBoard({
               >
                 {piece && (
                   <span
-                    className={`flex aspect-square w-full items-center justify-center rounded-full border text-[min(4.5vw,1.35rem)] font-bold leading-none ${
+                    className={`flex aspect-square items-center justify-center rounded-full border font-bold leading-none ${
+                      BOARD_TOKEN_SIZE[PIECE_TIER[piece.type]]
+                    } ${
                       piece.side === "white"
                         ? "border-emerald-300/40 bg-emerald-700 text-emerald-50"
                         : "border-red-300/40 bg-red-700 text-red-50"

@@ -50,6 +50,7 @@ export function SameScreenJanggiGame() {
 
   const turn = janggiEngine.turn(state);
   const captured = janggiEngine.capturedPieces(state);
+  const scores = janggiEngine.scores(state);
   const history = janggiEngine.notationHistory(state);
   const lastEntry = state.moves[state.moves.length - 1];
 
@@ -242,7 +243,11 @@ export function SameScreenJanggiGame() {
               active={phase === "playing" && turn === topSide}
             />
           )}
-          <CapturedPiecesView pieces={captured[topSide]} render={janggiCapturedGlyph} />
+          <CapturedPiecesView
+            pieces={captured[topSide]}
+            render={janggiCapturedGlyph}
+            score={scores[topSide]}
+          />
           <JanggiBoard
             board={state.board}
             orientation={orientation}
@@ -256,7 +261,11 @@ export function SameScreenJanggiGame() {
             checkSquare={checkSquare}
             onPointTap={onPointTap}
           />
-          <CapturedPiecesView pieces={captured[orientation]} render={janggiCapturedGlyph} />
+          <CapturedPiecesView
+            pieces={captured[orientation]}
+            render={janggiCapturedGlyph}
+            score={scores[orientation]}
+          />
           {clocks && (
             <ClockView
               clock={clocks[orientation]}
