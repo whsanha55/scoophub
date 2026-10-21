@@ -37,7 +37,7 @@ class AlpacaMarketDataClient(
     restClientBuilder: RestClient.Builder,
     private val clock: Clock,
 ) {
-    private val restClient = buildClient(restClientBuilder.clone(), BASE_URL, props)
+    private val restClient = buildClient(restClientBuilder.clone(), props.alpaca.dataUrl, props)
 
     /** open interest 는 시세 API 에 없어 Trading API 에서 받는다. 키 종류(paper/live)에 따라 베이스 URL 이 다르다 */
     private val tradingClient = buildClient(restClientBuilder.clone(), props.alpaca.tradingUrl, props)
@@ -247,7 +247,6 @@ class AlpacaMarketDataClient(
             .build()
 
     companion object {
-        const val BASE_URL = "https://data.alpaca.markets"
         private val ET: ZoneId = ZoneId.of("America/New_York")
         private val SIP_DELAY = Duration.ofMinutes(16)
         private const val HISTORY_YEARS = 10L

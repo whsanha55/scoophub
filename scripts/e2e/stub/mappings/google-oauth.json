@@ -1,0 +1,130 @@
+{
+  "mappings": [
+    {
+      "request": {
+        "method": "POST",
+        "urlPath": "/google/token",
+        "bodyPatterns": [
+          {
+            "contains": "code=super"
+          }
+        ]
+      },
+      "response": {
+        "status": 200,
+        "jsonBody": {
+          "access_token": "at-super",
+          "token_type": "Bearer"
+        },
+        "headers": {
+          "Content-Type": "application/json"
+        }
+      }
+    },
+    {
+      "request": {
+        "method": "POST",
+        "urlPath": "/google/token",
+        "bodyPatterns": [
+          {
+            "contains": "code=member"
+          }
+        ]
+      },
+      "response": {
+        "status": 200,
+        "jsonBody": {
+          "access_token": "at-member",
+          "token_type": "Bearer"
+        },
+        "headers": {
+          "Content-Type": "application/json"
+        }
+      }
+    },
+    {
+      "request": {
+        "method": "POST",
+        "urlPath": "/google/token",
+        "bodyPatterns": [
+          {
+            "contains": "code=stranger"
+          }
+        ]
+      },
+      "response": {
+        "status": 200,
+        "jsonBody": {
+          "access_token": "at-stranger",
+          "token_type": "Bearer"
+        },
+        "headers": {
+          "Content-Type": "application/json"
+        }
+      }
+    },
+    {
+      "request": {
+        "method": "GET",
+        "urlPath": "/google/userinfo",
+        "headers": {
+          "Authorization": {
+            "equalTo": "Bearer at-super"
+          }
+        }
+      },
+      "response": {
+        "status": 200,
+        "jsonBody": {
+          "email": "super@e2e.test",
+          "name": "E2E 관리자"
+        },
+        "headers": {
+          "Content-Type": "application/json"
+        }
+      }
+    },
+    {
+      "request": {
+        "method": "GET",
+        "urlPath": "/google/userinfo",
+        "headers": {
+          "Authorization": {
+            "equalTo": "Bearer at-member"
+          }
+        }
+      },
+      "response": {
+        "status": 200,
+        "jsonBody": {
+          "email": "member@e2e.test",
+          "name": "E2E 회원"
+        },
+        "headers": {
+          "Content-Type": "application/json"
+        }
+      }
+    },
+    {
+      "request": {
+        "method": "GET",
+        "urlPath": "/google/userinfo",
+        "headers": {
+          "Authorization": {
+            "equalTo": "Bearer at-stranger"
+          }
+        }
+      },
+      "response": {
+        "status": 200,
+        "jsonBody": {
+          "email": "stranger@e2e.test",
+          "name": "허용 안 된 사용자"
+        },
+        "headers": {
+          "Content-Type": "application/json"
+        }
+      }
+    }
+  ]
+}

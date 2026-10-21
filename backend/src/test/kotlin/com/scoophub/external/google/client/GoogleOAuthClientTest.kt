@@ -26,7 +26,7 @@ class GoogleOAuthClientTest @Autowired constructor(
     fun `authorize URL 에 client_id, redirect_uri, scope, state 포함`() {
         val url = client.authorizeUrl("abc")
 
-        assertThat(url).startsWith(GoogleOAuthClient.AUTHORIZE_URL + "?response_type=code")
+        assertThat(url).startsWith("https://accounts.google.com/o/oauth2/v2/auth" + "?response_type=code")
         assertThat(url).contains("scope=openid%20email%20profile")
         assertThat(url).contains("state=abc")
     }
@@ -34,11 +34,11 @@ class GoogleOAuthClientTest @Autowired constructor(
     @Test
     fun `code 교환 후 access_token 으로 userinfo 조회`() {
         // given
-        server.expect(requestTo(GoogleOAuthClient.TOKEN_URL))
+        server.expect(requestTo("https://oauth2.googleapis.com/token"))
             .andExpect(method(HttpMethod.POST))
             .andExpect(content().formDataContains(mapOf("grant_type" to "authorization_code", "code" to "c")))
             .andRespond(withSuccess("""{"access_token":"at","expires_in":3599}""", MediaType.APPLICATION_JSON))
-        server.expect(requestTo(GoogleOAuthClient.USERINFO_URL))
+        server.expect(requestTo("https://www.googleapis.com/oauth2/v3/userinfo"))
             .andExpect(header("Authorization", "Bearer at"))
             .andRespond(
                 withSuccess("""{"sub":"1","email":"a@b.com","name":"A","picture":"x"}""", MediaType.APPLICATION_JSON),

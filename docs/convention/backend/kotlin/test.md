@@ -48,7 +48,7 @@ assertThat(fee).isEqualByComparingTo("1.25")
 | Service | 단위 테스트 + MockK |
 | Controller | `@WebMvcTest` + `@MockkBean` (요청 검증, 응답 형태, HTTP 상태) |
 | Repository | `@DataJpaTest` |
-| 핵심 API 흐름 | `@SpringBootTest` 통합 테스트 |
+| API 흐름 (E2E) | `@SpringBootTest(webEnvironment = RANDOM_PORT)`, `backend/common/test.md` 참고 |
 
 ## 5. Mock
 

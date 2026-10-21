@@ -1,5 +1,6 @@
 package com.scoophub.external.devto
 
+import com.scoophub.global.config.ScoophubProperties
 import org.springframework.http.HttpHeaders
 import org.springframework.stereotype.Component
 import org.springframework.web.client.RestClient
@@ -7,10 +8,10 @@ import tools.jackson.databind.JsonNode
 
 /** Dev.to API — 태그별 트렌딩 아티클 */
 @Component
-class DevtoClient(restClientBuilder: RestClient.Builder) {
+class DevtoClient(restClientBuilder: RestClient.Builder, props: ScoophubProperties) {
     // Dev.to 는 User-Agent 없음/기본 Java UA 요청을 403 으로 막는다
     private val restClient = restClientBuilder
-        .baseUrl("https://dev.to/api")
+        .baseUrl(props.endpoints.devto)
         .defaultHeader(HttpHeaders.USER_AGENT, USER_AGENT)
         .build()
 

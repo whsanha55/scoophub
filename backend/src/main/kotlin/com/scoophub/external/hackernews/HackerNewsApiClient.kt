@@ -1,14 +1,15 @@
 package com.scoophub.external.hackernews
 
+import com.scoophub.global.config.ScoophubProperties
 import org.springframework.stereotype.Component
 import org.springframework.web.client.RestClient
 import tools.jackson.databind.JsonNode
 
 /** Hacker News Firebase API — top/best stories, item */
 @Component
-class HackerNewsApiClient(restClientBuilder: RestClient.Builder) {
+class HackerNewsApiClient(restClientBuilder: RestClient.Builder, props: ScoophubProperties) {
     private val restClient = restClientBuilder
-        .baseUrl("https://hacker-news.firebaseio.com/v0")
+        .baseUrl(props.endpoints.hackerNews)
         .build()
 
     fun storyIds(storyType: String): JsonNode = restClient.get()

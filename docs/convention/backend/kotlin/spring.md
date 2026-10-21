@@ -97,6 +97,23 @@ data class OrderResponse(
 - 연관관계는 지연 로딩을 쓴다. 양방향 연관관계는 필요한 경우에만 쓴다.
 - `toString()`에 연관관계를 포함하지 않는다.
 
+상태 판단과 전이는 Entity가 맡는다.
+
+- Service에서 getter로 상태를 확인해 분기한 뒤 값을 바꾸지 않는다. `order.cancel()`처럼 Entity 메서드를 호출한다.
+- 허용되지 않는 전이는 Entity 메서드 안에서 도메인 예외로 막는다.
+- 상태 enum을 `when`으로 분기할 때 `else`를 쓰지 않는다. 상태가 추가되면 컴파일 오류로 드러나게 한다.
+
+```kotlin
+// Service가 판단하지 않는다
+if (order.status == OrderStatusEnum.RECEIVED) order.cancel()
+
+// Entity가 판단한다
+fun cancel() {
+    if (status != OrderStatusEnum.RECEIVED) throw OrderException(ErrorCodeEnum.ORDER_NOT_CANCELABLE)
+    status = OrderStatusEnum.CANCELED
+}
+```
+
 ```kotlin
 @Entity
 @Table(name = "orders")
@@ -151,6 +168,29 @@ class JpaConfig {
 - 트랜잭션 밖에서 지연 로딩을 하지 않는다. 연관 엔티티가 필요하면 fetch join이나 프로젝션으로 한 번에 조회한다.
 - 복잡한 조회는 QueryDSL이나 `@Query`를 쓴다. 메서드 이름 기반 쿼리가 길어지면 명시적 쿼리로 바꾼다.
 - 대량 데이터에 조건 없는 `findAll()`을 쓰지 않는다.
+
+`@Query` 문자열은 JPQL과 네이티브 쿼리 모두 같은 형식으로 쓴다.
+
+- 문자열 연결(`+`) 대신 `"""`를 쓴다. 애노테이션 인자라 `trimIndent()`는 붙이지 않는다.
+- `SELECT`, `FROM`, `JOIN`, `WHERE`, `GROUP BY`, `HAVING`, `ORDER BY`마다 줄을 나눈다.
+- `AND`, `OR` 조건도 한 줄에 하나씩 쓰고, `WHERE`보다 한 단계 들여 쓴다.
+- SQL 키워드와 함수(`LOWER`, `CONCAT` 등)는 대문자로 쓴다.
+- 파라미터에 `@Param`을 붙이지 않는다. 메서드 파라미터 이름으로 연결된다. Spring Boot Gradle 플러그인이 없는 프로젝트는 `kotlin { compilerOptions { javaParameters = true } }`를 켠다.
+
+```kotlin
+@Query(
+    """
+    SELECT m
+    FROM MovieEntity m
+    WHERE m.overview IS NOT NULL
+        AND (
+            m.moodModel IS NULL
+            OR m.moodModel <> :version
+        )
+    """,
+)
+fun findRequiringMoodTag(version: String): List<MovieEntity>
+```
 
 ## 7. DB 시간 컬럼
 

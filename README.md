@@ -78,6 +78,24 @@ npm test
 npm run build
 ```
 
+### 백엔드 E2E
+
+실제 서버를 띄우고 `curl`로 API 전체를 호출하는 셸 스크립트입니다. Postgres와 외부 API 스텁(WireMock)은 Docker Compose로, 백엔드는 bootJar로 호스트에서 실행합니다. Google 로그인, Alpaca, LLM, Telegram 등 외부 API는 모두 스텁으로 대체하므로 키가 필요 없습니다. `curl`, `jq`, Docker, Java 25, Node(게임 WebSocket)가 필요합니다.
+
+```bash
+scripts/e2e/run-all.sh              # 서버 기동 → 전체 실행 → 요약 → 서버 종료
+scripts/e2e/run-all.sh stock news   # 일부 도메인만
+
+# 서버를 띄워 두고 스크립트 하나씩 반복할 때
+scripts/e2e/server.sh start         # SKIP_BUILD=1 이면 bootJar 재빌드 생략
+bash scripts/e2e/stock-e2e.sh
+scripts/e2e/server.sh stop          # 컨테이너와 데이터 삭제
+```
+
+- 설정: `scripts/e2e/application-e2e.yml` (외부 API 주소를 스텁으로 돌림), 기본 스텁: `scripts/e2e/stub/mappings/`
+- 공통 함수: `scripts/e2e/lib.sh` (`step`, `expect`, `login`, `stub_json`, `sql` 등)
+- 로그: `scripts/e2e/.run/app.log`(서버), `scripts/e2e/.run/<이름>.log`(run-all)
+
 ## 실시간 뉴스 운영
 
 Alpaca WebSocket → `news_article` → 5초 DB 워커 → 한국어 요약 → Telegram 순으로 처리합니다.
@@ -98,5 +116,5 @@ Docker Compose와 외부 `infra` 네트워크, 해당 네트워크의 `postgres`
 <!-- convention:start -->
 ## Convention
 
-이 프로젝트는 [whsanha55/conventions](https://github.com/whsanha55/conventions) (`04a627c`)를 따릅니다. 문서는 `docs/convention/`, 프로젝트 예외는 [LOCAL.md](docs/convention/LOCAL.md)에 있습니다.
+이 프로젝트는 개인 컨벤션 [whsanha55/claude-code-skills/conventions](https://github.com/whsanha55/claude-code-skills/tree/main/conventions)를 따른다. 문서는 `docs/convention/`에 있고, 프로젝트 예외는 `docs/convention/LOCAL.md`에 적는다.
 <!-- convention:end -->

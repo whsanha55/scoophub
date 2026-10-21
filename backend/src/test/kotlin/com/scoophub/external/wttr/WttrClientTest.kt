@@ -1,8 +1,10 @@
 package com.scoophub.external.wttr
 
+import com.scoophub.global.config.ScoophubProperties
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
+import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.boot.restclient.test.autoconfigure.RestClientTest
 import org.springframework.http.MediaType
 import org.springframework.test.web.client.MockRestServiceServer
@@ -10,6 +12,7 @@ import org.springframework.test.web.client.match.MockRestRequestMatchers.request
 import org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess
 
 @RestClientTest(WttrClient::class)
+@EnableConfigurationProperties(ScoophubProperties::class)
 class WttrClientTest @Autowired constructor(
     private val client: WttrClient,
     private val server: MockRestServiceServer,

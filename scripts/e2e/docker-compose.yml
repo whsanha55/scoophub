@@ -1,0 +1,30 @@
+# E2E 인프라: Postgres + 외부 API 스텁(WireMock). 백엔드는 호스트에서 bootJar 로 띄운다 (server.sh).
+# 데이터는 컨테이너 안에만 두고 down 하면 사라진다.
+name: scoophub-e2e
+
+services:
+  postgres:
+    # 운영과 같은 메이저 버전 (backend TestcontainersConfiguration 과 맞춘다)
+    image: postgres:17
+    environment:
+      POSTGRES_DB: scoophub
+      POSTGRES_USER: scoophub
+      POSTGRES_PASSWORD: scoophub
+    ports:
+      - "127.0.0.1:${E2E_DB_PORT:-28432}:5432"
+    tmpfs:
+      - /var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U scoophub -d scoophub"]
+      interval: 1s
+      timeout: 3s
+      retries: 30
+
+  stub:
+    image: wiremock/wiremock:3.13.1
+    # JDK HttpClient 의 평문 HTTP/2 업그레이드(h2c)가 WireMock 과 맞지 않아 끈다. 운영 외부 API 는 HTTPS 다
+    command: ["--disable-banner", "--disable-http2-plain"]
+    ports:
+      - "127.0.0.1:${E2E_STUB_PORT:-28089}:8080"
+    volumes:
+      - ./stub:/home/wiremock

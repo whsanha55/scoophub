@@ -1,5 +1,6 @@
 package com.scoophub.external.github
 
+import com.scoophub.global.config.ScoophubProperties
 import io.github.oshai.kotlinlogging.KotlinLogging
 import org.jsoup.Jsoup
 import org.jsoup.nodes.Document
@@ -21,13 +22,14 @@ data class TrendingRepo(
 
 /** legacy `gtrending` 대체 — github.com/trending HTML 스크래핑 (Jsoup) */
 @Component
-class GithubTrendingClient {
+class GithubTrendingClient(props: ScoophubProperties) {
+    private val baseUrl = props.endpoints.github
 
     fun trending(language: String?, since: String): List<TrendingRepo> {
         val url = if (language.isNullOrBlank()) {
-            "https://github.com/trending?since=$since"
+            "$baseUrl/trending?since=$since"
         } else {
-            "https://github.com/trending/$language?since=$since"
+            "$baseUrl/trending/$language?since=$since"
         }
         val doc: Document = Jsoup.connect(url)
             .userAgent("Mozilla/5.0 (compatible; scoophub/1.0)")
