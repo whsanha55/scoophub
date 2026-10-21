@@ -195,3 +195,41 @@ export function status(state: YachtState): GameStatus {
   const winner = white === black ? null : white > black ? "white" : "black";
   return { over: true, winner, reason: `총점 ${white} : ${black}` };
 }
+
+// ---------- 혼자 하기: 대국과 같은 점수 규칙으로 점수표 하나만 채운다 ----------
+
+export interface SoloYachtState {
+  sheet: Sheet;
+  /** 이번 차례 주사위 눈. 아직 굴리지 않았으면 0 */
+  dice: number[];
+  kept: boolean[];
+  rollsLeft: number;
+}
+
+export function initialSoloState(sheet: Sheet = {}): SoloYachtState {
+  return {
+    sheet,
+    dice: Array(DICE_COUNT).fill(0),
+    kept: Array(DICE_COUNT).fill(false),
+    rollsLeft: MAX_ROLLS,
+  };
+}
+
+export function isSoloOver(state: SoloYachtState): boolean {
+  return isFull(state.sheet);
+}
+
+export function soloRoll(state: SoloYachtState, die: () => number = randomDie): SoloYachtState | null {
+  if (state.rollsLeft <= 0 || isSoloOver(state)) return null;
+  return { ...state, dice: rollDice(state.dice, state.kept, die), rollsLeft: state.rollsLeft - 1 };
+}
+
+export function soloToggleKeep(state: SoloYachtState, index: number): SoloYachtState | null {
+  if (state.rollsLeft >= MAX_ROLLS || isSoloOver(state)) return null;
+  return { ...state, kept: state.kept.map((k, i) => (i === index ? !k : k)) };
+}
+
+export function soloRecord(state: SoloYachtState, category: Category): SoloYachtState | null {
+  if (state.rollsLeft >= MAX_ROLLS || state.sheet[category] !== undefined) return null;
+  return initialSoloState({ ...state.sheet, [category]: scoreCategory(state.dice, category) });
+}

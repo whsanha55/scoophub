@@ -23,6 +23,12 @@ export default function YachtModePage() {
           href: "/game/room/new?game=yacht",
           icon: "✉️",
         },
+        {
+          title: "혼자 하기",
+          description: "점수표 하나를 채워 최고 총점에 도전한다",
+          href: "/game/yacht/solo",
+          icon: "🎯",
+        },
       ]}
     />
   );

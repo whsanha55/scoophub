@@ -10,13 +10,28 @@ interface GameCard {
   icon: ReactNode;
 }
 
-const games: GameCard[] = [
+const soloGames: GameCard[] = [
   {
     title: "레몬게임",
-    description: "합이 10이 되도록 레몬을 골라 지우는 혼자 하는 시간제한 게임",
+    description: "합이 10이 되도록 레몬을 골라 지우는 시간제한 게임",
     href: "/game/lemon",
     icon: "🍋",
   },
+  {
+    title: "2048",
+    description: "같은 숫자 타일을 밀어 합쳐 2048을 만드는 게임",
+    href: "/game/2048",
+    icon: "🔢",
+  },
+  {
+    title: "지뢰찾기",
+    description: "숫자 단서로 지뢰 없는 칸을 모두 여는 게임",
+    href: "/game/minesweeper",
+    icon: "💣",
+  },
+];
+
+const versusGames: GameCard[] = [
   {
     title: "체스",
     description: "같은 화면에서 둘이, 또는 초대해서 따로 두는 체스",
@@ -37,7 +52,7 @@ const games: GameCard[] = [
   },
   {
     title: "야추다이스",
-    description: "주사위 5개로 점수표를 채우는 둘이 하는 주사위 게임",
+    description: "주사위 5개로 점수표를 채우는 주사위 게임. 혼자 점수 도전도 된다",
     href: "/game/yacht",
     icon: "🎲",
   },
@@ -70,7 +85,14 @@ export default function GamePage() {
   return (
     <div className="space-y-6">
       <h1 className="text-2xl font-bold">게임</h1>
-      <CardGrid cards={games} />
+      <section className="space-y-3">
+        <h2 className="text-lg font-semibold">혼자 하기</h2>
+        <CardGrid cards={soloGames} />
+      </section>
+      <section className="space-y-3">
+        <h2 className="text-lg font-semibold">둘이 하기</h2>
+        <CardGrid cards={versusGames} />
+      </section>
     </div>
   );
 }
