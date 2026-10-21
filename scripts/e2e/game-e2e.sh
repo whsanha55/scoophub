@@ -150,6 +150,82 @@ guest.close();
 clearTimeout(timer);
 '
 
+step "야추다이스 방 만들기" 200 POST /api/game/rooms "$(room_body yacht "$HOST_ID")" "$IP"
+YACHT_CODE="$(json .data.code)"
+step "야추다이스 초대코드 확인" 200 GET "/api/game/yacht/rooms/$YACHT_CODE" "" "$IP"
+expect '.data.game_id' 'yacht'
+
+echo "==> WebSocket 야추 중간 행동: /ws/game/yacht/$YACHT_CODE"
+WS_BASE="${BASE_URL/http/ws}" CODE="$YACHT_CODE" HOST_ID="$HOST_ID" GUEST_ID="$GUEST_ID" node --input-type=module -e '
+const { WS_BASE, CODE, HOST_ID, GUEST_ID } = process.env;
+const fail = (m) => { console.error("FAIL: " + m); process.exit(1); };
+const timer = setTimeout(() => fail("야추 WebSocket 시나리오가 10초 안에 끝나지 않았다"), 10_000);
+
+function connect(guest, nick) {
+  const ws = new WebSocket(`${WS_BASE}/ws/game/yacht/${CODE}?guest=${guest}&nick=${nick}`);
+  const inbox = [];
+  const waiters = [];
+  ws.onmessage = (ev) => {
+    const msg = JSON.parse(ev.data);
+    const i = waiters.findIndex((w) => w.match(msg));
+    if (i >= 0) waiters.splice(i, 1)[0].resolve(msg); else inbox.push(msg);
+  };
+  const opened = new Promise((res, rej) => { ws.onopen = res; ws.onerror = () => rej(new Error("연결 실패")); });
+  const closed = new Promise((res) => { ws.onclose = res; });
+  return {
+    opened,
+    closed,
+    send: (obj) => ws.send(JSON.stringify(obj)),
+    next: (match) => {
+      const i = inbox.findIndex(match);
+      if (i >= 0) return Promise.resolve(inbox.splice(i, 1)[0]);
+      return new Promise((resolve) => waiters.push({ match, resolve }));
+    },
+    close: () => ws.close(),
+  };
+}
+
+const playing = (m) => m.type === "room" && m.payload.phase === "playing";
+const host = connect(HOST_ID, "host");
+await host.opened;
+const guest = connect(GUEST_ID, "guest");
+await guest.opened;
+await guest.next(playing);
+await host.next(playing);
+
+guest.send({ type: "game_action", payload: { kind: "roll", dice: [6, 6, 6, 6, 6] } });
+const rejected = await guest.next((m) => m.type === "error");
+if (rejected.payload.message !== "지금은 행동할 수 없습니다") fail(`차례가 아닌 행동의 에러가 다르다: ${rejected.payload.message}`);
+console.log("    차례가 아닌 대국자의 행동은 거부: " + rejected.payload.message);
+
+host.send({ type: "game_action", payload: { kind: "roll", dice: [2, 2, 3, 3, 3] } });
+const relayed = await guest.next((m) => m.type === "game_action");
+if (relayed.payload.side !== "white" || relayed.payload.action.dice.join() !== "2,2,3,3,3") fail(`중계된 행동이 다르다: ${JSON.stringify(relayed.payload)}`);
+host.send({ type: "game_action", payload: { kind: "keep", kept: [true, true, false, false, false] } });
+await guest.next((m) => m.type === "game_action" && m.payload.action.kind === "keep");
+console.log("    굴림·고정이 상대에게 그대로 중계됐다");
+
+// 새로고침: 방장이 끊고 다시 붙으면 스냅샷 actions 로 이번 차례가 돌아온다
+host.close();
+await host.closed;
+const again = connect(HOST_ID, "host");
+await again.opened;
+const restored = await again.next((m) => m.type === "room");
+const kinds = restored.payload.actions.map((a) => a.action.kind).join();
+if (kinds !== "roll,keep") fail(`재접속 스냅샷의 행동 로그가 다르다: ${kinds}`);
+console.log("    재접속 스냅샷 actions 로 굴림·고정이 복구됐다");
+
+again.send({ type: "move", payload: { from: "fullHouse", to: "13", notation: "풀하우스 13" } });
+const cleared = await guest.next((m) => m.type === "room" && m.payload.moves.length === 1);
+if (cleared.payload.actions.length !== 0) fail("기록 뒤에도 행동 로그가 남아 있다");
+if (cleared.payload.turn !== "black") fail(`기록 다음 차례가 black 이 아니다: ${cleared.payload.turn}`);
+console.log("    기록(move) 뒤 행동 로그가 비고 차례가 넘어갔다");
+
+again.close();
+guest.close();
+clearTimeout(timer);
+'
+
 step "게임 종류가 빈 방 만들기" 400 POST /api/game/rooms "$(room_body "" "$HOST_ID")" "$IP"
 
 LIMIT_IP="CF-Connecting-IP: 10.8.$((RANDOM % 250)).$((RANDOM % 250))"
