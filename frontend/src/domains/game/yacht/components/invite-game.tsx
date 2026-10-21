@@ -1,5 +1,6 @@
 "use client";
 
+import { useRef } from "react";
 import type { RoomSnapshot } from "../../lib/room-client";
 import { InviteGameRoom, useInviteRoom } from "../../components/invite-game-room";
 import {
@@ -17,6 +18,8 @@ import {
 } from "../engine";
 import { DiceTray } from "./dice-tray";
 import { ScoreSheet, yachtSideLabel } from "./score-sheet";
+
+const PENDING_TIMEOUT_MS = 3_000;
 
 const isCategory = (value: string): value is Category => (CATEGORIES as readonly string[]).includes(value);
 
@@ -45,15 +48,27 @@ export function InviteYachtGame({ gameId, code }: { gameId: string; code: string
   const { snapshot, canMove, send, sendFinish } = room;
   const state = snapshot ? replayYacht(snapshot) : initialState();
 
+  // 보낸 행동은 서버 중계가 돌아와야 화면 상태가 바뀐다. 그 전에 또 누르면 낡은 상태로 한 번 더 보내게 되므로
+  // 진행 상황(기록·행동 수)이 바뀌거나 잠시 지날 때까지 다음 행동을 막는다. 거절돼도 영영 잠기지 않게 시간을 둔다
+  const progress = `${snapshot?.moves.length ?? 0}:${snapshot?.actions.length ?? 0}`;
+  const pendingRef = useRef<{ progress: string; at: number } | null>(null);
+  const sendOnce = (message: unknown): boolean => {
+    const pending = pendingRef.current;
+    if (pending && pending.progress === progress && Date.now() - pending.at < PENDING_TIMEOUT_MS) return false;
+    pendingRef.current = { progress, at: Date.now() };
+    send(message);
+    return true;
+  };
+
   // 굴림·고정은 차례를 넘기지 않는 중간 행동이다. 주사위는 굴리는 쪽이 만든다(ADR-0004)
   const roll = () => {
     if (!canMove || state.rollsLeft === 0) return;
-    send({ type: "game_action", payload: { kind: "roll", dice: rollDice(state.dice, state.kept) } });
+    sendOnce({ type: "game_action", payload: { kind: "roll", dice: rollDice(state.dice, state.kept) } });
   };
 
   const toggleKeep = (index: number) => {
     if (!canMove || !hasRolled(state)) return;
-    send({ type: "game_action", payload: { kind: "keep", kept: state.kept.map((k, i) => (i === index ? !k : k)) } });
+    sendOnce({ type: "game_action", payload: { kind: "keep", kept: state.kept.map((k, i) => (i === index ? !k : k)) } });
   };
 
   // 기록만 수(move)로 보낸다: from=칸, to=점수. 차례가 넘어가고 시계가 멈춘다
@@ -61,9 +76,9 @@ export function InviteYachtGame({ gameId, code }: { gameId: string; code: string
     if (!canMove) return;
     const recorded = record(state, category);
     if (!recorded) return;
-    send({ type: "move", payload: { from: category, to: String(recorded.score), notation: recorded.notation } });
+    const isSent = sendOnce({ type: "move", payload: { from: category, to: String(recorded.score), notation: recorded.notation } });
     const after = status(recorded.state);
-    if (after.over) sendFinish(after.winner, after.reason);
+    if (isSent && after.over) sendFinish(after.winner, after.reason);
   };
 
   return (

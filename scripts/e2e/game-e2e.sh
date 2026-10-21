@@ -205,6 +205,11 @@ host.send({ type: "game_action", payload: { kind: "keep", kept: [true, true, fal
 await guest.next((m) => m.type === "game_action" && m.payload.action.kind === "keep");
 console.log("    굴림·고정이 상대에게 그대로 중계됐다");
 
+host.send({ type: "game_action", payload: { kind: "note", text: "x".repeat(2000) } });
+const tooLarge = await host.next((m) => m.type === "error");
+if (tooLarge.payload.message !== "지금은 행동할 수 없습니다") fail(`큰 행동의 에러가 다르다: ${tooLarge.payload.message}`);
+console.log("    1,024자를 넘는 행동은 거부: " + tooLarge.payload.message);
+
 // 새로고침: 방장이 끊고 다시 붙으면 스냅샷 actions 로 이번 차례가 돌아온다
 host.close();
 await host.closed;
