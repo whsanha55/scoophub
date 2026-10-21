@@ -31,6 +31,12 @@ export const JANGGI_DEFAULT_RULE: TimeRule = {
   byoYomiCount: 3,
 };
 
+export const OMOK_DEFAULT_RULE: TimeRule = {
+  baseMs: 5 * 60_000,
+  byoYomiMs: 30_000,
+  byoYomiCount: 3,
+};
+
 export interface PlayerClock {
   /** 기본 시간 남은 ms. 음수가 될 수 없다. */
   baseLeftMs: number;
