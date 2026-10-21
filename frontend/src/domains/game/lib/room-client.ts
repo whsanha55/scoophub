@@ -12,6 +12,12 @@ export interface RoomMoveEntry {
   notation: string;
 }
 
+/** 차례 안의 중간 행동(야추 굴림·고정 등). 서버는 action 을 해석하지 않는다(ADR-0004) */
+export interface RoomAction {
+  side: "white" | "black";
+  action: Record<string, unknown>;
+}
+
 export interface ChatEntry {
   nickname: string;
   text: string;
@@ -34,6 +40,8 @@ export interface RoomSnapshot {
   chat: ChatEntry[];
   turn: "white" | "black";
   moves: RoomMoveEntry[];
+  /** 직전 수 이후의 중간 행동 로그 */
+  actions: RoomAction[];
   clocks: { white: PlayerClock; black: PlayerClock };
   result: { winner: "white" | "black" | null; reason: string } | null;
   serverNow: number;
@@ -43,6 +51,7 @@ export type RoomMessage =
   | { type: "room"; payload: RoomSnapshot }
   | { type: "move"; payload: { move: RoomMoveEntry; turn: "white" | "black" } }
   | { type: "chat"; payload: ChatEntry }
+  | { type: "game_action"; payload: RoomAction }
   | { type: "game_end"; payload: { winner: string | null; reason: string } }
   | { type: "error"; payload: { message: string } }
   | { type: "pong"; payload: Record<string, never> };
@@ -86,6 +95,7 @@ function mapSnapshot(raw: Record<string, unknown>): RoomSnapshot {
     chat: ((raw.chat as Record<string, unknown>[]) ?? []).map(mapChat),
     turn: raw.turn as RoomSnapshot["turn"],
     moves: (raw.moves as RoomMoveEntry[]) ?? [],
+    actions: (raw.actions as RoomAction[]) ?? [],
     clocks: {
       white: mapClock(clocks.white),
       black: mapClock(clocks.black),

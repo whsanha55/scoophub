@@ -35,6 +35,12 @@ const games: GameCard[] = [
     href: "/game/omok",
     icon: "⚫",
   },
+  {
+    title: "야추다이스",
+    description: "주사위 5개로 점수표를 채우는 둘이 하는 주사위 게임",
+    href: "/game/yacht",
+    icon: "🎲",
+  },
 ];
 
 function CardGrid({ cards }: { cards: GameCard[] }) {
