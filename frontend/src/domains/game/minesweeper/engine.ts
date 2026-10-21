@@ -110,10 +110,9 @@ function openCells(field: Field, starts: number[]): Field {
 
 /** 칸을 연다. 첫 클릭이면 지뢰부터 놓는다. 열 수 없으면 같은 판을 돌려준다 */
 export function reveal(field: Field, index: number, random: () => number = Math.random): Field {
-  if (field.status === "won" || field.status === "lost") return field;
+  const cell = field.cells[index];
+  if (field.status === "won" || field.status === "lost" || !cell || cell.open || cell.flag) return field;
   const started = field.status === "ready" ? placeMines(field, index, random) : field;
-  const cell = started.cells[index];
-  if (!cell || cell.open || cell.flag) return started;
   return openCells(started, [index]);
 }
 

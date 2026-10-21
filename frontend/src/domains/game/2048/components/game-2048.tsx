@@ -70,7 +70,9 @@ export function Game2048() {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const dir = KEY_DIRECTION[e.key.length === 1 ? e.key.toLowerCase() : e.key];
-      if (!dir) return;
+      if (!dir || game?.phase !== "playing") return;
+      // 입력창에서 친 글자는 가로채지 않는다
+      if (e.target instanceof HTMLElement && e.target.closest("input, textarea, [contenteditable]")) return;
       e.preventDefault();
       step(dir);
     };
@@ -114,7 +116,7 @@ export function Game2048() {
           if (t) touchStart.current = { x: t.clientX, y: t.clientY };
         }}
         onTouchEnd={onTouchEnd}
-        role="grid"
+        role="group"
         aria-label="2048 판. 방향키나 스와이프로 민다"
       >
         {(game?.board ?? EMPTY_BOARD).flat().map((v, i) => (

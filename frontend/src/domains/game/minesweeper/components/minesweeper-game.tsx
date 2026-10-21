@@ -111,7 +111,7 @@ export function MinesweeperGame() {
       </div>
       <div className="max-w-full overflow-x-auto">
         <div
-          role="grid"
+          role="group"
           aria-label={`지뢰찾기 ${LEVEL_LABEL[levelId]} 판`}
           className="mx-auto grid w-max gap-px rounded-md border bg-border p-px select-none"
           style={{ gridTemplateColumns: `repeat(${field.cols}, 1.75rem)` }}

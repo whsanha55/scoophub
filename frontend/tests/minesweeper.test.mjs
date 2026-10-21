@@ -79,3 +79,10 @@ test("틀린 깃발로 주변을 열면 진다", () => {
   f = chord(f, at(f, 1, 1));
   assert.equal(f.status, "lost");
 });
+
+test("첫 클릭 전 깃발 꽂은 칸을 눌러도 판이 시작되지 않는다", () => {
+  const f = toggleFlag(newField(LEVELS.beginner), 0);
+  const after = reveal(f, 0);
+  assert.equal(after, f);
+  assert.equal(after.status, "ready");
+});
