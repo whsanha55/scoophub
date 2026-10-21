@@ -1,13 +1,14 @@
 package com.scoophub.github
 
 import com.scoophub.external.github.GithubTrendingClient
+import com.scoophub.scoophubProperties
 import org.assertj.core.api.Assertions.assertThat
 import org.jsoup.Jsoup
 import org.junit.jupiter.api.Test
 
 /** github.com/trending 마크업 파싱 검증 — 스프링 컨텍스트 없는 순수 단위 */
 class GithubTrendingClientTest {
-    private val client = GithubTrendingClient()
+    private val client = GithubTrendingClient(scoophubProperties())
 
     @Test
     fun `Jsoup 파싱 — trending HTML 구조`() {

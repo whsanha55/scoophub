@@ -1,5 +1,6 @@
 package com.scoophub.external.arxiv
 
+import com.scoophub.global.config.ScoophubProperties
 import org.jsoup.Jsoup
 import org.jsoup.nodes.Document
 import org.jsoup.parser.Parser
@@ -24,9 +25,9 @@ data class ArxivPaper(
 
 /** legacy `arxiv` 파이썬 라이브러리 대체 — Atom API 직접 호출 (Jsoup XML 파싱) */
 @Component
-class ArxivClient(restClientBuilder: RestClient.Builder) {
+class ArxivClient(restClientBuilder: RestClient.Builder, props: ScoophubProperties) {
     private val restClient = restClientBuilder
-        .baseUrl("https://export.arxiv.org/api/query")
+        .baseUrl(props.endpoints.arxiv)
         .build()
 
     /** cat:{category} 최신 제출순 조회 */

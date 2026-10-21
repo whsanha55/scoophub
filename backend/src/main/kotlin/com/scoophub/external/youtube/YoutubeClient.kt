@@ -10,7 +10,7 @@ import tools.jackson.databind.JsonNode
 class YoutubeClient(props: ScoophubProperties, restClientBuilder: RestClient.Builder) {
     private val apiKey = props.youtubeApiKey
     private val restClient = restClientBuilder
-        .baseUrl("https://www.googleapis.com/youtube/v3")
+        .baseUrl(props.endpoints.youtube)
         .build()
 
     fun mostPopular(regionCode: String, maxResults: Int): JsonNode {

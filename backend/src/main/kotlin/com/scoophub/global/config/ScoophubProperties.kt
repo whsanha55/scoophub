@@ -12,11 +12,29 @@ data class ScoophubProperties(
     val telegram: Telegram,
     val youtubeApiKey: String,
     val alpaca: Alpaca = Alpaca(),
+    val endpoints: Endpoints = Endpoints(),
 ) {
+    /** 외부 API 주소. 운영은 기본값을 쓰고, E2E 는 스텁 서버를 가리킨다 (application-e2e.yml) */
+    data class Endpoints(
+        val hackerNews: String = "https://hacker-news.firebaseio.com/v0",
+        val devto: String = "https://dev.to/api",
+        val arxiv: String = "https://export.arxiv.org/api/query",
+        val youtube: String = "https://www.googleapis.com/youtube/v3",
+        val github: String = "https://github.com",
+        val wttr: String = "https://wttr.in",
+        val openMeteoAirQuality: String = "https://air-quality-api.open-meteo.com/v1/air-quality",
+        val telegram: String = "https://api.telegram.org",
+        val googleAuthorize: String = "https://accounts.google.com/o/oauth2/v2/auth",
+        val googleToken: String = "https://oauth2.googleapis.com/token",
+        val googleUserinfo: String = "https://www.googleapis.com/oauth2/v3/userinfo",
+    )
+
     data class Alpaca(
         val apiKey: String = "",
         val apiSecret: String = "",
         val streamUrl: String = "wss://stream.data.alpaca.markets/v1beta1/news",
+        /** Market Data API(일봉, 스냅샷, 옵션 체인) */
+        val dataUrl: String = "https://data.alpaca.markets",
         /** Trading API(옵션 계약 open interest). live 키면 https://api.alpaca.markets */
         val tradingUrl: String = "https://paper-api.alpaca.markets",
         val streamEnabled: Boolean = false,

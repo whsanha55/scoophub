@@ -1,5 +1,6 @@
 package com.scoophub.external.openmeteo
 
+import com.scoophub.global.config.ScoophubProperties
 import com.scoophub.global.jackson.elements
 import org.springframework.stereotype.Component
 import org.springframework.web.client.RestClient
@@ -17,9 +18,13 @@ data class AirQuality(val pm10: Double?, val pm25: Double?, val ozone: Double?, 
 
 /** Open-Meteo Air Quality API — PM10/PM2.5/오존/자외선 */
 @Component
-class OpenMeteoAirQualityClient(restClientBuilder: RestClient.Builder, private val clock: Clock) {
+class OpenMeteoAirQualityClient(
+    restClientBuilder: RestClient.Builder,
+    private val clock: Clock,
+    props: ScoophubProperties,
+) {
     private val restClient = restClientBuilder
-        .baseUrl("https://air-quality-api.open-meteo.com/v1/air-quality")
+        .baseUrl(props.endpoints.openMeteoAirQuality)
         .build()
 
     fun seoulCurrent(): AirQuality? {

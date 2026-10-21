@@ -6,6 +6,7 @@ import com.scoophub.external.arxiv.ArxivClient
 import com.scoophub.external.arxiv.ArxivPaper
 import com.scoophub.global.crawl.CrawlDataStore
 import com.scoophub.global.crawl.CrawlRunner
+import com.scoophub.scoophubProperties
 import io.mockk.every
 import org.assertj.core.api.Assertions.assertThat
 import org.jsoup.Jsoup
@@ -148,7 +149,7 @@ class ArxivTest @Autowired constructor(
 
 /** Atom XML 파싱 검증 — 스프링 컨텍스트 없는 순수 단위 */
 class ArxivClientParseTest {
-    private val client = ArxivClient(org.springframework.web.client.RestClient.builder())
+    private val client = ArxivClient(org.springframework.web.client.RestClient.builder(), scoophubProperties())
 
     @Test
     fun `Atom 엔트리 파싱`() {

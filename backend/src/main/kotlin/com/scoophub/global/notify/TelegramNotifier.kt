@@ -10,7 +10,7 @@ import tools.jackson.databind.JsonNode
 @Component
 class TelegramNotifier(props: ScoophubProperties, restClientBuilder: RestClient.Builder) : Notifier {
     private val restClient = restClientBuilder
-        .baseUrl("https://api.telegram.org/bot${props.telegram.botToken}")
+        .baseUrl("${props.endpoints.telegram}/bot${props.telegram.botToken}")
         .build()
 
     override val channel = "telegram"

@@ -41,7 +41,7 @@ class AlpacaMarketDataClientTest @Autowired constructor(
     @Test
     fun `일봉은 최근 10년을 SIP split 조정으로 요청하고 다음 페이지까지 모아 ET 날짜로 변환한다`() {
         // given
-        server.expect(requestTo(org.hamcrest.Matchers.startsWith("${AlpacaMarketDataClient.BASE_URL}/v2/stocks/bars")))
+        server.expect(requestTo(org.hamcrest.Matchers.startsWith("$DATA_URL/v2/stocks/bars")))
             .andExpect(header("APCA-API-KEY-ID", "key"))
             .andExpect(header("APCA-API-SECRET-KEY", "secret"))
             .andExpect(queryParam("symbols", "AAPL,QQQ"))
@@ -57,7 +57,7 @@ class AlpacaMarketDataClientTest @Autowired constructor(
                     MediaType.APPLICATION_JSON,
                 ),
             )
-        server.expect(requestTo(org.hamcrest.Matchers.startsWith("${AlpacaMarketDataClient.BASE_URL}/v2/stocks/bars")))
+        server.expect(requestTo(org.hamcrest.Matchers.startsWith("$DATA_URL/v2/stocks/bars")))
             .andExpect(queryParam("page_token", "p2"))
             .andRespond(
                 withSuccess(
@@ -82,7 +82,7 @@ class AlpacaMarketDataClientTest @Autowired constructor(
     @Test
     fun `스냅샷은 최근 체결가와 전일 종가로 등락을 계산하고 응답에 없는 심볼은 뺀다`() {
         // given
-        server.expect(requestTo("${AlpacaMarketDataClient.BASE_URL}/v2/stocks/snapshots?symbols=QQQ,NONE"))
+        server.expect(requestTo("$DATA_URL/v2/stocks/snapshots?symbols=QQQ,NONE"))
             .andRespond(
                 withSuccess(
                     """{"QQQ":{"latestTrade":{"p":760.0},
@@ -109,7 +109,7 @@ class AlpacaMarketDataClientTest @Autowired constructor(
         // given
         server.expect(
             requestTo(
-                org.hamcrest.Matchers.startsWith("${AlpacaMarketDataClient.BASE_URL}/v1beta1/options/snapshots/QQQ"),
+                org.hamcrest.Matchers.startsWith("$DATA_URL/v1beta1/options/snapshots/QQQ"),
             ),
         )
             .andExpect(queryParam("expiration_date_gte", "2026-10-07"))
@@ -149,7 +149,7 @@ class AlpacaMarketDataClientTest @Autowired constructor(
         // given
         server.expect(
             requestTo(
-                org.hamcrest.Matchers.startsWith("${AlpacaMarketDataClient.BASE_URL}/v1beta1/options/snapshots/SOXX"),
+                org.hamcrest.Matchers.startsWith("$DATA_URL/v1beta1/options/snapshots/SOXX"),
             ),
         )
             .andExpect(queryParam("expiration_date_lte", "2026-11-21"))
@@ -203,7 +203,7 @@ class AlpacaMarketDataClientTest @Autowired constructor(
     fun `429 응답은 상태 코드를 담은 예외로 바꾼다`() {
         // given
         server.expect(
-            requestTo(org.hamcrest.Matchers.startsWith("${AlpacaMarketDataClient.BASE_URL}/v2/stocks/snapshots")),
+            requestTo(org.hamcrest.Matchers.startsWith("$DATA_URL/v2/stocks/snapshots")),
         )
             .andRespond(withStatus(HttpStatus.TOO_MANY_REQUESTS).body("""{"message":"too many requests"}"""))
 
@@ -222,3 +222,5 @@ class AlpacaMarketDataClientTest @Autowired constructor(
         server.verify()
     }
 }
+
+private const val DATA_URL = "https://data.alpaca.markets"

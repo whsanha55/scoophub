@@ -15,7 +15,7 @@ import org.springframework.web.util.UriComponentsBuilder
 class GoogleOAuthClient(private val props: ScoophubProperties, restClientBuilder: RestClient.Builder) {
     private val restClient = restClientBuilder.build()
 
-    fun authorizeUrl(state: String): String = UriComponentsBuilder.fromUriString(AUTHORIZE_URL)
+    fun authorizeUrl(state: String): String = UriComponentsBuilder.fromUriString(props.endpoints.googleAuthorize)
         .queryParam("response_type", "code")
         .queryParam("client_id", props.auth.googleClientId)
         .queryParam("redirect_uri", props.auth.oauthRedirectUri)
@@ -33,13 +33,13 @@ class GoogleOAuthClient(private val props: ScoophubProperties, restClientBuilder
             add("client_id", props.auth.googleClientId)
             add("client_secret", props.auth.googleClientSecret)
         }
-        val token = restClient.post().uri(TOKEN_URL)
+        val token = restClient.post().uri(props.endpoints.googleToken)
             .contentType(MediaType.APPLICATION_FORM_URLENCODED)
             .body(form)
             .retrieve()
             .body<GoogleTokenResponse>()
             ?: error("empty token response")
-        return restClient.get().uri(USERINFO_URL)
+        return restClient.get().uri(props.endpoints.googleUserinfo)
             .headers { it.setBearerAuth(token.accessToken) }
             .retrieve()
             .body<GoogleUserInfo>()
@@ -47,9 +47,6 @@ class GoogleOAuthClient(private val props: ScoophubProperties, restClientBuilder
     }
 
     companion object {
-        const val AUTHORIZE_URL = "https://accounts.google.com/o/oauth2/v2/auth"
-        const val TOKEN_URL = "https://oauth2.googleapis.com/token"
-        const val USERINFO_URL = "https://www.googleapis.com/oauth2/v3/userinfo"
         private const val SCOPE = "openid email profile"
     }
 }

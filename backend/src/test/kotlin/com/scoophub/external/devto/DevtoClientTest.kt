@@ -1,8 +1,10 @@
 package com.scoophub.external.devto
 
+import com.scoophub.global.config.ScoophubProperties
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
+import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.boot.restclient.test.autoconfigure.RestClientTest
 import org.springframework.http.HttpHeaders
 import org.springframework.http.MediaType
@@ -12,6 +14,7 @@ import org.springframework.test.web.client.match.MockRestRequestMatchers.request
 import org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess
 
 @RestClientTest(DevtoClient::class)
+@EnableConfigurationProperties(ScoophubProperties::class)
 class DevtoClientTest @Autowired constructor(
     private val client: DevtoClient,
     private val server: MockRestServiceServer,
