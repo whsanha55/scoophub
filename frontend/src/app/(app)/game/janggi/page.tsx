@@ -1,15 +1,29 @@
 import type { Metadata } from "next";
-import { SameScreenJanggiGame } from "@/domains/game/janggi/components/same-screen-game";
+import { GameModePicker } from "@/domains/game/components/game-mode-picker";
 
 export const metadata: Metadata = {
-  title: "장기 같은 화면 대국 — ScoopHub",
+  title: "장기 — ScoopHub",
 };
 
-export default function JanggiPage() {
+export default function JanggiModePage() {
   return (
-    <div className="space-y-4">
-      <h1 className="text-2xl font-bold">장기 · 같은 화면 대국</h1>
-      <SameScreenJanggiGame />
-    </div>
+    <GameModePicker
+      gameId="janggi"
+      title="장기"
+      modes={[
+        {
+          title: "같은 화면에서 둘이",
+          description: "한 기기에서 둘이 번갈아 둔다",
+          href: "/game/janggi/local",
+          icon: "📱",
+        },
+        {
+          title: "방 만들고 초대하기",
+          description: "초대코드를 보내 서로 다른 기기에서 둔다",
+          href: "/game/room/new?game=janggi",
+          icon: "✉️",
+        },
+      ]}
+    />
   );
 }

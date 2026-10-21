@@ -40,14 +40,15 @@ class GameController(private val gameRoomService: GameRoomService, private val c
         return ApiResponse.ok(CreateRoomResponse(code = room.code), ResponseMeta(clock.instant()))
     }
 
-    @Operation(summary = "초대코드 확인")
-    @GetMapping("/rooms/{code}")
+    @Operation(summary = "초대코드 확인. 초대코드는 게임마다 따로다")
+    @GetMapping("/{gameId}/rooms/{code}")
     fun getRoomSummary(
+        @PathVariable gameId: String,
         @PathVariable code: String,
         servletRequest: HttpServletRequest,
     ): ApiResponse<RoomSummaryResponse> {
         gameRoomService.validateCodeAttempt(clientIpOf(servletRequest))
-        val room = gameRoomService.findRoom(code)
+        val room = gameRoomService.findRoom(gameId, code)
         val summary =
             room?.let { gameRoomService.locked(it) { RoomSummaryResponse.from(it) } } ?: RoomSummaryResponse.from(null)
         return ApiResponse.ok(summary, ResponseMeta(clock.instant()))

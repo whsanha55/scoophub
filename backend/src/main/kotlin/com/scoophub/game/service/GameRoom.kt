@@ -38,6 +38,9 @@ class RoomPlayer(val guestId: String, val nickname: String, var side: SideEnum) 
 
 data class RoomSpectator(val guestId: String, val nickname: String)
 
+/** 게임 종류 + 초대코드 → 방 저장소 키. */
+fun roomKeyOf(gameId: String, code: String): String = "$gameId:$code"
+
 /**
  * 게임 방. DB 없이 메모리에만 둔다(ADR-0002). 게임 종류와 규칙을 모른다 — 수의 합법성은
  * 클라이언트가 판정하고(ADR-0001) 방은 차례 순서(선 후공 교대)와 시계, 기보 기록만 관리한다.
@@ -56,6 +59,9 @@ class GameRoom(
 ) {
     var timeRule = timeRule
         private set
+
+    /** 방 저장소 키. 초대코드는 게임마다 따로라 게임 종류와 묶는다. */
+    val key: String get() = roomKeyOf(gameId, code)
 
     /** 방장 게스트. 시간 규칙 변경 권한이 있다. */
     var hostGuestId: String? = null

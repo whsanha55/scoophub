@@ -104,6 +104,7 @@ export class RoomSocket {
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor(
+    private readonly gameId: string,
     private readonly code: string,
     private readonly guestId: string,
     private readonly nickname: string,
@@ -118,7 +119,7 @@ export class RoomSocket {
 
   private open() {
     this.onState("connecting");
-    const url = `${wsBase()}/ws/game/${this.code}?guest=${encodeURIComponent(this.guestId)}&nick=${encodeURIComponent(this.nickname)}`;
+    const url = `${wsBase()}/ws/game/${this.gameId}/${this.code}?guest=${encodeURIComponent(this.guestId)}&nick=${encodeURIComponent(this.nickname)}`;
     const ws = new WebSocket(url);
     this.ws = ws;
     ws.onopen = () => {
@@ -206,8 +207,9 @@ export interface RoomSummary {
   full: boolean | null;
 }
 
-export async function checkRoom(code: string): Promise<RoomSummary> {
-  const res = await fetch(`/api/game/rooms/${encodeURIComponent(code)}`);
+/** 초대코드는 게임마다 따로라 게임 종류와 함께 확인한다. */
+export async function checkRoom(gameId: string, code: string): Promise<RoomSummary> {
+  const res = await fetch(`/api/game/${encodeURIComponent(gameId)}/rooms/${encodeURIComponent(code)}`);
   if (!res.ok) {
     const body = await res.json().catch(() => null);
     throw new Error(body?.detail ?? "방을 확인하지 못했다");

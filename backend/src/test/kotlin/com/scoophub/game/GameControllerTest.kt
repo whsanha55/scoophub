@@ -44,7 +44,7 @@ class GameControllerTest @Autowired constructor(
         val code = objectMapper.readTree(created.response.contentAsString)["data"]["code"].asString()
 
         // when
-        val summary = mockMvc.get("/api/game/rooms/$code") { header(CLIENT_IP_HEADER, "10.0.0.1") }
+        val summary = mockMvc.get("/api/game/janggi/rooms/$code") { header(CLIENT_IP_HEADER, "10.0.0.1") }
 
         // then
         summary.andExpect {
@@ -56,14 +56,34 @@ class GameControllerTest @Autowired constructor(
             jsonPath("$.data.player_count") { value(1) }
             jsonPath("$.data.time_rule.base_ms") { value(600000) }
         }
-        assertThat(gameRoomService.findRoom(code)?.isSetupRequired).isTrue()
+        assertThat(gameRoomService.findRoom("janggi", code)?.isSetupRequired).isTrue()
+    }
+
+    @Test
+    fun `다른 게임의 초대코드로 확인하면 exists=false 다`() {
+        // given
+        val created = mockMvc.post("/api/game/rooms") {
+            header(CLIENT_IP_HEADER, "10.0.0.5")
+            contentType = MediaType.APPLICATION_JSON
+            content = createRoomBody(gameId = "janggi", ip = "10.0.0.5")
+        }.andExpect { status { isOk() } }.andReturn()
+        val code = objectMapper.readTree(created.response.contentAsString)["data"]["code"].asString()
+
+        // when
+        val summary = mockMvc.get("/api/game/chess/rooms/$code") { header(CLIENT_IP_HEADER, "10.0.0.5") }
+
+        // then
+        summary.andExpect {
+            status { isOk() }
+            jsonPath("$.data.exists") { value(false) }
+        }
     }
 
     @Test
     fun `없는 초대코드는 exists=false 다`() {
         // given
         // when
-        val summary = mockMvc.get("/api/game/rooms/000000") { header(CLIENT_IP_HEADER, "10.0.0.2") }
+        val summary = mockMvc.get("/api/game/chess/rooms/000000") { header(CLIENT_IP_HEADER, "10.0.0.2") }
 
         // then
         summary.andExpect {
@@ -91,10 +111,10 @@ class GameControllerTest @Autowired constructor(
     @Test
     fun `초대코드 확인 한도를 넘으면 429 와 사유가 온다`() {
         // given
-        repeat(10) { mockMvc.get("/api/game/rooms/000000") { header(CLIENT_IP_HEADER, "10.0.0.4") } }
+        repeat(10) { mockMvc.get("/api/game/chess/rooms/000000") { header(CLIENT_IP_HEADER, "10.0.0.4") } }
 
         // when
-        val response = mockMvc.get("/api/game/rooms/000000") { header(CLIENT_IP_HEADER, "10.0.0.4") }
+        val response = mockMvc.get("/api/game/chess/rooms/000000") { header(CLIENT_IP_HEADER, "10.0.0.4") }
 
         // then
         response.andExpect {

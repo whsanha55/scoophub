@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { use, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { ensureGuestId, ensureNickname } from "@/domains/game/lib/guest";
@@ -22,25 +23,18 @@ const GAMES = [
 
 type GameId = (typeof GAMES)[number]["id"];
 
-export default function NewRoomPage() {
+export default function NewRoomPage({ searchParams }: { searchParams: Promise<{ game?: string }> }) {
   const router = useRouter();
-  const [gameId, setGameId] = useState<GameId>("chess");
-  const [baseMin, setBaseMin] = useState(CHESS_DEFAULT_RULE.baseMs / 60_000);
-  const [byoSec, setByoSec] = useState(CHESS_DEFAULT_RULE.byoYomiMs / 1000);
-  const [byoCount, setByoCount] = useState(CHESS_DEFAULT_RULE.byoYomiCount);
+  // 종목은 앞 화면(/game/chess, /game/janggi)에서 고른다
+  const gameId: GameId = use(searchParams).game === "janggi" ? "janggi" : "chess";
+  const defaultRule = gameId === "janggi" ? JANGGI_DEFAULT_RULE : CHESS_DEFAULT_RULE;
+  const [baseMin, setBaseMin] = useState(defaultRule.baseMs / 60_000);
+  const [byoSec, setByoSec] = useState(defaultRule.byoYomiMs / 1000);
+  const [byoCount, setByoCount] = useState(defaultRule.byoYomiCount);
   const [side, setSide] = useState<string>("random");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const game = GAMES.find((g) => g.id === gameId)!;
-
-  const switchGame = (id: GameId) => {
-    setGameId(id);
-    const rule = id === "janggi" ? JANGGI_DEFAULT_RULE : CHESS_DEFAULT_RULE;
-    setBaseMin(rule.baseMs / 60_000);
-    setByoSec(rule.byoYomiMs / 1000);
-    setByoCount(rule.byoYomiCount);
-    setSide("random");
-  };
 
   const create = async () => {
     setBusy(true);
@@ -62,7 +56,7 @@ export default function NewRoomPage() {
         guestId,
         nickname,
       );
-      router.push(`/game/room/${code}`);
+      router.push(`/game/room/${gameId}/${code}`);
     } catch (e) {
       setError(e instanceof Error ? e.message : "방을 만들지 못했다");
       setBusy(false);
@@ -89,16 +83,11 @@ export default function NewRoomPage() {
 
   return (
     <div className="mx-auto flex w-full max-w-sm flex-col gap-4">
-      <h1 className="text-2xl font-bold">초대 대국 만들기</h1>
+      <Link href={`/game/${gameId}`} className="text-sm text-muted-foreground hover:text-foreground">
+        ← {game.label}
+      </Link>
+      <h1 className="text-2xl font-bold">{game.label} · 초대 대국 만들기</h1>
       <div className="flex flex-col gap-4 rounded-xl border bg-card p-5">
-        <h2 className="font-semibold">게임</h2>
-        <div className="flex gap-1">
-          {GAMES.map((g) => (
-            <Button key={g.id} variant={gameId === g.id ? "default" : "outline"} size="sm" onClick={() => switchGame(g.id)}>
-              {g.label}
-            </Button>
-          ))}
-        </div>
         <h2 className="font-semibold">내 진영</h2>
         <div className="flex gap-1">
           {game.sides.map((s) => (

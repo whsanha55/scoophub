@@ -65,7 +65,7 @@ class GameRoomService(
                 createdAt = now,
             )
         }
-        limiter.onRoomCreated(room.code, command.guestId, command.ip)
+        limiter.onRoomCreated(room.key, command.guestId, command.ip)
         room.join(command.guestId, command.nickname, now)
         return room
     }
@@ -75,14 +75,14 @@ class GameRoomService(
         limiter.findCodeAttemptBlockReason(ip)?.let { throw tooManyRequests(it) }
     }
 
-    fun findRoom(code: String): GameRoom? = rooms[code]
+    fun findRoom(gameId: String, code: String): GameRoom? = rooms[roomKeyOf(gameId, code)]
 
     /**
      * WS 연결 대상 방. 이미 방에 있는 게스트의 재접속은 한도를 세지 않고,
      * 처음 들어오는 연결은 초대코드 시도로 센다 — WS 로 코드를 대입해 보는 것을 막는다.
      */
-    fun findRoomToConnect(code: String, guestId: String, ip: String): GameRoom? {
-        val room = rooms[code]
+    fun findRoomToConnect(gameId: String, code: String, guestId: String, ip: String): GameRoom? {
+        val room = findRoom(gameId, code)
         if (room != null && locked(room) { room.isParticipant(guestId) }) return room
         validateCodeAttempt(ip)
         return room
@@ -169,8 +169,8 @@ class GameRoomService(
     fun claimAbandonWin(room: GameRoom, guestId: String): RoomResult? =
         endWith(room) { room.claimAbandonWin(guestId, clock.instant()) }
 
-    fun closeRoom(code: String) {
-        rooms.remove(code)?.let { limiter.onRoomClosed(it.code) }
+    fun closeRoom(room: GameRoom) {
+        if (rooms.remove(room.key, room)) limiter.onRoomClosed(room.key)
     }
 
     fun activeRoomCount(): Int = rooms.size
@@ -196,7 +196,7 @@ class GameRoomService(
             if (n % EXPIRE_EVERY_TICKS == 0) {
                 rooms.values
                     .filter { room -> locked(room) { room.isExpired(now) } }
-                    .forEach { closeRoom(it.code) }
+                    .forEach { closeRoom(it) }
             }
             if (n % CLOCK_EVERY_TICKS != 0) return
             for (room in rooms.values) {
@@ -214,12 +214,12 @@ class GameRoomService(
         }
     }
 
-    /** 쓰이지 않는 6자리 코드로 방을 등록한다. 동시에 같은 코드를 잡지 않도록 putIfAbsent 로 확정한다. */
+    /** 그 게임에서 쓰이지 않는 6자리 코드로 방을 등록한다. 동시에 같은 코드를 잡지 않도록 putIfAbsent 로 확정한다. */
     private fun registerWithNewCode(create: (String) -> GameRoom): GameRoom {
         while (true) {
             val code = (random.nextInt(900_000) + 100_000).toString()
             val room = create(code)
-            if (rooms.putIfAbsent(code, room) == null) return room
+            if (rooms.putIfAbsent(room.key, room) == null) return room
         }
     }
 

@@ -95,6 +95,20 @@ class GameRoomServiceTest {
     }
 
     @Test
+    fun `초대코드는 게임마다 따로다 - 다른 게임으로는 같은 코드의 방을 찾지 못한다`() {
+        // given
+        val room = createRoom(gameId = "chess")
+
+        // when
+        val asChess = service.findRoom("chess", room.code)
+        val asJanggi = service.findRoom("janggi", room.code)
+
+        // then
+        assertThat(asChess).isSameAs(room)
+        assertThat(asJanggi).isNull()
+    }
+
+    @Test
     fun `방을 만들 때 시간 규칙은 상한 안으로 맞춘다`() {
         // given
         val rule = TimeRule(baseMs = 999 * 60_000L, byoYomiMs = 999_000, byoYomiCount = 99)
@@ -411,11 +425,11 @@ class GameRoomServiceTest {
     @Test
     fun `한도 - WS로 처음 들어오는 연결도 초대코드 시도로 센다`() {
         // given
-        repeat(10) { i -> service.findRoomToConnect("00000$i", "stranger", "5.5.5.5") }
+        repeat(10) { i -> service.findRoomToConnect("chess", "00000$i", "stranger", "5.5.5.5") }
 
         // when
         // then
-        assertTooManyRequests { service.findRoomToConnect("999999", "stranger", "5.5.5.5") }
+        assertTooManyRequests { service.findRoomToConnect("chess", "999999", "stranger", "5.5.5.5") }
     }
 
     @Test
@@ -425,7 +439,7 @@ class GameRoomServiceTest {
         repeat(10) { service.validateCodeAttempt("6.6.6.6") }
 
         // when
-        val found = service.findRoomToConnect(room.code, "guest2", "6.6.6.6")
+        val found = service.findRoomToConnect(room.gameId, room.code, "guest2", "6.6.6.6")
 
         // then
         assertThat(found).isSameAs(room)
@@ -437,7 +451,7 @@ class GameRoomServiceTest {
         val rooms = (0 until 3).map { createRoom(guestId = "g1") }
 
         // when
-        service.closeRoom(rooms.first().code)
+        service.closeRoom(rooms.first())
 
         // then
         createRoom(guestId = "g1")
@@ -449,7 +463,7 @@ class GameRoomServiceTest {
         val rooms = (0 until 20).map { i -> createRoom(guestId = "guest$i", ip = "7.7.7.7") }
 
         // when
-        service.closeRoom(rooms.first().code)
+        service.closeRoom(rooms.first())
 
         // then
         createRoom(guestId = "another", ip = "7.7.7.7")
