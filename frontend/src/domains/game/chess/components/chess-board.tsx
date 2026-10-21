@@ -14,7 +14,7 @@ const PIECE_GLYPH: Record<string, string> = {
   p: "♟",
 };
 
-/** 잡힌 기물 글자. 시계 행 배경은 테마를 따르므로 보드와 달리 토큰 색으로 그린다. */
+/** 잡힌 기물 글자. 잡은 기물 칸 배경은 테마를 따르므로 보드와 달리 토큰 색으로 그린다. */
 export function chessCapturedGlyph(piece: PieceInfo): ReactNode {
   return (
     <span

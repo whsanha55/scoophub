@@ -10,7 +10,7 @@ export function CapturedPiecesView({
   pieces: PieceInfo[];
   render: (piece: PieceInfo) => ReactNode;
 }) {
-  if (pieces.length === 0) return null;
+  // 비어 있어도 칸을 그린다. 첫 기물을 잡을 때 칸이 생기면 보드가 밀려 탭이 빗나간다
   return (
     <div
       aria-label="잡은 기물"
