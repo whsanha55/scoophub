@@ -105,15 +105,18 @@ class SystemConfigAndScheduleTest @Autowired constructor(
     }
 
     @Test
-    fun `스케줄 PATCH — cron 타입에 schedules 설정`() {
+    fun `스케줄 PATCH — 잡이 미등록이면 런타임 반영 없이 DB 만 갱신하고 200`() {
         try {
             mockMvc.patch("/api/schedules/github_trending/github_trending_crawler") {
                 header("Authorization", bearer)
                 contentType = MediaType.APPLICATION_JSON
                 content = """{"schedules": ["30 9 * * *"]}"""
             }.andExpect {
-                // 잡이 등록 안 된 테스트 환경에선 DB 갱신 후 런타임 반영에서 500 (legacy 동일)
-                status { isInternalServerError() }
+                // 테스트 환경은 ENABLE_SCHEDULER=false 라 잡이 미등록 — 다음 기동 때 반영된다
+                status { isOk() }
+                jsonPath("$.data.schedules[0]") { value("30 9 * * *") }
+                jsonPath("$.data.next_run_time") { doesNotExist() }
+                jsonPath("$.data.paused") { doesNotExist() }
             }
             // DB 는 갱신됐다
             val schedules = jdbcClient.sql(
@@ -126,7 +129,7 @@ class SystemConfigAndScheduleTest @Autowired constructor(
                 header("Authorization", bearer)
                 contentType = MediaType.APPLICATION_JSON
                 content = """{"schedules": ["0 9 * * *"]}"""
-            }.andExpect { status { isInternalServerError() } }
+            }.andExpect { status { isOk() } }
         }
     }
 

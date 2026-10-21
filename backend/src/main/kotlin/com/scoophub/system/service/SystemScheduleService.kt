@@ -29,7 +29,10 @@ class SystemScheduleService(
         return attachRuntime(ScheduleItem.from(row))
     }
 
-    /** 주기(schedules/schedule_minutes) 또는 활성화(enabled) 변경. 변경 즉시 런타임에 반영 */
+    /**
+     * 주기(schedules/schedule_minutes) 또는 활성화(enabled) 변경. 변경 즉시 런타임에 반영.
+     * 잡이 미등록(ENABLE_SCHEDULER=false 등)이면 DB 만 갱신하고, 다음 기동 때 반영된다.
+     */
     fun update(
         crawler: String,
         jobId: String,
@@ -76,11 +79,14 @@ class SystemScheduleService(
             throw ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY, "no updatable fields provided")
         }
 
-        // 런타임 반영 — 미등록 잡이면 500 (legacy 동일)
-        try {
-            crawlScheduler.apply(crawler, jobId)
-        } catch (e: IllegalStateException) {
-            throw ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, e.message)
+        if (crawlScheduler.isRegistered(jobId)) {
+            try {
+                crawlScheduler.apply(crawler, jobId)
+            } catch (e: IllegalStateException) {
+                throw ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, e.message)
+            }
+        } else {
+            log.info { "Job not registered in scheduler, runtime apply skipped (crawler=$crawler, job_id=$jobId)" }
         }
 
         val row = requireNotNull(scheduleRepository.findByCrawlerAndJobId(crawler, jobId))
