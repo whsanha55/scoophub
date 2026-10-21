@@ -37,6 +37,13 @@ export const OMOK_DEFAULT_RULE: TimeRule = {
   byoYomiCount: 3,
 };
 
+/** 야추다이스: 기본 5분, 초읽기 없음 (재검토 #319 확정) */
+export const YACHT_DEFAULT_RULE: TimeRule = {
+  baseMs: 5 * 60_000,
+  byoYomiMs: 0,
+  byoYomiCount: 0,
+};
+
 export interface PlayerClock {
   /** 기본 시간 남은 ms. 음수가 될 수 없다. */
   baseLeftMs: number;

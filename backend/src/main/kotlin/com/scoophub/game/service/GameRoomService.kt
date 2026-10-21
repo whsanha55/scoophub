@@ -7,6 +7,7 @@ import com.scoophub.game.enums.SidePreferenceEnum
 import com.scoophub.game.vo.ChatEntry
 import com.scoophub.game.vo.JoinResult
 import com.scoophub.game.vo.MoveResult
+import com.scoophub.game.vo.RoomAction
 import com.scoophub.game.vo.RoomMove
 import com.scoophub.game.vo.RoomResult
 import com.scoophub.game.vo.TimeRule
@@ -110,6 +111,13 @@ class GameRoomService(
         val entry = locked(room) { room.addChat(guestId, text, clock.instant()) } ?: return null
         publish(RoomEvent.Chatted(room, entry))
         return entry
+    }
+
+    /** 차례 안의 중간 행동(ADR-0004). 거절되면 null. */
+    fun addAction(room: GameRoom, guestId: String, payload: Map<String, Any?>): RoomAction? {
+        val action = locked(room) { room.addAction(guestId, payload, clock.instant()) } ?: return null
+        publish(RoomEvent.Acted(room, action))
+        return action
     }
 
     fun addMove(

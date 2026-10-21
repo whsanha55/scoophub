@@ -17,6 +17,11 @@ data class JoinResult(val side: SideEnum?, val role: RoomRoleEnum, val isAllowed
 
 data class RoomMove(val side: SideEnum, val from: String, val to: String, val notation: String, val at: Instant)
 
+/**
+ * 한 차례 안의 중간 행동(야추 굴림·고정 등). 서버는 payload 를 해석하지 않고 중계·보관만 한다(ADR-0004).
+ */
+data class RoomAction(val side: SideEnum, val payload: Map<String, Any?>, val at: Instant)
+
 data class RoomResult(val winner: SideEnum?, val reason: String)
 
 /** 수를 둔 결과. 차례가 아니면 거절, 둘 사람 시계가 이미 다 됐으면 시간패로 끝난다. */

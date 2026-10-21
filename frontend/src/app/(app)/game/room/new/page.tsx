@@ -6,7 +6,12 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { ensureGuestId, ensureNickname } from "@/domains/game/lib/guest";
 import { createRoom } from "@/domains/game/lib/room-client";
-import { CHESS_DEFAULT_RULE, JANGGI_DEFAULT_RULE, OMOK_DEFAULT_RULE } from "@/domains/game/lib/time-control";
+import {
+  CHESS_DEFAULT_RULE,
+  JANGGI_DEFAULT_RULE,
+  OMOK_DEFAULT_RULE,
+  YACHT_DEFAULT_RULE,
+} from "@/domains/game/lib/time-control";
 
 const GAMES = [
   { id: "chess", label: "체스", defaultRule: CHESS_DEFAULT_RULE, requiresSetup: false, sides: [
@@ -25,11 +30,16 @@ const GAMES = [
     { value: "white", label: "흑" },
     { value: "black", label: "백" },
   ] },
+  { id: "yacht", label: "야추다이스", defaultRule: YACHT_DEFAULT_RULE, requiresSetup: false, sides: [
+    { value: "random", label: "무작위" },
+    { value: "white", label: "선공" },
+    { value: "black", label: "후공" },
+  ] },
 ] as const;
 
 export default function NewRoomPage({ searchParams }: { searchParams: Promise<{ game?: string }> }) {
   const router = useRouter();
-  // 종목은 앞 화면(/game/chess, /game/janggi, /game/omok)에서 고른다. 모르는 값이면 체스
+  // 종목은 앞 화면(/game/chess, /game/janggi, /game/omok, /game/yacht)에서 고른다. 모르는 값이면 체스
   const requested = use(searchParams).game;
   const game = GAMES.find((g) => g.id === requested) ?? GAMES[0];
   const gameId = game.id;

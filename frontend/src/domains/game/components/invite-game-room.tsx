@@ -64,6 +64,9 @@ export function useInviteRoom(gameId: string, code: string) {
               setNotice(null);
             } else if (msg.type === "chat") {
               setChat((prev) => [...prev.slice(-80), msg.payload]);
+            } else if (msg.type === "game_action") {
+              // 중간 행동은 그 메시지만 온다. 다음 방 스냅샷(수 기록 뒤)이 오면 서버 로그로 바뀐다
+              setSnapshot((prev) => (prev ? { ...prev, actions: [...prev.actions, msg.payload] } : prev));
             }
           },
           (state) => setConn(state),
