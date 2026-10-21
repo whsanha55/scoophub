@@ -32,8 +32,10 @@ test("초기 상태: 32개 기물(궁 제외 기물 좌표 포함), 초가 선�
   const state = janggiEngine.initialState();
   assert.equal(janggiEngine.turn(state), "white");
   assert.equal(janggiEngine.pieces(state).size, 32);
-  assert.equal(state.board[0][4].type, "K"); // 한 궁
-  assert.equal(state.board[9][4].type, "K"); // 초 궁
+  assert.equal(state.board[1][4].type, "K"); // 한 궁: 궁성 가운데
+  assert.equal(state.board[8][4].type, "K"); // 초 궁: 궁성 가운데
+  assert.equal(state.board[0][4], null);
+  assert.equal(state.board[9][4], null);
   assert.equal(state.board[2][1].type, "C"); // 한 포
   assert.equal(state.board[7][1].type, "C"); // 초 포
 });

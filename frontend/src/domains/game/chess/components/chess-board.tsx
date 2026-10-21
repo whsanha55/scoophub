@@ -66,6 +66,8 @@ export function ChessBoard({
           const isTarget = targets.includes(square);
           const isLast = lastMove && (lastMove.from === square || lastMove.to === square);
           const isCheck = checkSquare === square;
+          // 마지막에 움직인 기물은 노란 빛 테두리로 표시한다
+          const isMoved = lastMove?.to === square;
           return (
             <button
               key={square}
@@ -91,6 +93,9 @@ export function ChessBoard({
                 >
                   {PIECE_GLYPH[piece.type]}
                 </span>
+              )}
+              {isMoved && (
+                <span className="absolute inset-0 z-0 ring-4 ring-inset ring-yellow-400 shadow-[inset_0_0_12px_rgba(250,204,21,0.9)]" />
               )}
               {isTarget && !piece && (
                 <span className="relative z-10 h-1/4 w-1/4 rounded-full bg-neutral-800/35" />

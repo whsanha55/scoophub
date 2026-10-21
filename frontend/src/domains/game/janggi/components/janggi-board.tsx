@@ -110,6 +110,8 @@ export function JanggiBoard({
             const isSelected = selected === point;
             const isTarget = targets.includes(point);
             const isLast = lastMove && (lastMove.from === point || lastMove.to === point);
+            // 마지막에 움직인 기물은 노란 빛 테두리로 표시한다
+            const isMoved = lastMove?.to === point;
             const isCheck = checkSquare === point;
             return (
               <button
@@ -136,7 +138,7 @@ export function JanggiBoard({
                         : "border-red-300/40 bg-red-700 text-red-50"
                     } ${isSelected ? "ring-2 ring-sky-400 ring-offset-1 ring-offset-[#e8c98f]" : ""} ${
                       isCheck ? "ring-2 ring-red-500 ring-offset-1 ring-offset-[#e8c98f]" : ""
-                    }`}
+                    } ${isMoved ? "border-yellow-200 shadow-[0_0_10px_4px_rgba(253,224,71,0.9)]" : ""}`}
                   >
                     {PIECE_HANJA[piece.side][piece.type]}
                   </span>

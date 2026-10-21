@@ -155,7 +155,7 @@ export function createBoard(setup: JanggiSetup): (JanggiPiece | null)[][] {
   put(0, 1, han1, "black");
   put(0, 2, han2, "black");
   put(0, 3, "A", "black");
-  put(0, 4, "K", "black");
+  put(1, 4, "K", "black"); // 궁은 궁성 가운데서 시작한다
   put(0, 5, "A", "black");
   put(0, 6, han3, "black");
   put(0, 7, han4, "black");
@@ -168,7 +168,7 @@ export function createBoard(setup: JanggiSetup): (JanggiPiece | null)[][] {
   put(9, 1, cho1, "white");
   put(9, 2, cho2, "white");
   put(9, 3, "A", "white");
-  put(9, 4, "K", "white");
+  put(8, 4, "K", "white");
   put(9, 5, "A", "white");
   put(9, 6, cho3, "white");
   put(9, 7, cho4, "white");
