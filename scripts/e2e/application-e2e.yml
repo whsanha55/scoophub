@@ -1,0 +1,54 @@
+# E2E 전용 설정. server.sh 가 --spring.config.additional-location 으로 붙인다. 운영 jar 에는 들어가지 않는다.
+# 외부 API 는 모두 스텁 서버(WireMock)를 가리킨다. 스텁 경로 앞부분은 서비스 이름이다.
+server:
+  port: ${E2E_APP_PORT:28010}
+
+spring:
+  datasource:
+    url: jdbc:postgresql://127.0.0.1:${E2E_DB_PORT:28432}/scoophub
+    username: scoophub
+    password: scoophub
+
+scoophub:
+  # 운영처럼 잡을 등록해야 스케줄 수정(PATCH /api/schedules)이 런타임에 반영된다. 주기 잡은 첫 실행이 주기만큼 뒤다
+  enable-scheduler: true
+  cors-origins: http://localhost:3000
+  youtube-api-key: e2e-youtube-key
+  alpaca:
+    api-key: e2e-alpaca-key
+    api-secret: e2e-alpaca-secret
+    data-url: ${E2E_STUB_URL:http://127.0.0.1:28089}/alpaca-data
+    trading-url: ${E2E_STUB_URL:http://127.0.0.1:28089}/alpaca-trading
+    # 스트림(WebSocket)은 끄고, news_article 에 쌓인 기사를 처리하는 워커만 켠다 (news-e2e.sh)
+    stream-enabled: false
+    worker-enabled: true
+  llm:
+    api-url: ${E2E_STUB_URL:http://127.0.0.1:28089}/llm/chat/completions
+    api-key: e2e-llm-key
+    model: e2e-model
+  auth:
+    allowed-emails: member@e2e.test,super@e2e.test
+    super-emails: super@e2e.test
+    google-client-id: e2e-client
+    google-client-secret: e2e-secret
+    jwt-secret: e2e-jwt-secret-e2e-jwt-secret-0000
+    jwt-expire-hours: 1
+    bypass: false
+    redirect-url: http://localhost:3000/auth/callback
+    oauth-redirect-uri: http://localhost:${E2E_APP_PORT:28010}/api/auth/callback
+  telegram:
+    bot-token: e2e-bot
+    # 비워 두면 크롤 뒤 자동 토픽 라우트를 만들지 않는다
+    default-chat-id: ""
+  endpoints:
+    hacker-news: ${E2E_STUB_URL:http://127.0.0.1:28089}/hacker-news
+    devto: ${E2E_STUB_URL:http://127.0.0.1:28089}/devto
+    arxiv: ${E2E_STUB_URL:http://127.0.0.1:28089}/arxiv/query
+    youtube: ${E2E_STUB_URL:http://127.0.0.1:28089}/youtube
+    github: ${E2E_STUB_URL:http://127.0.0.1:28089}/github
+    wttr: ${E2E_STUB_URL:http://127.0.0.1:28089}/wttr
+    open-meteo-air-quality: ${E2E_STUB_URL:http://127.0.0.1:28089}/open-meteo/air-quality
+    telegram: ${E2E_STUB_URL:http://127.0.0.1:28089}/telegram
+    google-authorize: ${E2E_STUB_URL:http://127.0.0.1:28089}/google/authorize
+    google-token: ${E2E_STUB_URL:http://127.0.0.1:28089}/google/token
+    google-userinfo: ${E2E_STUB_URL:http://127.0.0.1:28089}/google/userinfo
