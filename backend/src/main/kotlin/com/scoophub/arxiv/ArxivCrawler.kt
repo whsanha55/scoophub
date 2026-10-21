@@ -49,13 +49,15 @@ class ArxivCrawler(
             return CrawlResult(errors = errors)
         }
 
+        // arxiv_id로 중복 제거 (여러 분류에 교차 등록된 논문이 있을 수 있음)
+        val unique = allPapers.distinctBy { it.arxivId }
         // crawl_data(category=feed, purpose=arxiv, key=arxiv_id)
         val existingIds = crawlDataRepository
-            .findByCategoryAndPurposeAndKeyIn("feed", "arxiv", allPapers.map { it.arxivId })
+            .findByCategoryAndPurposeAndKeyIn("feed", "arxiv", unique.map { it.arxivId })
             .map { it.key }
             .toSet()
         var itemsNew = 0
-        for (paper in allPapers) {
+        for (paper in unique) {
             try {
                 store.upsert(
                     category = "feed",
@@ -87,7 +89,7 @@ class ArxivCrawler(
             }
         }
 
-        log.info { "arxiv fetch completed: fetched=${allPapers.size} new=$itemsNew errors=${errors.size}" }
-        return CrawlResult(itemsFetched = allPapers.size, itemsNew = itemsNew, errors = errors)
+        log.info { "arxiv fetch completed: fetched=${unique.size} new=$itemsNew errors=${errors.size}" }
+        return CrawlResult(itemsFetched = unique.size, itemsNew = itemsNew, errors = errors)
     }
 }

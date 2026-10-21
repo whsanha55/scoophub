@@ -101,6 +101,21 @@ class ArxivTest @Autowired constructor(
     }
 
     @Test
+    fun `여러 분류에 걸친 논문은 한 건으로 집계`() {
+        // given — cs.AI·cs.LG 가 같은 논문을 돌려준다
+        every { arxivClient.searchByCategory(any(), any()) } returns emptyList()
+        every { arxivClient.searchByCategory("cs.AI", 25) } returns listOf(paper("2401.00001", "Paper A"))
+        every { arxivClient.searchByCategory("cs.LG", 25) } returns listOf(paper("2401.00001", "Paper A"))
+
+        // when
+        val result = crawlRunner.run(crawler)
+
+        // then
+        assertThat(result!!.itemsFetched).isEqualTo(1)
+        assertThat(result.itemsNew).isEqualTo(1)
+    }
+
+    @Test
     fun `category·query 필터와 정렬`() {
         // given
         val fetched = clock.instant().toString()

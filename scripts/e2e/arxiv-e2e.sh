@@ -25,7 +25,7 @@ stub_text GET /arxiv/query "$E2E_TMP/arxiv.xml" "application/atom+xml"
 SUPER="$(auth "$(login super)")"
 step "크롤 실행" 200 POST /api/crawling/arxiv "" "$SUPER"
 expect '.success' 'true'
-[ "$(sql "SELECT COUNT(*) FROM crawl_data WHERE purpose = 'arxiv' AND key = '$ARXIV_ID'")" = "1" ] || fail "논문이 한 건으로 저장되지 않았다"
+expect '.data.items_new' '1'
 
 step "카테고리·제목 검색" 200 GET "/api/arxiv?category=cs.E2E&query=Attention"
 expect '.data[0].arxiv_id' "$ARXIV_ID"
