@@ -28,6 +28,7 @@ hotfix/WLT-7-settlement-timeout
 ```
 
 - 설명은 소문자와 하이픈으로 쓴다.
+- 설명에 도구·스킬·에이전트 이름이나 리뷰 번호를 쓰지 않는다.
 
 ## 2. 커밋 메시지
 
@@ -67,6 +68,7 @@ hotfix/WLT-7-settlement-timeout
 금지:
 
 - `Co-Authored-By` 등 AI나 도구의 서명 트레일러
+- 도구·스킬·에이전트 이름이나 리뷰 번호 같은 작업 표시 (예: `ponytail`, `(audit #3)`)
 - `wip`, `수정`, `.` 같은 의미 없는 메시지
 
 ## 3. Push
@@ -79,13 +81,14 @@ hotfix/WLT-7-settlement-timeout
 
 - 제목은 커밋 메시지 형식과 같다. squash 병합 시 PR 제목이 `main`의 커밋 제목이 된다.
 - 한 PR에는 한 주제만 담는다. 변경이 400줄을 넘으면 나누는 것을 검토한다.
+- 이름을 바꿀 때는 한 PR에서 모든 사용처를 바꾼다. 예전 이름을 남겨 두는 호환 코드는 실제로 쓰는 곳이 있을 때만 둔다.
 - 작업 중이면 Draft로 올린다.
 - 병합 전에 diff를 직접 훑고 머지 전 체크리스트(6절)를 확인한다.
 - squash 병합하고, 병합한 브랜치는 삭제한다.
 
 ## 5. PR 본문
 
-[`tooling/pull_request_template.md`](tooling/pull_request_template.md)를 프로젝트의 `.github/pull_request_template.md`로 둔다.
+아래 양식을 따른다.
 
 ```markdown
 ## 변경 내용
@@ -100,7 +103,7 @@ hotfix/WLT-7-settlement-timeout
 - 섹션을 비우지 않는다. 해당 없으면 "없음"이라고 쓴다.
 - 이유에 관련 티켓을 적는다.
 - 영향에는 API, DB, 설정 변경 여부와 배포 시 주의점을 적는다.
-- "Generated with Claude Code" 등 도구 문구를 넣지 않는다.
+- "Generated with Claude Code" 등 도구 문구나 리뷰 번호 같은 작업 표시를 넣지 않는다.
 
 ## 6. 머지 전 체크리스트
 
