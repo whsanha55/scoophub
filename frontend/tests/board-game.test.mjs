@@ -186,3 +186,61 @@ test("시간패 무승부 판정: 시간이 다 된 쪽의 기물은 세지 않�
   assert.equal(hasMatingMaterial(board, "b"), false);
   assert.equal(hasMatingMaterial(board, "w"), true);
 });
+
+// ---------- 잡힌 기물 ----------
+
+test("잡은 기물: 폰을 잡으면 잡은 쪽 표기에 오른다", () => {
+  let state = chessEngine.initialState();
+  const play = (from, to) => {
+    const r = chessEngine.applyMove(state, from, to);
+    assert.ok(r);
+    state = r.state;
+  };
+  play("e2", "e4");
+  play("d7", "d5");
+  play("e4", "d5"); // 백이 흑 폰을 잡는다
+  assert.deepEqual(chessEngine.capturedPieces(state).white, [{ type: "p", side: "black" }]);
+  assert.deepEqual(chessEngine.capturedPieces(state).black, []);
+});
+
+test("잡은 기물: 잡은 순서와 무관하게 값 높은 기물부터 정렬한다", () => {
+  let state = chessEngine.initialState();
+  const play = (from, to) => {
+    const r = chessEngine.applyMove(state, from, to);
+    assert.ok(r);
+    state = r.state;
+  };
+  play("e2", "e4");
+  play("d7", "d5");
+  play("e4", "d5"); // 백이 흑 폰을 잡는다
+  play("b8", "c6");
+  play("d5", "c6"); // 백이 흑 나이트를 잡는다
+  assert.deepEqual(chessEngine.capturedPieces(state).white, [
+    { type: "n", side: "black" },
+    { type: "p", side: "black" },
+  ]);
+});
+
+test("잡은 기물: 무르면 되돌아간다", () => {
+  let state = chessEngine.initialState();
+  const play = (from, to) => {
+    const r = chessEngine.applyMove(state, from, to);
+    assert.ok(r);
+    state = r.state;
+  };
+  play("e2", "e4");
+  play("d7", "d5");
+  play("e4", "d5");
+  const undone = chessEngine.undo(state);
+  assert.ok(undone);
+  assert.deepEqual(chessEngine.capturedPieces(undone).white, []);
+});
+
+test("잡은 기물: 폭 승격하며 잡아도 기물 수가 왜곡되지 않는다", () => {
+  // 남은 기물 수를 세는 방식이면 승격한 폰이 잡힌 것처럼 보인다. 기보 기반은 아니다
+  const game = new Chess("3r2k1/4P3/8/8/8/8/8/7K w - - 0 1");
+  game.move({ from: "e7", to: "d8", promotion: "q" });
+  const captured = chessEngine.capturedPieces({ game });
+  assert.deepEqual(captured.white, [{ type: "r", side: "black" }]);
+  assert.deepEqual(captured.black, []);
+});

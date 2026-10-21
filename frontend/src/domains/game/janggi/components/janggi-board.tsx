@@ -1,6 +1,51 @@
 "use client";
 
-import { PIECE_HANJA, type JanggiPiece } from "../engine";
+import type { ReactNode } from "react";
+import { PIECE_HANJA, type JanggiPiece, type JanggiPieceType } from "../engine";
+import type { PieceInfo } from "../../lib/board-game";
+
+/** 기물 등급: 궁 > 차·포·마·상 > 사·병. 판과 잡은 기물 칸이 같은 비율(1 : 0.87 : 0.63)로 그린다. */
+type PieceTier = "large" | "medium" | "small";
+const PIECE_TIER: Record<JanggiPieceType, PieceTier> = {
+  K: "large",
+  R: "medium",
+  C: "medium",
+  N: "medium",
+  B: "medium",
+  A: "small",
+  P: "small",
+};
+
+/** 판 위 기물 크기 (칸 너비 기준) */
+const BOARD_TOKEN_SIZE: Record<PieceTier, string> = {
+  large: "w-full text-[min(4.5vw,1.35rem)]",
+  medium: "w-[87%] text-[min(3.9vw,1.15rem)]",
+  small: "w-[63%] text-[min(2.9vw,0.85rem)]",
+};
+
+/** 잡힌 기물 토큰 크기 (궁은 잡히는 순간 대국이 끝나므로 표시되지 않는다) */
+const CAPTURED_TOKEN_SIZE: Record<PieceTier, string> = {
+  large: "h-9 w-9 text-lg",
+  medium: "h-8 w-8 text-base",
+  small: "h-6 w-6 text-xs",
+};
+
+export function janggiCapturedGlyph(piece: PieceInfo): ReactNode {
+  const type = piece.type as JanggiPieceType;
+  return (
+    <span
+      className={`flex shrink-0 items-center justify-center rounded-full border font-bold leading-none ${
+        CAPTURED_TOKEN_SIZE[PIECE_TIER[type]]
+      } ${
+        piece.side === "white"
+          ? "border-emerald-300/40 bg-emerald-700 text-emerald-50"
+          : "border-red-300/40 bg-red-700 text-red-50"
+      }`}
+    >
+      {PIECE_HANJA[piece.side][type]}
+    </span>
+  );
+}
 
 export interface JanggiBoardProps {
   board: (JanggiPiece | null)[][];
@@ -65,6 +110,8 @@ export function JanggiBoard({
             const isSelected = selected === point;
             const isTarget = targets.includes(point);
             const isLast = lastMove && (lastMove.from === point || lastMove.to === point);
+            // 마지막에 움직인 기물은 노란 빛 테두리로 표시한다
+            const isMoved = lastMove?.to === point;
             const isCheck = checkSquare === point;
             return (
               <button
@@ -83,13 +130,15 @@ export function JanggiBoard({
               >
                 {piece && (
                   <span
-                    className={`flex aspect-square w-full items-center justify-center rounded-full border text-[min(4.5vw,1.35rem)] font-bold leading-none ${
+                    className={`flex aspect-square items-center justify-center rounded-full border font-bold leading-none ${
+                      BOARD_TOKEN_SIZE[PIECE_TIER[piece.type]]
+                    } ${
                       piece.side === "white"
                         ? "border-emerald-300/40 bg-emerald-700 text-emerald-50"
                         : "border-red-300/40 bg-red-700 text-red-50"
                     } ${isSelected ? "ring-2 ring-sky-400 ring-offset-1 ring-offset-[#e8c98f]" : ""} ${
                       isCheck ? "ring-2 ring-red-500 ring-offset-1 ring-offset-[#e8c98f]" : ""
-                    }`}
+                    } ${isMoved ? "border-yellow-200 shadow-[0_0_10px_4px_rgba(253,224,71,0.9)]" : ""}`}
                   >
                     {PIECE_HANJA[piece.side][piece.type]}
                   </span>

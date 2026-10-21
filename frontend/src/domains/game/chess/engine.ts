@@ -1,6 +1,6 @@
 // 체스 규칙 어댑터. 검증된 chess.js를 보드게임 공통 인터페이스 뒤에 둔다.
 import { Chess, type Move, type Square } from "chess.js";
-import type { BoardGameEngine, GameStatus, PieceInfo } from "../lib/board-game";
+import type { BoardGameEngine, GameStatus, PieceInfo, Side } from "../lib/board-game";
 
 /** color 진영에 메이트할 기물이 있는지. 시간패한 쪽의 상대에게 없으면 시간패 대신 무승부다. */
 export function hasMatingMaterial(
@@ -22,6 +22,23 @@ export function hasMatingMaterial(
 
 export interface ChessState {
   game: Chess;
+}
+
+/** 잡힌 기물 표기 순서: 값 높은 기물부터 */
+const CAPTURED_ORDER: Record<string, number> = { q: 0, r: 1, b: 2, n: 3, p: 4 };
+
+function capturedOf(game: Chess): Record<Side, PieceInfo[]> {
+  const out: Record<Side, PieceInfo[]> = { white: [], black: [] };
+  // verbose 기보의 captured 필드가 잡은 기물을 알려준다. 남은 기물 수를 세는 방식과 달리 프로모션과 무관하게 정확하다
+  for (const m of game.history({ verbose: true })) {
+    if (!m.captured) continue;
+    const mover: Side = m.color === "w" ? "white" : "black";
+    out[mover].push({ type: m.captured, side: mover === "white" ? "black" : "white" });
+  }
+  for (const side of ["white", "black"] as const) {
+    out[side].sort((a, b) => CAPTURED_ORDER[a.type] - CAPTURED_ORDER[b.type]);
+  }
+  return out;
 }
 
 function statusOf(game: Chess): GameStatus {
@@ -68,6 +85,10 @@ export const chessEngine: BoardGameEngine<ChessState> = {
       }
     }
     return map;
+  },
+
+  capturedPieces(state: ChessState): Record<Side, PieceInfo[]> {
+    return capturedOf(state.game);
   },
 
   legalTargets(state: ChessState, from: string): string[] {

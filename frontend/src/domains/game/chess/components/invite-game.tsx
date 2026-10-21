@@ -17,10 +17,11 @@ import {
   type Side,
 } from "../../lib/time-control";
 import { chessEngine, hasMatingMaterial, type ChessState } from "../engine";
-import { ChessBoard } from "./chess-board";
+import { ChessBoard, chessCapturedGlyph } from "./chess-board";
 import { RuleStepper } from "../../components/rule-stepper";
 import { ClockView } from "../../components/clock-view";
-import { JanggiBoard } from "../../janggi/components/janggi-board";
+import { CapturedPiecesView } from "../../components/captured-pieces";
+import { JanggiBoard, janggiCapturedGlyph } from "../../janggi/components/janggi-board";
 import {
   janggiEngine,
   SETUP_PATTERNS,
@@ -191,6 +192,21 @@ export function InviteChessGame({ gameId, code }: { gameId: string; code: string
     if (isJanggi) return janggiTargets;
     return state ? chessEngine.legalTargets(state, selected) : [];
   })();
+  const captured = state && !isJanggi ? chessEngine.capturedPieces(state) : null;
+  const janggiCaptured = janggiState ? janggiEngine.capturedPieces(janggiState) : null;
+  const janggiScores = janggiState ? janggiEngine.scores(janggiState) : null;
+  // 잡은 기물 칸. 게임 종류에 맞는 모양으로 그린다
+  const capturedStrip = (side: Side) =>
+    isJanggi
+      ? janggiCaptured &&
+        janggiScores && (
+          <CapturedPiecesView
+            pieces={janggiCaptured[side]}
+            render={janggiCapturedGlyph}
+            score={janggiScores[side]}
+          />
+        )
+      : captured && <CapturedPiecesView pieces={captured[side]} render={chessCapturedGlyph} />;
 
   const onSquareTap = (square: string) => {
     if (!snapshot || snapshot.phase !== "playing") return;
@@ -430,6 +446,7 @@ export function InviteChessGame({ gameId, code }: { gameId: string; code: string
               untimed={isUntimed(snapshot.timeRule)}
             />
           )}
+          {capturedStrip(opponentSide)}
           {isJanggi ? (
             <JanggiBoard
               board={(janggiState ?? janggiEngine.initialState()).board}
@@ -451,6 +468,7 @@ export function InviteChessGame({ gameId, code }: { gameId: string; code: string
               onSquareTap={onSquareTap}
             />
           )}
+          {capturedStrip(mySide ?? myView)}
           {clocks && mySide && (
             <ClockView
               clock={clocks[mySide]}
