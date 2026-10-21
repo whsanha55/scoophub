@@ -6,35 +6,40 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { ensureGuestId, ensureNickname } from "@/domains/game/lib/guest";
 import { createRoom } from "@/domains/game/lib/room-client";
-import { CHESS_DEFAULT_RULE, JANGGI_DEFAULT_RULE } from "@/domains/game/lib/time-control";
+import { CHESS_DEFAULT_RULE, JANGGI_DEFAULT_RULE, OMOK_DEFAULT_RULE } from "@/domains/game/lib/time-control";
 
 const GAMES = [
-  { id: "chess", label: "체스", sides: [
+  { id: "chess", label: "체스", defaultRule: CHESS_DEFAULT_RULE, requiresSetup: false, sides: [
     { value: "random", label: "무작위" },
     { value: "white", label: "백" },
     { value: "black", label: "흑" },
   ] },
-  { id: "janggi", label: "장기", sides: [
+  { id: "janggi", label: "장기", defaultRule: JANGGI_DEFAULT_RULE, requiresSetup: true, sides: [
     { value: "random", label: "무작위" },
     { value: "white", label: "초" },
     { value: "black", label: "한" },
   ] },
+  // 오목은 선수(white)가 흑돌이다
+  { id: "omok", label: "오목", defaultRule: OMOK_DEFAULT_RULE, requiresSetup: false, sides: [
+    { value: "random", label: "무작위" },
+    { value: "white", label: "흑" },
+    { value: "black", label: "백" },
+  ] },
 ] as const;
-
-type GameId = (typeof GAMES)[number]["id"];
 
 export default function NewRoomPage({ searchParams }: { searchParams: Promise<{ game?: string }> }) {
   const router = useRouter();
-  // 종목은 앞 화면(/game/chess, /game/janggi)에서 고른다
-  const gameId: GameId = use(searchParams).game === "janggi" ? "janggi" : "chess";
-  const defaultRule = gameId === "janggi" ? JANGGI_DEFAULT_RULE : CHESS_DEFAULT_RULE;
+  // 종목은 앞 화면(/game/chess, /game/janggi, /game/omok)에서 고른다. 모르는 값이면 체스
+  const requested = use(searchParams).game;
+  const game = GAMES.find((g) => g.id === requested) ?? GAMES[0];
+  const gameId = game.id;
+  const defaultRule = game.defaultRule;
   const [baseMin, setBaseMin] = useState(defaultRule.baseMs / 60_000);
   const [byoSec, setByoSec] = useState(defaultRule.byoYomiMs / 1000);
   const [byoCount, setByoCount] = useState(defaultRule.byoYomiCount);
   const [side, setSide] = useState<string>("random");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const game = GAMES.find((g) => g.id === gameId)!;
 
   const create = async () => {
     setBusy(true);
@@ -51,7 +56,7 @@ export default function NewRoomPage({ searchParams }: { searchParams: Promise<{ 
             byoYomiCount: byoSec > 0 ? byoCount : 0,
           },
           sidePreference: side as "white" | "black" | "random",
-          requiresSetup: gameId === "janggi",
+          requiresSetup: game.requiresSetup,
         },
         guestId,
         nickname,

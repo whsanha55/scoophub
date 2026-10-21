@@ -2,9 +2,10 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { InviteChessGame } from "@/domains/game/chess/components/invite-game";
 import { InviteJanggiGame } from "@/domains/game/janggi/components/invite-game";
+import { InviteOmokGame } from "@/domains/game/omok/components/invite-game";
 
-const GAME_LABELS: Record<string, string> = { chess: "체스", janggi: "장기" };
-const INVITE_GAMES = { chess: InviteChessGame, janggi: InviteJanggiGame } as const;
+const GAME_LABELS: Record<string, string> = { chess: "체스", janggi: "장기", omok: "오목" };
+const INVITE_GAMES = { chess: InviteChessGame, janggi: InviteJanggiGame, omok: InviteOmokGame } as const;
 
 type Params = Promise<{ gameId: string; code: string }>;
 
