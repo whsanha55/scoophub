@@ -363,3 +363,40 @@ test("자기 장군 금지: 내수를 두고 내 궁이 잡히면 그 수는 불
   const good = janggiEngine.applyMovePos(state, { row: 6, col: 2 }, { row: 5, col: 4 });
   assert.ok(good);
 });
+
+// ---------- 잡힌 기물 ----------
+
+test("잡은 기물: 병이 병을 잡으면 잡은 쪽 표기에 오르고, 무르면 되돌아간다", () => {
+  let state = janggiEngine.initialState();
+  const play = (from, to) => {
+    const r = janggiEngine.applyMovePos(state, from, to);
+    assert.ok(r);
+    state = r.state;
+  };
+  play({ row: 6, col: 0 }, { row: 5, col: 0 }); // 초 병 전진
+  play({ row: 3, col: 0 }, { row: 4, col: 0 }); // 한 병 전진
+  play({ row: 5, col: 0 }, { row: 4, col: 0 }); // 초 병이 한 병을 잡는다
+  assert.deepEqual(janggiEngine.capturedPieces(state).white, [{ type: "P", side: "black" }]);
+  assert.deepEqual(janggiEngine.capturedPieces(state).black, []);
+  const undone = janggiEngine.undo(state);
+  assert.ok(undone);
+  assert.deepEqual(janggiEngine.capturedPieces(undone).white, []);
+});
+
+test("잡은 기물: 사라진 만큼 상대 표기에 점수 높은 기물부터 오른다", () => {
+  // 궁만 남은 판면 — 나머지가 모두 잡힌 것으로 계산된다
+  const state = stateWithBoard([
+    [0, 4, "K", "black"],
+    [9, 4, "K", "white"],
+  ]);
+  const sorted = ["R", "R", "C", "C", "N", "N", "B", "B", "A", "A", "P", "P", "P", "P", "P"];
+  const { white, black } = janggiEngine.capturedPieces(state);
+  assert.deepEqual(
+    white.map((p) => p.type),
+    sorted,
+  );
+  assert.deepEqual(
+    black.map((p) => p.type),
+    sorted,
+  );
+});

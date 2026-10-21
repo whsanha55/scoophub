@@ -17,7 +17,8 @@ import {
 } from "../../lib/time-control";
 import { janggiEngine, SETUP_PATTERNS, type JanggiState } from "../engine";
 import { ClockView } from "../../components/clock-view";
-import { JanggiBoard } from "./janggi-board";
+import { CapturedPiecesView } from "../../components/captured-pieces";
+import { JanggiBoard, janggiCapturedGlyph } from "./janggi-board";
 
 const ROTATE_KEY = "game.board.rotate";
 
@@ -48,6 +49,7 @@ export function SameScreenJanggiGame() {
   const scoreRef = useRef(0);
 
   const turn = janggiEngine.turn(state);
+  const captured = janggiEngine.capturedPieces(state);
   const history = janggiEngine.notationHistory(state);
   const lastEntry = state.moves[state.moves.length - 1];
 
@@ -240,6 +242,7 @@ export function SameScreenJanggiGame() {
               active={phase === "playing" && turn === topSide}
             />
           )}
+          <CapturedPiecesView pieces={captured[topSide]} render={janggiCapturedGlyph} />
           <JanggiBoard
             board={state.board}
             orientation={orientation}
@@ -253,6 +256,7 @@ export function SameScreenJanggiGame() {
             checkSquare={checkSquare}
             onPointTap={onPointTap}
           />
+          <CapturedPiecesView pieces={captured[orientation]} render={janggiCapturedGlyph} />
           {clocks && (
             <ClockView
               clock={clocks[orientation]}

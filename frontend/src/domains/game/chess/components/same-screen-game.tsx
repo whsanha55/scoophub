@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { useLocalValue } from "../../lib/local-value";
-import { ChessBoard } from "./chess-board";
+import { ChessBoard, chessCapturedGlyph } from "./chess-board";
 import {
   CHESS_DEFAULT_RULE,
   clockAfterMove,
@@ -17,6 +17,7 @@ import {
 } from "../../lib/time-control";
 import { chessEngine, hasMatingMaterial, type ChessState } from "../engine";
 import { ClockView } from "../../components/clock-view";
+import { CapturedPiecesView } from "../../components/captured-pieces";
 import { RuleStepper } from "../../components/rule-stepper";
 import type { GameStatus } from "../../lib/board-game";
 
@@ -42,6 +43,7 @@ export function SameScreenChessGame() {
 
   const turn = chessEngine.turn(state);
   const pieces = chessEngine.pieces(state);
+  const captured = chessEngine.capturedPieces(state);
   const targets = selected ? chessEngine.legalTargets(state, selected) : [];
   const history = chessEngine.notationHistory(state);
 
@@ -217,6 +219,7 @@ export function SameScreenChessGame() {
               active={phase === "playing" && turn === topSide}
             />
           )}
+          <CapturedPiecesView pieces={captured[topSide]} render={chessCapturedGlyph} />
           <div className="relative">
             <ChessBoard
               pieces={pieces}
@@ -246,6 +249,7 @@ export function SameScreenChessGame() {
               </div>
             )}
           </div>
+          <CapturedPiecesView pieces={captured[orientation]} render={chessCapturedGlyph} />
           {clocks && (
             <ClockView
               clock={clocks[orientation]}

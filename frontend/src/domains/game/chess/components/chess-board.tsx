@@ -1,5 +1,6 @@
 "use client";
 
+import type { ReactNode } from "react";
 import type { PieceInfo } from "../../lib/board-game";
 
 const FILES = ["a", "b", "c", "d", "e", "f", "g", "h"];
@@ -12,6 +13,19 @@ const PIECE_GLYPH: Record<string, string> = {
   n: "♞",
   p: "♟",
 };
+
+/** 잡힌 기물 글자. 시계 행 배경은 테마를 따르므로 보드와 달리 토큰 색으로 그린다. */
+export function chessCapturedGlyph(piece: PieceInfo): ReactNode {
+  return (
+    <span
+      className={`text-lg leading-none ${
+        piece.side === "white" ? "text-foreground" : "text-muted-foreground"
+      }`}
+    >
+      {PIECE_GLYPH[piece.type]}
+    </span>
+  );
+}
 
 export interface ChessBoardProps {
   pieces: Map<string, PieceInfo>;

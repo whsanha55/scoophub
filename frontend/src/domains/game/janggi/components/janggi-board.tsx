@@ -1,6 +1,36 @@
 "use client";
 
-import { PIECE_HANJA, type JanggiPiece } from "../engine";
+import type { ReactNode } from "react";
+import { PIECE_HANJA, type JanggiPiece, type JanggiPieceType } from "../engine";
+import type { PieceInfo } from "../../lib/board-game";
+
+/** 잡힌 기물 토큰 크기: 판 위 기물과 같은 동그라미를 기물 점수(크기)별로 그린다. */
+const CAPTURED_TOKEN_SIZE: Record<JanggiPieceType, string> = {
+  K: "h-6 w-6 text-sm", // 궁은 잡히는 순간 대국이 끝나므로 표시되지 않는다
+  R: "h-8 w-8 text-lg",
+  C: "h-7 w-7 text-base",
+  N: "h-6 w-6 text-sm",
+  B: "h-5 w-5 text-[11px]",
+  A: "h-5 w-5 text-[11px]",
+  P: "h-4 w-4 text-[9px]",
+};
+
+export function janggiCapturedGlyph(piece: PieceInfo): ReactNode {
+  const type = piece.type as JanggiPieceType;
+  return (
+    <span
+      className={`flex shrink-0 items-center justify-center rounded-full border font-bold leading-none ${
+        CAPTURED_TOKEN_SIZE[type]
+      } ${
+        piece.side === "white"
+          ? "border-emerald-300/40 bg-emerald-700 text-emerald-50"
+          : "border-red-300/40 bg-red-700 text-red-50"
+      }`}
+    >
+      {PIECE_HANJA[piece.side][type]}
+    </span>
+  );
+}
 
 export interface JanggiBoardProps {
   board: (JanggiPiece | null)[][];

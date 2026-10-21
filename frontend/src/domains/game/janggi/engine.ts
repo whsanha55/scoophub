@@ -71,6 +71,39 @@ export const PIECE_NAME: Record<JanggiPieceType, string> = {
 const ROWS = 10;
 const COLS = 9;
 
+/** 상차림과 무관하게 각 진영의 초기 기물 수. 장기엔 승격이 없어 판면과의 차이가 곧 잡힌 기물이다. */
+const INITIAL_COUNTS: Record<JanggiPieceType, number> = {
+  K: 1,
+  R: 2,
+  C: 2,
+  N: 2,
+  B: 2,
+  A: 2,
+  P: 5,
+};
+
+/** 잡힌 기물 표기 순서: 점수 높은 기물부터 (궁은 잡히는 순간 대국이 끝나므로 제외) */
+const CAPTURED_ORDER: JanggiPieceType[] = ["R", "C", "N", "B", "A", "P"];
+
+function capturedPiecesOf(state: JanggiState): Record<Side, PieceInfo[]> {
+  const out: Record<Side, PieceInfo[]> = { white: [], black: [] };
+  for (const side of ["white", "black"] as const) {
+    const live: Partial<Record<JanggiPieceType, number>> = {};
+    for (const row of state.board) {
+      for (const p of row) {
+        if (p && p.side === side) live[p.type] = (live[p.type] ?? 0) + 1;
+      }
+    }
+    // side 진영에서 사라진 기물은 상대가 잡았다
+    const taker: Side = side === "white" ? "black" : "white";
+    for (const type of CAPTURED_ORDER) {
+      const missing = INITIAL_COUNTS[type] - (live[type] ?? 0);
+      for (let i = 0; i < missing; i++) out[taker].push({ type, side });
+    }
+  }
+  return out;
+}
+
 export function posKey(p: Pos): string {
   return `${p.row},${p.col}`;
 }
@@ -674,6 +707,8 @@ export const janggiEngine: JanggiEngine = {
     }
     return map;
   },
+
+  capturedPieces: capturedPiecesOf,
 
   legalTargets(state, from: string): string[] {
     const [r, c] = from.split(",").map(Number);

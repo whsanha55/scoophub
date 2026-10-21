@@ -25,6 +25,8 @@ export interface BoardGameEngine<S> {
   turn(state: S): Side;
   /** 칸 → 기물. 체스는 "e4", 장기는 "0,1" 같은 게임별 좌표. */
   pieces(state: S): Map<string, PieceInfo>;
+  /** 진영별로 그 진영이 잡은 상대 기물. 표기 순서는 어댑터가 정한다. */
+  capturedPieces(state: S): Record<Side, PieceInfo[]>;
   /** from에서 둘 수 있는 칸 목록 */
   legalTargets(state: S, from: string): string[];
   /** 수를 둔다. 불법수면 null. 반환 상태는 원본과 별개 값이다. */
