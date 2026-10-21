@@ -1,6 +1,5 @@
 package com.scoophub.game.dto
 
-import com.scoophub.game.enums.RoomPhaseEnum
 import com.scoophub.game.service.GameRoom
 import com.scoophub.game.vo.TimeRule
 import io.swagger.v3.oas.annotations.media.Schema
@@ -35,8 +34,8 @@ data class TimeRuleResponse(
 data class RoomSummaryResponse(
     @field:Schema(description = "방이 있는지")
     val exists: Boolean,
-    @field:Schema(description = "방 진행 단계")
-    val phase: RoomPhaseEnum?,
+    @field:Schema(description = "방 진행 단계 (WebSocket room 메시지와 같은 소문자)", example = "waiting")
+    val phase: String?,
     @field:Schema(description = "게임 종류", example = "chess")
     val gameId: String?,
     @field:Schema(description = "시간 규칙")
@@ -50,7 +49,7 @@ data class RoomSummaryResponse(
         /** 방이 없으면 exists=false 만 채운다. 호출하는 쪽에서 방을 잠근 채로 부른다. */
         fun from(room: GameRoom?) = RoomSummaryResponse(
             exists = room != null,
-            phase = room?.phase,
+            phase = room?.phase?.name?.lowercase(),
             gameId = room?.gameId,
             timeRule = room?.let { TimeRuleResponse.from(it.timeRule) },
             playerCount = room?.playerCount,

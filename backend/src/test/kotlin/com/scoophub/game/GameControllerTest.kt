@@ -50,7 +50,7 @@ class GameControllerTest @Autowired constructor(
         summary.andExpect {
             status { isOk() }
             jsonPath("$.data.exists") { value(true) }
-            jsonPath("$.data.phase") { value("WAITING") }
+            jsonPath("$.data.phase") { value("waiting") }
             jsonPath("$.data.game_id") { value("janggi") }
             jsonPath("$.data.is_full") { value(false) }
             jsonPath("$.data.player_count") { value(1) }
