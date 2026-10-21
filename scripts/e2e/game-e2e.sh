@@ -91,7 +91,7 @@ clearTimeout(timer);
 
 step "WebSocket 대국 뒤 방 요약" 200 GET "/api/game/chess/rooms/$CODE" "" "$IP"
 expect '.data.player_count' '2'
-expect '.data.phase' 'PLAYING'
+expect '.data.phase' 'playing'
 
 step "게임 종류가 빈 방 만들기" 400 POST /api/game/rooms "$(room_body "" "$HOST_ID")" "$IP"
 

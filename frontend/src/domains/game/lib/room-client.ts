@@ -220,7 +220,7 @@ export async function checkRoom(gameId: string, code: string): Promise<RoomSumma
   const data = (await res.json()).data;
   return {
     exists: data.exists as boolean,
-    phase: (data.phase?.toLowerCase() as RoomSummary["phase"]) ?? null,
+    phase: (data.phase as RoomSummary["phase"]) ?? null,
     gameId: (data.game_id as string) ?? null,
     full: (data.is_full as boolean) ?? null,
   };
