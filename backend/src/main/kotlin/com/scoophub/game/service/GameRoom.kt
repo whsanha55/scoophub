@@ -9,6 +9,7 @@ import com.scoophub.game.vo.ChatEntry
 import com.scoophub.game.vo.JoinResult
 import com.scoophub.game.vo.MoveResult
 import com.scoophub.game.vo.PlayerClock
+import com.scoophub.game.vo.RoomAction
 import com.scoophub.game.vo.RoomMove
 import com.scoophub.game.vo.RoomResult
 import com.scoophub.game.vo.TimeRule
@@ -80,6 +81,9 @@ class GameRoom(
     private val players = mutableListOf<RoomPlayer>()
     private val spectators = mutableListOf<RoomSpectator>()
     private val moves = mutableListOf<RoomMove>()
+
+    /** 직전 수 이후의 중간 행동 로그. 재접속한 대국자가 차례 진행 상황을 되찾는다(ADR-0004). */
+    private val actions = ArrayDeque<RoomAction>()
     private val chatLog = ArrayDeque<ChatEntry>()
     private val lastChatAt = mutableMapOf<String, Instant>()
     private val setups = mutableMapOf<SideEnum, String>()
@@ -199,6 +203,7 @@ class GameRoom(
         phase = RoomPhaseEnum.PLAYING
         clocks = mutableMapOf(SideEnum.WHITE to timeRule.initialClock(), SideEnum.BLACK to timeRule.initialClock())
         matingMaterial.keys.forEach { matingMaterial[it] = true }
+        actions.clear()
         // 상차림 등 시작 전 준비에 쓴 시간은 시계에 넣지 않는다
         lastClockAt = now
         touch(now)
@@ -253,9 +258,25 @@ class GameRoom(
         settleClock(now)?.let { return MoveResult.TimedOut(it) }
         val move = RoomMove(side = side, from = from, to = to, notation = notation, at = now)
         moves.add(move)
+        actions.clear()
         clocks[side] = clocks.getValue(side).afterMove(timeRule)
         this.matingMaterial.putAll(matingMaterial)
         return MoveResult.Moved(move)
+    }
+
+    /**
+     * 차례 안의 중간 행동을 기록한다. 대국 중 차례인 대국자만 보낼 수 있고, 차례·시계는 바뀌지 않는다.
+     * payload 는 해석하지 않는다(ADR-0004). 로그는 최근 [ACTION_LOG_LIMIT]개만 남긴다.
+     */
+    fun addAction(guestId: String, payload: Map<String, Any?>, now: Instant): RoomAction? {
+        touch(now)
+        if (phase != RoomPhaseEnum.PLAYING) return null
+        val side = findSide(guestId) ?: return null
+        if (side != turn()) return null
+        val action = RoomAction(side = side, payload = payload, at = now)
+        actions.addLast(action)
+        while (actions.size > ACTION_LOG_LIMIT) actions.removeFirst()
+        return action
     }
 
     /** 규칙 판정 결과(외통수·빅장 등)로 대국을 끝낸다. 판정은 클라이언트가 했다(ADR-0001). */
@@ -306,6 +327,7 @@ class GameRoom(
         // 진영 교대: 백과 흑이 서로 바뀐다
         players.forEach { it.side = it.side.opposite() }
         moves.clear()
+        actions.clear()
         rematchVotes.clear()
         result = null
         if (isSetupRequired) {
@@ -346,6 +368,8 @@ class GameRoom(
 
     fun movesSnapshot(): List<RoomMove> = moves.toList()
 
+    fun actionsSnapshot(): List<RoomAction> = actions.toList()
+
     fun playersSnapshot(): List<RoomPlayer> = players.toList()
 
     fun spectatorsSnapshot(): List<RoomSpectator> = spectators.toList()
@@ -359,6 +383,7 @@ class GameRoom(
         const val SPECTATOR_LIMIT = 10
         const val CHAT_HISTORY = 50
         const val MAX_CHAT_LENGTH = 200
+        const val ACTION_LOG_LIMIT = 64
         private val CHAT_INTERVAL = Duration.ofSeconds(1)
         val ABANDON_LIMIT: Duration = Duration.ofMinutes(5)
         private val WAITING_LIMIT = Duration.ofMinutes(30)

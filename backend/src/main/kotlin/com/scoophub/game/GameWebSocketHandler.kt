@@ -6,6 +6,7 @@ import com.scoophub.game.service.GameRoomService
 import com.scoophub.game.service.RoomEvent
 import com.scoophub.game.service.roomKeyOf
 import com.scoophub.game.vo.ChatEntry
+import com.scoophub.game.vo.RoomAction
 import com.scoophub.game.vo.RoomMove
 import com.scoophub.game.vo.RoomResult
 import io.github.oshai.kotlinlogging.KotlinLogging
@@ -119,6 +120,15 @@ class GameWebSocketHandler(
                 if (move == null) sendError(connection.out, "지금은 둘 수 없습니다")
             }
 
+            "game_action" -> {
+                // 해석하지 않고 중계·보관한다(ADR-0004). 큰 payload 는 로그 메모리를 지키려 거절한다
+                val action = payload.entries.associate { (key, value) -> key.toString() to value }
+                val isTooLarge = objectMapper.writeValueAsString(action).length > MAX_ACTION_CHARS
+                if (isTooLarge || gameRoomService.addAction(room, guestId, action) == null) {
+                    sendError(connection.out, "지금은 행동할 수 없습니다")
+                }
+            }
+
             "resign" -> gameRoomService.resign(room, guestId)
 
             "finish" -> {
@@ -198,8 +208,11 @@ class GameWebSocketHandler(
             is RoomEvent.Ended -> broadcast(room, "game_end", resultPayload(event.result))
 
             is RoomEvent.Chatted -> broadcast(room, "chat", chatEntryPayload(event.entry))
+
+            is RoomEvent.Acted -> broadcast(room, "game_action", actionPayload(event.action))
         }
-        if (event !is RoomEvent.Chatted) broadcastRoomState(room)
+        // 채팅·중간 행동은 그 메시지만 보낸다. 받은 쪽이 스냅샷에 이어 붙인다
+        if (event !is RoomEvent.Chatted && event !is RoomEvent.Acted) broadcastRoomState(room)
     }
 
     private fun broadcastRoomState(room: GameRoom) {
@@ -232,6 +245,7 @@ class GameWebSocketHandler(
             "chat" to room.chatSnapshot().map { chatEntryPayload(it) },
             "turn" to room.turn().name.lowercase(),
             "moves" to room.movesSnapshot().map { movePayloadEntry(it) },
+            "actions" to room.actionsSnapshot().map { actionPayload(it) },
             "rematch_votes" to room.rematchVotesSnapshot(),
             "setups" to room.setupSnapshot().entries.associate { (side, pattern) -> side.name.lowercase() to pattern },
             "clocks" to clocksPayload(room),
@@ -262,6 +276,11 @@ class GameWebSocketHandler(
         "from" to move.from,
         "to" to move.to,
         "notation" to move.notation,
+    )
+
+    private fun actionPayload(action: RoomAction): Map<String, Any?> = mapOf(
+        "side" to action.side.name.lowercase(),
+        "action" to action.payload,
     )
 
     private fun chatEntryPayload(entry: ChatEntry): Map<String, Any?> = mapOf(
@@ -326,5 +345,6 @@ class GameWebSocketHandler(
     companion object {
         private const val SEND_TIME_LIMIT_MS = 5_000
         private const val SEND_BUFFER_LIMIT_BYTES = 512 * 1024
+        private const val MAX_ACTION_CHARS = 1_024
     }
 }

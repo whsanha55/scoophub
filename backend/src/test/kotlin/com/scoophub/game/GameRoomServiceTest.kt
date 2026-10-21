@@ -775,4 +775,89 @@ class GameRoomServiceTest {
         assertThat(room.phase).isEqualTo(RoomPhaseEnum.PLAYING)
         assertThat(isAccepted).isFalse()
     }
+
+    // ---------- 중간 행동(game_action)과 행동 로그 (ADR-0004) ----------
+
+    private fun roll(vararg dice: Int): Map<String, Any?> = mapOf("kind" to "roll", "dice" to dice.toList())
+
+    @Test
+    fun `차례인 대국자의 행동은 로그에 쌓이고 차례·시계는 그대로다`() {
+        // given
+        val room = startedRoom(rule = TimeRule(baseMs = 60_000, byoYomiMs = 0, byoYomiCount = 0))
+
+        // when
+        val first = service.addAction(room, "host", roll(1, 2, 3, 4, 5))
+        val keep = mapOf("kind" to "keep", "kept" to listOf(true, false, false, false, false))
+        val second = service.addAction(room, "host", keep)
+
+        // then
+        assertThat(first?.side).isEqualTo(SideEnum.WHITE)
+        assertThat(second).isNotNull
+        assertThat(room.actionsSnapshot().map { it.payload["kind"] }).containsExactly("roll", "keep")
+        assertThat(room.turn()).isEqualTo(SideEnum.WHITE)
+        assertThat(room.movesSnapshot()).isEmpty()
+    }
+
+    @Test
+    fun `차례가 아닌 대국자·관전자·대국 전 행동은 거절된다`() {
+        // given
+        val waiting = createRoom(guestId = "solo")
+        val room = startedRoom()
+        service.join(room, "watcher", "관전")
+
+        // when
+        val beforeStart = service.addAction(waiting, "solo", roll(1, 1, 1, 1, 1))
+        val opponent = service.addAction(room, "guest2", roll(6, 6, 6, 6, 6))
+        val spectator = service.addAction(room, "watcher", roll(6, 6, 6, 6, 6))
+
+        // then
+        assertThat(beforeStart).isNull()
+        assertThat(opponent).isNull()
+        assertThat(spectator).isNull()
+        assertThat(room.actionsSnapshot()).isEmpty()
+    }
+
+    @Test
+    fun `행동 로그는 최근 64개만 남는다`() {
+        // given
+        val room = startedRoom()
+
+        // when
+        repeat(70) { service.addAction(room, "host", mapOf("kind" to "keep", "n" to it)) }
+
+        // then
+        val actions = room.actionsSnapshot()
+        assertThat(actions).hasSize(GameRoom.ACTION_LOG_LIMIT)
+        assertThat(actions.first().payload["n"]).isEqualTo(6)
+        assertThat(actions.last().payload["n"]).isEqualTo(69)
+    }
+
+    @Test
+    fun `기록(수)을 하면 행동 로그를 비운다`() {
+        // given
+        val room = startedRoom()
+        service.addAction(room, "host", roll(2, 2, 3, 3, 3))
+
+        // when
+        service.addMove(room, "host", "fullHouse", "13", "풀하우스 13")
+
+        // then
+        assertThat(room.actionsSnapshot()).isEmpty()
+        assertThat(service.addAction(room, "guest2", roll(1, 2, 3, 4, 6))).isNotNull
+    }
+
+    @Test
+    fun `재대국하면 행동 로그를 비운다`() {
+        // given
+        val room = startedRoom()
+        service.addAction(room, "host", roll(1, 2, 3, 4, 5))
+        service.resign(room, "host")
+
+        // when
+        service.requestRematch(room, "host")
+        service.requestRematch(room, "guest2")
+
+        // then
+        assertThat(room.actionsSnapshot()).isEmpty()
+    }
 }

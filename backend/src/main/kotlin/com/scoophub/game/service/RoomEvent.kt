@@ -1,6 +1,7 @@
 package com.scoophub.game.service
 
 import com.scoophub.game.vo.ChatEntry
+import com.scoophub.game.vo.RoomAction
 import com.scoophub.game.vo.RoomMove
 import com.scoophub.game.vo.RoomResult
 
@@ -15,4 +16,6 @@ sealed class RoomEvent {
     data class Ended(override val room: GameRoom, val result: RoomResult) : RoomEvent()
 
     data class Chatted(override val room: GameRoom, val entry: ChatEntry) : RoomEvent()
+
+    data class Acted(override val room: GameRoom, val action: RoomAction) : RoomEvent()
 }
