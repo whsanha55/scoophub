@@ -27,9 +27,9 @@ class SystemConfigAndScheduleTest @Autowired constructor(
     // ── config ─────────────────────────────────────────────────────────
 
     @Test
-    fun `전체 config 조회 — seed 6종(V26 reddit 정리) + V47 hotdeal_notify`() {
+    fun `전체 config 조회 — seed 6종(V26 reddit 정리) + V47 hotdeal_notify + V48 morning_briefing`() {
         mockMvc.get("/api/config").andExpect {
-            jsonPath("$.data.length()") { value(7) }
+            jsonPath("$.data.length()") { value(8) }
             jsonPath("$.data[0].crawler") { exists() }
             jsonPath("$.data[0].params") { exists() }
         }
@@ -65,6 +65,27 @@ class SystemConfigAndScheduleTest @Autowired constructor(
     }
 
     @Test
+    fun `config PATCH — 아침 브리핑 기준값을 바꾼다`() {
+        try {
+            mockMvc.patch("/api/config/morning_briefing") {
+                header("Authorization", bearer)
+                contentType = MediaType.APPLICATION_JSON
+                content = """{"params": {"hn_min_score": 200}}"""
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.data.params.hn_min_score") { value(200) }
+                jsonPath("$.data.params.max_items") { value(5) } // 기존값 유지
+            }
+        } finally {
+            mockMvc.patch("/api/config/morning_briefing") {
+                header("Authorization", bearer)
+                contentType = MediaType.APPLICATION_JSON
+                content = """{"params": {"hn_min_score": 300}}"""
+            }.andExpect { status { isOk() } }
+        }
+    }
+
+    @Test
     fun `config PATCH — unknown 키는 422`() {
         mockMvc.patch("/api/config/hacker_news") {
             header("Authorization", bearer)
@@ -83,11 +104,11 @@ class SystemConfigAndScheduleTest @Autowired constructor(
 
     // ── schedules ──────────────────────────────────────────────────────
 
-    // seed 14종에서 V19 로 1행, V22 news, V23 kal_bonus, V24·V26 정리, V30 추가, V33 정리, V42 hotdeal_zod·V45 hotdeal_ppomppu 추가
+    // seed 14종에서 V19 로 1행, V22 news, V23 kal_bonus, V24·V26 정리, V30 추가, V33 정리, V42 hotdeal_zod·V45 hotdeal_ppomppu·V48 morning_briefing 추가
     @Test
-    fun `전체 스케줄 조회 — seed 12행, 미등록 잡은 paused=null`() {
+    fun `전체 스케줄 조회 — seed 13행, 미등록 잡은 paused=null`() {
         mockMvc.get("/api/schedules").andExpect {
-            jsonPath("$.data.length()") { value(12) }
+            jsonPath("$.data.length()") { value(13) }
             jsonPath("$.data[0].job_id") { exists() }
             jsonPath("$.data[0].schedule_type") { exists() }
             jsonPath("$.data[0].next_run_time") { doesNotExist() } // null
