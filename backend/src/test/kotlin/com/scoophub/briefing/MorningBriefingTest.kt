@@ -171,6 +171,31 @@ class MorningBriefingTest {
     }
 
     @Test
+    fun `링크 주소의 따옴표는 이스케이프한다`() {
+        // given
+        val candidate = BriefingCandidateRow(BriefingSectionEnum.NEWS, "1", "뉴스", "https://x.test/?q=\"a\"&b", 5)
+
+        // when
+        val blocks = compose(listOf(candidate))?.blocks()
+
+        // then
+        assertThat(blocks?.get(1)).contains("""<a href="https://x.test/?q=&quot;a&quot;&amp;b">뉴스</a>""")
+    }
+
+    @Test
+    fun `이모지 중간에서 자르지 않는다`() {
+        // given — 150번째 글자에서 이모지(서로게이트 쌍)가 시작된다
+        val title = "가".repeat(149) + "🚀" + "끝"
+        val candidate = BriefingCandidateRow(BriefingSectionEnum.NEWS, "1", title, null, 5)
+
+        // when
+        val blocks = compose(listOf(candidate))?.blocks()
+
+        // then
+        assertThat(blocks?.get(1)).isEqualTo("📰 뉴스\n · ${"가".repeat(149)}…")
+    }
+
+    @Test
     fun `주소가 없으면 링크 없이 제목만 쓴다`() {
         // given
         val candidate = BriefingCandidateRow(BriefingSectionEnum.NEWS, "1", "주소 없는 뉴스", null, 5)

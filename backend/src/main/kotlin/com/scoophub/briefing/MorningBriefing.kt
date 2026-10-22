@@ -23,7 +23,8 @@ data class MorningBriefing(val date: LocalDate, val sections: Map<BriefingSectio
 
     private fun line(item: BriefingCandidateRow): String {
         val title = escapeHtml(truncate(item.title, TITLE_MAX))
-        val head = item.url?.let { """<a href="${escapeHtml(it)}">$title</a>""" } ?: title
+        // 주소에 " 가 있으면 속성이 깨져 Telegram 이 메시지 전체를 거부한다
+        val head = item.url?.let { """<a href="${escapeHtml(it).replace("\"", "&quot;")}">$title</a>""" } ?: title
         return when (item.section) {
             BriefingSectionEnum.NEWS -> head
 
@@ -67,7 +68,12 @@ data class MorningBriefing(val date: LocalDate, val sections: Map<BriefingSectio
             return if (sections.isEmpty()) null else MorningBriefing(date, sections)
         }
 
-        private fun truncate(text: String, max: Int): String = if (text.length <= max) text else text.take(max) + "…"
+        /** 이모지(서로게이트 쌍)를 반으로 자르면 Telegram 이 메시지를 거부하므로 쌍째 뺀다 */
+        private fun truncate(text: String, max: Int): String {
+            if (text.length <= max) return text
+            val end = if (text[max - 1].isHighSurrogate()) max - 1 else max
+            return text.take(end) + "…"
+        }
 
         private fun count(value: Long): String = "%,d".format(Locale.ROOT, value)
     }
