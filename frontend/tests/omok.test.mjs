@@ -5,6 +5,7 @@ import {
   emptyBoard,
   forbiddenPoints,
   isForbidden,
+  isWinningMove,
   winningLine,
   pointNotation,
   SIZE,
@@ -111,6 +112,20 @@ test("후수(백)는 장목(6목 이상)도 승리한다", () => {
   assert.ok(moved);
   assert.deepEqual(omokEngine.status(moved.state), { over: true, winner: "black", reason: "오목" });
   assert.equal(winningLine(moved.state).length, 6);
+});
+
+test("바로 이기는 점: 선수(흑)는 정확히 5목만, 후수(백)는 장목도 이긴다. 판은 바꾸지 않는다", () => {
+  const board = emptyBoard();
+  for (const c of [2, 3, 4, 6, 7]) board[7][c] = "white";
+  for (const c of [2, 3, 4, 6, 7]) board[9][c] = "black";
+  for (const c of [3, 4, 5, 6]) board[11][c] = "white";
+  const before = JSON.stringify(board);
+  assert.equal(isWinningMove(board, 7, 5, "white"), false); // 장목
+  assert.equal(isWinningMove(board, 9, 5, "black"), true);
+  assert.equal(isWinningMove(board, 11, 7, "white"), true);
+  assert.equal(isWinningMove(board, 11, 7, "black"), false);
+  assert.equal(isWinningMove(board, 7, 2, "white"), false); // 이미 돌이 있는 점
+  assert.equal(JSON.stringify(board), before);
 });
 
 // ---------- 금수 (선수만) ----------

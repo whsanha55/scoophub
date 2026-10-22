@@ -124,6 +124,17 @@ export function isForbidden(board: Board, r: number, c: number): boolean {
   return isForbiddenAt(board.map((row) => [...row]), r, c, 0);
 }
 
+/** side 가 빈 점 (r,c)에 두면 바로 이기는가. 선수는 정확히 5목, 후수는 5목 이상. 판은 바꾸지 않는다. */
+export function isWinningMove(board: Board, r: number, c: number, side: Side): boolean {
+  if (!inside(r, c) || board[r][c] !== null) return false;
+  board[r][c] = side;
+  try {
+    return DIRECTIONS.some(([dr, dc]) => isWinningRun(runLength(board, r, c, dr, dc, side), side));
+  } finally {
+    board[r][c] = null;
+  }
+}
+
 /** 근처(4칸 이내)에 선수 돌이 2개 이상 없으면 금수가 될 수 없다. 판 전체 계산을 줄이는 거름망. */
 function mayBeForbidden(board: Board, r: number, c: number): boolean {
   let near = 0;
