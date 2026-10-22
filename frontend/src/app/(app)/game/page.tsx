@@ -46,7 +46,7 @@ const versusGames: GameCard[] = [
   },
   {
     title: "오목",
-    description: "같은 화면에서 둘이, 또는 초대해서 따로 두는 금수 규칙 오목",
+    description: "같은 화면에서 둘이, 또는 초대해서 따로 두는 금수 규칙 오목. 컴퓨터와도 둔다",
     href: "/game/omok",
     icon: "⚫",
   },

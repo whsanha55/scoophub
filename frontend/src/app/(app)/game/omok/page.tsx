@@ -23,6 +23,12 @@ export default function OmokModePage() {
           href: "/game/room/new?game=omok",
           icon: "✉️",
         },
+        {
+          title: "컴퓨터와 대국",
+          description: "혼자서 컴퓨터를 상대로 둔다. 쉬움·어려움",
+          href: "/game/omok/computer",
+          icon: "🤖",
+        },
       ]}
     />
   );
