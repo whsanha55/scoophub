@@ -32,6 +32,7 @@ export function ComputerOmokGame() {
   const myTurn = phase === "playing" && turn === humanSide;
   const history = omokEngine.notationHistory(state);
   const lastEntry = state.moves[state.moves.length - 1];
+  const lastComputerMove = lastEntry?.side === computerSide ? `컴퓨터 ${lastEntry.notation} · ` : "";
   const myMoveCount = state.moves.filter((m) => m.side === humanSide).length;
   const difficultyLabel = DIFFICULTIES.find((d) => d.id === difficulty)?.label;
 
@@ -41,7 +42,12 @@ export function ComputerOmokGame() {
     const id = setTimeout(() => {
       const point = computerMove(state, difficulty);
       const moved = point ? omokEngine.applyMove(state, "", point) : null;
-      if (!moved) return;
+      if (!moved) {
+        // 컴퓨터(흑)가 둘 수 있는 점이 모두 금수면 더 둘 수 없으니 무승부로 끝낸다
+        setResult({ winner: null, reason: "둘 곳 없음" });
+        setPhase("over");
+        return;
+      }
       setState(moved.state);
       const after = omokEngine.status(moved.state);
       if (after.over) {
@@ -144,7 +150,7 @@ export function ComputerOmokGame() {
       />
       <div className="flex w-full flex-wrap items-center justify-between gap-2">
         <span className="text-sm font-medium" aria-live="polite">
-          {phase === "playing" ? (myTurn ? `내 차례 (${omokSideLabel(turn)})` : "컴퓨터가 두는 중…") : null}
+          {phase === "playing" ? (myTurn ? `${lastComputerMove}내 차례 (${omokSideLabel(turn)})` : "컴퓨터가 두는 중…") : null}
         </span>
         {phase === "playing" && (
           <div className="flex flex-wrap gap-2">
