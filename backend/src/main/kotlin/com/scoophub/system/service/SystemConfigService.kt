@@ -64,6 +64,14 @@ class SystemConfigService(
             "youtube_trending" to setOf("api_key", "region_codes", "max_results_per_region"),
             "devto_hashnode" to setOf("tags", "max_articles_per_tag"),
             "tech_newsletter" to setOf("feeds"),
+            "morning_briefing" to setOf(
+                "lookback_hours",
+                "max_items",
+                "news_min_importance",
+                "hn_min_score",
+                "github_min_stars",
+                "devto_min_reactions",
+            ),
         )
     }
 }
