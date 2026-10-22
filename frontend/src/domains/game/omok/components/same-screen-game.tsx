@@ -17,6 +17,7 @@ import {
 } from "../../lib/time-control";
 import { forbiddenPoints, omokEngine, winningLine, type OmokState } from "../engine";
 import { OmokBoard, omokSideLabel } from "./omok-board";
+import { OmokMoveList } from "./omok-move-list";
 
 type Phase = "setup" | "playing" | "over";
 type Clocks = Record<Side, PlayerClock>;
@@ -183,18 +184,7 @@ export function SameScreenOmokGame() {
           </div>
         )}
       </div>
-      {history.length > 0 && (
-        <div className="max-h-36 w-full overflow-y-auto rounded-lg border bg-card p-2">
-          <ol className="flex flex-wrap gap-x-3 text-sm tabular-nums">
-            {history.map((n, i) => (
-              <li key={i}>
-                <span className="mr-1 text-muted-foreground">{i + 1}.</span>
-                {n}
-              </li>
-            ))}
-          </ol>
-        </div>
-      )}
+      <OmokMoveList history={history} />
       {phase === "over" && result && (
         <div className="flex flex-col items-center gap-2 rounded-xl border bg-card p-5 text-center">
           <p className="text-lg font-bold">{result.winner ? `${omokSideLabel(result.winner)} 승리` : "무승부"}</p>
