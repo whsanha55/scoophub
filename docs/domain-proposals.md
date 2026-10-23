@@ -1,6 +1,6 @@
 # ScoopHub 스케줄링 도메인 제안
 
-> 기존 도메인: news / weather / stock / game, 그리고 이 문서에서 ✅ 구현됨으로 표시한 6개(github, hackernews, arxiv, youtube, devto, technewsletter)
+> 기존 도메인: news / weather / stock / game / hotdeal, 그리고 이 문서에서 ✅ 구현됨으로 표시한 6개(github, hackernews, arxiv, youtube, devto, technewsletter)
 > 기준일: 2026-06-04 (구현 현황은 2026-10-16에 반영)
 > 사이드프로젝트 관점 — 구현 난이도 · 사용자 가치 · ScoopHub 시너지 기준
 
