@@ -1,6 +1,7 @@
 package com.scoophub.hotdeal
 
 import com.scoophub.external.ppomppu.PpomppuClient
+import com.scoophub.scoophubProperties
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import org.springframework.web.client.RestClient
@@ -8,7 +9,7 @@ import java.time.Instant
 
 /** 뽐뿌 RSS 파싱 — 저장된 RSS fixture 기반 회귀 테스트 */
 class PpomppuClientTest {
-    private val client = PpomppuClient(RestClient.builder())
+    private val client = PpomppuClient(RestClient.builder(), scoophubProperties())
 
     private fun item(title: String, hits: String = "[0|10|3|0]") = """
         <rss version="2.0"><channel><title>뽐뿌</title>

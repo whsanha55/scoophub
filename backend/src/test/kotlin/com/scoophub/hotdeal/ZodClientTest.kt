@@ -1,6 +1,7 @@
 package com.scoophub.hotdeal
 
 import com.scoophub.external.zod.ZodClient
+import com.scoophub.scoophubProperties
 import org.assertj.core.api.Assertions.assertThat
 import org.jsoup.Jsoup
 import org.junit.jupiter.api.Test
@@ -9,7 +10,7 @@ import java.time.ZoneId
 
 /** zod.kr/deal 마크업 파싱 검증 — 저장된 HTML fixture 기반 회귀 테스트 */
 class ZodClientTest {
-    private val client = ZodClient()
+    private val client = ZodClient(scoophubProperties())
 
     private fun parse(html: String) = client.parse(Jsoup.parse(html))
 

@@ -52,3 +52,5 @@ scoophub:
     google-authorize: ${E2E_STUB_URL:http://127.0.0.1:28089}/google/authorize
     google-token: ${E2E_STUB_URL:http://127.0.0.1:28089}/google/token
     google-userinfo: ${E2E_STUB_URL:http://127.0.0.1:28089}/google/userinfo
+    ppomppu-rss: ${E2E_STUB_URL:http://127.0.0.1:28089}/ppomppu/rss.php
+    zod-deal: ${E2E_STUB_URL:http://127.0.0.1:28089}/zod/deal

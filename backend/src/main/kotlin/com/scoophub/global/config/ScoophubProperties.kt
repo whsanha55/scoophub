@@ -27,6 +27,8 @@ data class ScoophubProperties(
         val googleAuthorize: String = "https://accounts.google.com/o/oauth2/v2/auth",
         val googleToken: String = "https://oauth2.googleapis.com/token",
         val googleUserinfo: String = "https://www.googleapis.com/oauth2/v3/userinfo",
+        val ppomppuRss: String = "https://www.ppomppu.co.kr/rss.php?id=ppomppu",
+        val zodDeal: String = "https://zod.kr/deal",
     )
 
     data class Alpaca(

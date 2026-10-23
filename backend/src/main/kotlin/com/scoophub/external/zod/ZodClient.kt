@@ -1,5 +1,6 @@
 package com.scoophub.external.zod
 
+import com.scoophub.global.config.ScoophubProperties
 import org.jsoup.Jsoup
 import org.jsoup.nodes.Document
 import org.jsoup.nodes.Element
@@ -22,10 +23,11 @@ data class ZodDeal(
 
 /** 알구더(zod.kr/deal) 목록 HTML 스크래핑 (Jsoup). HTML fixture 회귀 테스트로 보호한다 */
 @Component
-class ZodClient {
+class ZodClient(props: ScoophubProperties) {
+    private val dealListUrl = props.endpoints.zodDeal
 
     fun deals(): List<ZodDeal> {
-        val doc: Document = Jsoup.connect(DEAL_LIST_URL)
+        val doc: Document = Jsoup.connect(dealListUrl)
             .userAgent("Mozilla/5.0 (compatible; scoophub/1.0)")
             .timeout(15_000)
             .get()
@@ -86,7 +88,6 @@ class ZodClient {
     }
 
     companion object {
-        private const val DEAL_LIST_URL = "https://zod.kr/deal"
         private const val DEAL_BASE_URL = "https://zod.kr/deal/"
 
         // 게시판의 절대 시각은 사이트 기준 시간대(KST)로 표기된다.

@@ -1,5 +1,6 @@
 package com.scoophub.external.ppomppu
 
+import com.scoophub.global.config.ScoophubProperties
 import org.jsoup.Jsoup
 import org.jsoup.nodes.Element
 import org.jsoup.parser.Parser
@@ -25,11 +26,12 @@ data class PpomppuDeal(
  * 제목 형식: "[몰] 상품명 (가격/배송)". [몰] 이 없으면 제목 전체를 상품명으로 둔다.
  */
 @Component
-class PpomppuClient(restClientBuilder: RestClient.Builder) {
+class PpomppuClient(restClientBuilder: RestClient.Builder, props: ScoophubProperties) {
     private val restClient = restClientBuilder.build()
+    private val rssUrl = props.endpoints.ppomppuRss
 
     fun deals(): List<PpomppuDeal> {
-        val xml = restClient.get().uri(RSS_URL).retrieve().body(String::class.java) ?: return emptyList()
+        val xml = restClient.get().uri(rssUrl).retrieve().body(String::class.java) ?: return emptyList()
         return parse(xml)
     }
 
@@ -89,7 +91,6 @@ class PpomppuClient(restClientBuilder: RestClient.Builder) {
         ?.toLongOrNull()
 
     companion object {
-        private const val RSS_URL = "https://www.ppomppu.co.kr/rss.php?id=ppomppu"
         private const val DEAL_URL = "https://www.ppomppu.co.kr/zboard/view.php?id=ppomppu&no="
         private const val VOTES_INDEX = 2
         private val NO_PARAM = Regex("[?&]no=(\\d+)")
