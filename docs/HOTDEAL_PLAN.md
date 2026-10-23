@@ -1,6 +1,6 @@
 # 핫딜 · 관심도 기반 추천 피드 계획
 
-> 상태: M0~M4 구현 완료, 머지 전 — 에픽 [#271](https://github.com/whsanha55/scoophub/issues/271), PR [#273](https://github.com/whsanha55/scoophub/pull/273).
+> 상태: M0~M4 구현 완료, 2026-10-21 머지 — 에픽 [#271](https://github.com/whsanha55/scoophub/issues/271), PR [#273](https://github.com/whsanha55/scoophub/pull/273).
 > 진행 현황은 16절.
 >
 > 별도 저장소 [feedforge](https://github.com/whsanha55/feedforge)(`docs/PLAN.md` v2)로 시작한 계획을
@@ -666,7 +666,7 @@ API (모두 `@SuperOnly`)
 
 ### 16.5. 남은 일
 
-- [ ] #273 전체 diff 리뷰 후 머지
+- [x] #273 전체 diff 리뷰 후 머지 (2026-10-21)
 - [ ] 운영 배포 후 확인: 뽐뿌 수집 로그(`crawl_logs`), 첫 LLM 판정 결과, 피드 화면
 - [ ] 관찰 후 `hotdeal_notify.enabled` 켜기 (시스템 관리 화면) 와 `web_url` 설정
 - [ ] 뽐뿌 `hits` 세 번째 값을 추천수로 본 가정 확인
